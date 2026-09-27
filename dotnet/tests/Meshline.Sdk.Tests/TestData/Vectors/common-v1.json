@@ -1,0 +1,1205 @@
+{
+  "$type": "meshline.protocol.test-vectors",
+  "protocol_version": "1.0",
+  "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+  "canonical_json": {
+    "vectors": [
+      {
+        "id": "canonical-json-basic",
+        "operation": "canonical_json",
+        "input_json": "{\"z\":\"Meshline\",\"list\":[3,2,1],\"a\":1,\"nested\":{\"b\":true,\"a\":\"text\"}}",
+        "input_utf8_hex": "7b227a223a224d6573686c696e65222c226c697374223a5b332c322c315d2c2261223a312c226e6573746564223a7b2262223a747275652c2261223a2274657874227d7d",
+        "expected": {
+          "canonical_json": "{\"a\":1,\"list\":[3,2,1],\"nested\":{\"a\":\"text\",\"b\":true},\"z\":\"Meshline\"}",
+          "utf8_hex": "7b2261223a312c226c697374223a5b332c322c315d2c226e6573746564223a7b2261223a2274657874222c2262223a747275657d2c227a223a224d6573686c696e65227d",
+          "utf8_base64": "eyJhIjoxLCJsaXN0IjpbMywyLDFdLCJuZXN0ZWQiOnsiYSI6InRleHQiLCJiIjp0cnVlfSwieiI6Ik1lc2hsaW5lIn0=",
+          "sha256_hex": "b3a31484a2a8bfe03a4cd8cc916e583fe9b8b739a53eeec5776867d8278466d7",
+          "sha256_base64url": "s6MUhKKov-A6TNjMkW5YP-m4tzmlPu7Fd2hn2CeEZtc"
+        }
+      },
+      {
+        "id": "canonical-json-rfc8785-unicode",
+        "operation": "canonical_json",
+        "input_json": "{\"z\":\"中文😀\",\"escaped\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\",\"a\":\"ö\"}",
+        "input_utf8_hex": "7b227a223a22e4b8ade69687f09f9880222c2265736361706564223a22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f222c2261223a22c3b6227d",
+        "expected": {
+          "canonical_json": "{\"a\":\"ö\",\"escaped\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\",\"z\":\"中文😀\"}",
+          "utf8_hex": "7b2261223a22c3b6222c2265736361706564223a22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f222c227a223a22e4b8ade69687f09f9880227d",
+          "utf8_base64": "eyJhIjoiw7YiLCJlc2NhcGVkIjoi4oKsJFx1MDAwZlxuQSdCXCJcXFxcXCIvIiwieiI6IuS4reaWh/CfmIAifQ==",
+          "sha256_hex": "c4fa5336467c112ff45e7bb295aa2d1fc4048e004dd1e349e4a0424b9a474dd3",
+          "sha256_base64url": "xPpTNkZ8ES_0XnuylaotH8QEjgBN0eNJ5KBCS5pHTdM"
+        }
+      },
+      {
+        "id": "canonical-json-safe-integer-boundaries",
+        "operation": "canonical_json",
+        "input_json": "{\"zero\":0,\"max\":9007199254740991,\"min\":-9007199254740991}",
+        "input_utf8_hex": "7b227a65726f223a302c226d6178223a393030373139393235343734303939312c226d696e223a2d393030373139393235343734303939317d",
+        "expected": {
+          "canonical_json": "{\"max\":9007199254740991,\"min\":-9007199254740991,\"zero\":0}",
+          "utf8_hex": "7b226d6178223a393030373139393235343734303939312c226d696e223a2d393030373139393235343734303939312c227a65726f223a307d",
+          "utf8_base64": "eyJtYXgiOjkwMDcxOTkyNTQ3NDA5OTEsIm1pbiI6LTkwMDcxOTkyNTQ3NDA5OTEsInplcm8iOjB9",
+          "sha256_hex": "b7b2401ddca2165824e98c61890c0aaec470258d3119dd265d02be9438bf47e6",
+          "sha256_base64url": "t7JAHdyiFlgk6YxhiQwKrsRwJY0xGd0mXQK-lDi_R-Y"
+        }
+      },
+      {
+        "id": "network-bound-json-basic",
+        "operation": "network_bound_json",
+        "input_json": "{\"z\":\"Meshline\",\"list\":[3,2,1],\"a\":1,\"nested\":{\"b\":true,\"a\":\"text\"}}",
+        "input_utf8_hex": "7b227a223a224d6573686c696e65222c226c697374223a5b332c322c315d2c2261223a312c226e6573746564223a7b2262223a747275652c2261223a2274657874227d7d",
+        "expected": {
+          "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"a\":1,\"list\":[3,2,1],\"nested\":{\"a\":\"text\",\"b\":true},\"z\":\"Meshline\"}",
+          "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c2261223a312c226c697374223a5b332c322c315d2c226e6573746564223a7b2261223a2274657874222c2262223a747275657d2c227a223a224d6573686c696e65227d",
+          "utf8_base64": "eyIkY29udGV4dCI6Im5lbzo4NjA4MzMxMDI6MHg1OTc5YmE3OTQzMTY3MmEzOGExOGEzMmNkYzQ4ZmQ3MzE3ODE4YjcwIiwiYSI6MSwibGlzdCI6WzMsMiwxXSwibmVzdGVkIjp7ImEiOiJ0ZXh0IiwiYiI6dHJ1ZX0sInoiOiJNZXNobGluZSJ9",
+          "sha256_hex": "784beb82ee40eebaecd8f658f6e53df286d6be44d2905ad72ed6828426153f0c",
+          "sha256_base64url": "eEvrgu5A7rrs2PZY9uU98obWvkTSkFrXLtaChCYVPww",
+          "network_bound_json_hash": "sha256:eEvrgu5A7rrs2PZY9uU98obWvkTSkFrXLtaChCYVPww"
+        }
+      }
+    ],
+    "rejection_vectors": [
+      {
+        "id": "canonical-json-duplicate-property",
+        "operation": "canonical_json",
+        "input_json": "{\"a\":1,\"a\":2}",
+        "expected": "reject",
+        "reason": "duplicate property name"
+      },
+      {
+        "id": "canonical-json-lone-surrogate",
+        "operation": "canonical_json",
+        "input_json": "{\"value\":\"\\ud800\"}",
+        "expected": "reject",
+        "reason": "invalid Unicode scalar value"
+      },
+      {
+        "id": "canonical-json-negative-zero",
+        "operation": "canonical_json",
+        "input_json": "{\"value\":-0}",
+        "expected": "reject",
+        "reason": "non-canonical integer token"
+      },
+      {
+        "id": "canonical-json-fraction",
+        "operation": "canonical_json",
+        "input_json": "{\"value\":1.0}",
+        "expected": "reject",
+        "reason": "protocol number is not an integer token"
+      },
+      {
+        "id": "canonical-json-exponent",
+        "operation": "canonical_json",
+        "input_json": "{\"value\":1e0}",
+        "expected": "reject",
+        "reason": "protocol number is not an integer token"
+      },
+      {
+        "id": "canonical-json-positive-integer-overflow",
+        "operation": "canonical_json",
+        "input_json": "{\"value\":9007199254740992}",
+        "expected": "reject",
+        "reason": "integer exceeds positive safe range"
+      },
+      {
+        "id": "canonical-json-negative-integer-overflow",
+        "operation": "canonical_json",
+        "input_json": "{\"value\":-9007199254740992}",
+        "expected": "reject",
+        "reason": "integer exceeds negative safe range"
+      }
+    ]
+  },
+  "base64url": {
+    "cases": [
+      {
+        "id": "empty",
+        "input": "",
+        "expected_accepted": true,
+        "decoded_hex": ""
+      },
+      {
+        "id": "one-zero-byte",
+        "input": "AA",
+        "expected_accepted": true,
+        "decoded_hex": "00"
+      },
+      {
+        "id": "two-zero-bytes",
+        "input": "AAA",
+        "expected_accepted": true,
+        "decoded_hex": "0000"
+      },
+      {
+        "id": "three-zero-bytes",
+        "input": "AAAA",
+        "expected_accepted": true,
+        "decoded_hex": "000000"
+      },
+      {
+        "id": "one-ff-byte",
+        "input": "_w",
+        "expected_accepted": true,
+        "decoded_hex": "ff"
+      },
+      {
+        "id": "two-ff-bytes",
+        "input": "__8",
+        "expected_accepted": true,
+        "decoded_hex": "ffff"
+      },
+      {
+        "id": "three-ff-bytes",
+        "input": "____",
+        "expected_accepted": true,
+        "decoded_hex": "ffffff"
+      },
+      {
+        "id": "url-alphabet",
+        "input": "-_8",
+        "expected_accepted": true,
+        "decoded_hex": "fbff"
+      },
+      {
+        "id": "case-sensitive",
+        "input": "aA",
+        "expected_accepted": true,
+        "decoded_hex": "68"
+      },
+      {
+        "id": "nonzero-four-pad-bits",
+        "input": "AB",
+        "expected_accepted": false
+      },
+      {
+        "id": "nonzero-two-pad-bits",
+        "input": "AAB",
+        "expected_accepted": false
+      },
+      {
+        "id": "nonzero-pad-bits-ff",
+        "input": "_x",
+        "expected_accepted": false
+      },
+      {
+        "id": "nonzero-pad-bits-ffff",
+        "input": "__9",
+        "expected_accepted": false
+      },
+      {
+        "id": "padding",
+        "input": "AA==",
+        "expected_accepted": false
+      },
+      {
+        "id": "partial-padding",
+        "input": "AA=",
+        "expected_accepted": false
+      },
+      {
+        "id": "length-one",
+        "input": "A",
+        "expected_accepted": false
+      },
+      {
+        "id": "length-five",
+        "input": "AAAAA",
+        "expected_accepted": false
+      },
+      {
+        "id": "standard-plus",
+        "input": "+w",
+        "expected_accepted": false
+      },
+      {
+        "id": "standard-slash",
+        "input": "/w",
+        "expected_accepted": false
+      },
+      {
+        "id": "newline",
+        "input": "AA\n",
+        "expected_accepted": false
+      },
+      {
+        "id": "leading-space",
+        "input": " AA",
+        "expected_accepted": false
+      },
+      {
+        "id": "embedded-space",
+        "input": "A A",
+        "expected_accepted": false
+      },
+      {
+        "id": "non-ascii",
+        "input": "ＡＡ",
+        "expected_accepted": false
+      },
+      {
+        "id": "nul",
+        "input": "AA\u0000",
+        "expected_accepted": false
+      },
+      {
+        "id": "percent-escape",
+        "input": "AA%3D%3D",
+        "expected_accepted": false
+      },
+      {
+        "id": "device-canonical",
+        "input": "dev_AAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "dev_",
+        "decoded_length": 16,
+        "expected_accepted": true,
+        "decoded_hex": "00000000000000000000000000000000"
+      },
+      {
+        "id": "device-nonzero-pad-bits",
+        "input": "dev_AAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "dev_",
+        "decoded_length": 16,
+        "expected_accepted": false
+      },
+      {
+        "id": "message-canonical",
+        "input": "msg_AAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "msg_",
+        "decoded_length": 16,
+        "expected_accepted": true,
+        "decoded_hex": "00000000000000000000000000000000"
+      },
+      {
+        "id": "message-nonzero-pad-bits",
+        "input": "msg_AAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "msg_",
+        "decoded_length": 16,
+        "expected_accepted": false
+      },
+      {
+        "id": "channel-canonical",
+        "input": "chan_AAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "chan_",
+        "decoded_length": 16,
+        "expected_accepted": true,
+        "decoded_hex": "00000000000000000000000000000000"
+      },
+      {
+        "id": "channel-nonzero-pad-bits",
+        "input": "chan_AAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "chan_",
+        "decoded_length": 16,
+        "expected_accepted": false
+      },
+      {
+        "id": "group-canonical",
+        "input": "grp_AAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "grp_",
+        "decoded_length": 16,
+        "expected_accepted": true,
+        "decoded_hex": "00000000000000000000000000000000"
+      },
+      {
+        "id": "group-nonzero-pad-bits",
+        "input": "grp_AAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "grp_",
+        "decoded_length": 16,
+        "expected_accepted": false
+      },
+      {
+        "id": "invite-canonical",
+        "input": "inv_AAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "inv_",
+        "decoded_length": 16,
+        "expected_accepted": true,
+        "decoded_hex": "00000000000000000000000000000000"
+      },
+      {
+        "id": "invite-nonzero-pad-bits",
+        "input": "inv_AAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "inv_",
+        "decoded_length": 16,
+        "expected_accepted": false
+      },
+      {
+        "id": "digest-canonical",
+        "input": "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "sha256:",
+        "decoded_length": 32,
+        "expected_accepted": true,
+        "decoded_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "id": "digest-nonzero-pad-bits",
+        "input": "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "sha256:",
+        "decoded_length": 32,
+        "expected_accepted": false
+      },
+      {
+        "id": "public-key-canonical",
+        "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "",
+        "decoded_length": 32,
+        "expected_accepted": true,
+        "decoded_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "id": "public-key-nonzero-pad-bits",
+        "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "",
+        "decoded_length": 32,
+        "expected_accepted": false
+      },
+      {
+        "id": "signature-canonical",
+        "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "",
+        "decoded_length": 64,
+        "expected_accepted": true,
+        "decoded_hex": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "id": "signature-nonzero-pad-bits",
+        "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+        "prefix": "",
+        "decoded_length": 64,
+        "expected_accepted": false
+      },
+      {
+        "id": "wrong-prefix",
+        "input": "MSG_AAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "msg_",
+        "decoded_length": 16,
+        "expected_accepted": false
+      },
+      {
+        "id": "wrong-decoded-length",
+        "input": "sha256:AAAAAAAAAAAAAAAAAAAAAA",
+        "prefix": "sha256:",
+        "decoded_length": 32,
+        "expected_accepted": false
+      }
+    ]
+  },
+  "unsigned_varint": {
+    "prefix_cases": [
+      {
+        "id": "zero",
+        "input_hex": "00",
+        "expected_accepted": true,
+        "decoded_value_decimal": "0"
+      },
+      {
+        "id": "one",
+        "input_hex": "01",
+        "expected_accepted": true,
+        "decoded_value_decimal": "1"
+      },
+      {
+        "id": "one-byte-max",
+        "input_hex": "7f",
+        "expected_accepted": true,
+        "decoded_value_decimal": "127"
+      },
+      {
+        "id": "two-byte-min",
+        "input_hex": "8001",
+        "expected_accepted": true,
+        "decoded_value_decimal": "128"
+      },
+      {
+        "id": "two-hundred-fifty-five",
+        "input_hex": "ff01",
+        "expected_accepted": true,
+        "decoded_value_decimal": "255"
+      },
+      {
+        "id": "three-hundred",
+        "input_hex": "ac02",
+        "expected_accepted": true,
+        "decoded_value_decimal": "300"
+      },
+      {
+        "id": "two-byte-max",
+        "input_hex": "ff7f",
+        "expected_accepted": true,
+        "decoded_value_decimal": "16383"
+      },
+      {
+        "id": "three-byte-min",
+        "input_hex": "808001",
+        "expected_accepted": true,
+        "decoded_value_decimal": "16384"
+      },
+      {
+        "id": "one-mib-minus-one",
+        "input_hex": "ffff3f",
+        "expected_accepted": true,
+        "decoded_value_decimal": "1048575"
+      },
+      {
+        "id": "one-mib",
+        "input_hex": "808040",
+        "expected_accepted": true,
+        "decoded_value_decimal": "1048576"
+      },
+      {
+        "id": "one-mib-plus-one",
+        "input_hex": "818040",
+        "expected_accepted": true,
+        "decoded_value_decimal": "1048577"
+      },
+      {
+        "id": "json-safe-integer-max",
+        "input_hex": "ffffffffffffff0f",
+        "expected_accepted": true,
+        "decoded_value_decimal": "9007199254740991"
+      },
+      {
+        "id": "above-json-safe-integer",
+        "input_hex": "8080808080808010",
+        "expected_accepted": true,
+        "decoded_value_decimal": "9007199254740992"
+      },
+      {
+        "id": "eight-byte-max",
+        "input_hex": "ffffffffffffff7f",
+        "expected_accepted": true,
+        "decoded_value_decimal": "72057594037927935"
+      },
+      {
+        "id": "nine-byte-min",
+        "input_hex": "808080808080808001",
+        "expected_accepted": true,
+        "decoded_value_decimal": "72057594037927936"
+      },
+      {
+        "id": "sixty-three-bit-max",
+        "input_hex": "ffffffffffffffff7f",
+        "expected_accepted": true,
+        "decoded_value_decimal": "9223372036854775807"
+      },
+      {
+        "id": "empty-at-eof",
+        "input_hex": "",
+        "expected_accepted": false
+      },
+      {
+        "id": "one-continuation-at-eof",
+        "input_hex": "80",
+        "expected_accepted": false
+      },
+      {
+        "id": "two-continuations-at-eof",
+        "input_hex": "8080",
+        "expected_accepted": false
+      },
+      {
+        "id": "eight-continuations-at-eof",
+        "input_hex": "8080808080808080",
+        "expected_accepted": false
+      },
+      {
+        "id": "non-minimal-zero",
+        "input_hex": "8000",
+        "expected_accepted": false
+      },
+      {
+        "id": "non-minimal-one",
+        "input_hex": "8100",
+        "expected_accepted": false
+      },
+      {
+        "id": "non-minimal-one-byte-max",
+        "input_hex": "ff00",
+        "expected_accepted": false
+      },
+      {
+        "id": "non-minimal-two-byte-min",
+        "input_hex": "808100",
+        "expected_accepted": false
+      },
+      {
+        "id": "non-minimal-one-mib",
+        "input_hex": "8080c000",
+        "expected_accepted": false
+      },
+      {
+        "id": "non-minimal-nine-byte-one",
+        "input_hex": "818080808080808000",
+        "expected_accepted": false
+      },
+      {
+        "id": "ninth-byte-continues",
+        "input_hex": "808080808080808080",
+        "expected_accepted": false
+      },
+      {
+        "id": "ten-byte-zero",
+        "input_hex": "80808080808080808000",
+        "expected_accepted": false
+      },
+      {
+        "id": "sixty-four-bit-min",
+        "input_hex": "80808080808080808001",
+        "expected_accepted": false
+      },
+      {
+        "id": "sixty-four-bit-max",
+        "input_hex": "ffffffffffffffffff01",
+        "expected_accepted": false
+      },
+      {
+        "id": "ten-continuations",
+        "input_hex": "ffffffffffffffffffff",
+        "expected_accepted": false
+      }
+    ],
+    "length_limit_cases": [
+      {
+        "id": "zero-at-one-mib-limit",
+        "prefix_case": "zero",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "one-at-one-mib-limit",
+        "prefix_case": "one",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "one-byte-max-at-one-mib-limit",
+        "prefix_case": "one-byte-max",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "two-byte-min-at-one-mib-limit",
+        "prefix_case": "two-byte-min",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "two-hundred-fifty-five-at-one-mib-limit",
+        "prefix_case": "two-hundred-fifty-five",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "three-hundred-at-one-mib-limit",
+        "prefix_case": "three-hundred",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "two-byte-max-at-one-mib-limit",
+        "prefix_case": "two-byte-max",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "three-byte-min-at-one-mib-limit",
+        "prefix_case": "three-byte-min",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "one-mib-minus-one-at-one-mib-limit",
+        "prefix_case": "one-mib-minus-one",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "one-mib-at-one-mib-limit",
+        "prefix_case": "one-mib",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": true
+      },
+      {
+        "id": "one-mib-plus-one-at-one-mib-limit",
+        "prefix_case": "one-mib-plus-one",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": false
+      },
+      {
+        "id": "json-safe-integer-max-at-one-mib-limit",
+        "prefix_case": "json-safe-integer-max",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": false
+      },
+      {
+        "id": "above-json-safe-integer-at-one-mib-limit",
+        "prefix_case": "above-json-safe-integer",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": false
+      },
+      {
+        "id": "eight-byte-max-at-one-mib-limit",
+        "prefix_case": "eight-byte-max",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": false
+      },
+      {
+        "id": "nine-byte-min-at-one-mib-limit",
+        "prefix_case": "nine-byte-min",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": false
+      },
+      {
+        "id": "sixty-three-bit-max-at-one-mib-limit",
+        "prefix_case": "sixty-three-bit-max",
+        "max_payload_bytes": 1048576,
+        "expected_within_limit": false
+      }
+    ]
+  },
+  "object_types": {
+    "scope": "Type selection and cryptographic type binding only. Transport authentication, permissions, full object validation and state transitions remain separate checks. Successor names are unknown test inputs, not definitions of new protocol types.",
+    "supported_content_types": {
+      "meshline.account.contacts.sync": "AccountContactSync",
+      "meshline.account.group.state.request": "AccountGroupPrivateStateRequest"
+    },
+    "content_type_cases": [
+      {
+        "name": "contacts_sync_without_format_field",
+        "input_json": "{\"$type\":\"meshline.account.contacts.sync\"}",
+        "expected": "AccountContactSync"
+      },
+      {
+        "name": "group_state_request_without_format_field",
+        "input_json": "{\"$type\":\"meshline.account.group.state.request\"}",
+        "expected": "AccountGroupPrivateStateRequest"
+      },
+      {
+        "name": "known_type_with_compatible_extension",
+        "input_json": "{\"$type\":\"meshline.account.contacts.sync\",\"future_data\":{\"note\":\"preserve\"}}",
+        "expected": "AccountContactSync"
+      },
+      {
+        "name": "unknown_successor",
+        "input_json": "{\"$type\":\"meshline.account.contacts.sync.v2\"}",
+        "expected": "unsupported_type"
+      },
+      {
+        "name": "no_implicit_v1_alias",
+        "input_json": "{\"$type\":\"meshline.account.contacts.sync.v1\"}",
+        "expected": "unsupported_type"
+      },
+      {
+        "name": "case_sensitive",
+        "input_json": "{\"$type\":\"Meshline.account.contacts.sync\"}",
+        "expected": "unsupported_type"
+      },
+      {
+        "name": "prefix_is_not_a_type",
+        "input_json": "{\"$type\":\"meshline.account.contacts\"}",
+        "expected": "unsupported_type"
+      },
+      {
+        "name": "suffix_is_not_a_type",
+        "input_json": "{\"$type\":\"meshline.account.contacts.sync.extra\"}",
+        "expected": "unsupported_type"
+      },
+      {
+        "name": "missing_type",
+        "input_json": "{}",
+        "expected": "invalid_type"
+      },
+      {
+        "name": "null_type",
+        "input_json": "{\"$type\":null}",
+        "expected": "invalid_type"
+      },
+      {
+        "name": "numeric_type",
+        "input_json": "{\"$type\":1}",
+        "expected": "invalid_type"
+      },
+      {
+        "name": "ordinary_type_is_not_an_alias",
+        "input_json": "{\"type\":\"meshline.account.contacts.sync\"}",
+        "expected": "invalid_type"
+      },
+      {
+        "name": "ordinary_type_does_not_override_reserved_type",
+        "input_json": "{\"$type\":\"meshline.account.contacts.sync\",\"type\":\"meshline.account.group.state.request\"}",
+        "expected": "AccountContactSync",
+        "expected_preserved_fields": {
+          "type": "meshline.account.group.state.request"
+        }
+      }
+    ],
+    "signed_envelope": {
+      "public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+      "envelope": {
+        "$type": "meshline.message.envelope",
+        "message_id": "msg_ICEiIyQlJicoKSorLC0uLw",
+        "created_at": 1730000000,
+        "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "from_device_id": "dev_AAECAwQFBgcICQoLDA0ODw",
+        "to": "neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn",
+        "payload": {
+          "alg": "AES-256-GCM",
+          "nonce": "4eLj5OXm5-jp6uvs",
+          "ciphertext": "xA6lGmZ1_pn1PvkgeQw3NnY_hKhuQL-YeVFRndhAnp-SZMUHT4gMwTcEbNnIW_dmdMFD4NCGOOqeG_X39AelPWfgsbmNY_7_Xl3Qki0EgniY6Uokx9kehOHQT36yuYbKK66QawM9UwMqwYhjupZcCw"
+        },
+        "device_signature": "F2zpznueI8b_4TlHesB-8jRMuP-co0GGrKgmHkpkmNCLHowb0DQESmQaF44cJlBl6dO_lk0HRKvNNxSM_HcMAg"
+      },
+      "cases": [
+        {
+          "name": "original",
+          "expected_signature_valid": true
+        },
+        {
+          "name": "changed_to_unknown_successor",
+          "type_override": "meshline.message.envelope.v2",
+          "expected_signature_valid": false
+        },
+        {
+          "name": "changed_to_another_known_type",
+          "type_override": "meshline.group.message",
+          "expected_signature_valid": false
+        },
+        {
+          "name": "type_removed",
+          "remove_type": true,
+          "expected_signature_valid": false
+        }
+      ]
+    },
+    "message_authentication": {
+      "content_key": "wcLDxMXGx8jJysvMzc7P0NHS09TV1tfY2drb3N3e3-A",
+      "envelope_ref": "/object_types/signed_envelope/envelope",
+      "plaintext_utf8_hex": "7b222474797065223a226d6573686c696e652e6d6573736167652e646972656374222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f706c61696e222c2274657874223a22766563746f72206d657373616765227d7d",
+      "cases": [
+        {
+          "name": "original_aad_type",
+          "expected_authenticated": true
+        },
+        {
+          "name": "changed_aad_type",
+          "aad_type_override": "meshline.message.aad.v2",
+          "expected_authenticated": false
+        },
+        {
+          "name": "missing_aad_type",
+          "remove_aad_type": true,
+          "expected_authenticated": false
+        }
+      ]
+    }
+  },
+  "network_binding": {
+    "scope": "Canonical context validation and network-bound input construction only. Signature context cases verify the given signature under the candidate trusted context; full schema, account-network and authorization checks remain separate. Test rejection labels are not protocol error codes.",
+    "format_cases": [
+      {
+        "name": "current",
+        "input": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": true
+      },
+      {
+        "name": "zero_network",
+        "input": "neo:0:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": true
+      },
+      {
+        "name": "maximum_network",
+        "input": "neo:4294967295:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": true
+      },
+      {
+        "name": "zero_registry",
+        "input": "neo:860833102:0x0000000000000000000000000000000000000000",
+        "expected_accepted": true
+      },
+      {
+        "name": "leading_zero",
+        "input": "neo:0860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "zero_with_leading_zero",
+        "input": "neo:00:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "negative_network",
+        "input": "neo:-1:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "explicit_plus",
+        "input": "neo:+1:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "overflow_network",
+        "input": "neo:4294967296:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "exponent_network",
+        "input": "neo:1e3:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "decimal_network",
+        "input": "neo:1.0:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "uppercase_chain",
+        "input": "NEO:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "unsupported_chain",
+        "input": "eth:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "uppercase_registry",
+        "input": "neo:860833102:0X5979BA79431672A38A18A32CDC48FD7317818B70",
+        "expected_accepted": false
+      },
+      {
+        "name": "short_registry",
+        "input": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b7",
+        "expected_accepted": false
+      },
+      {
+        "name": "long_registry",
+        "input": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b700",
+        "expected_accepted": false
+      },
+      {
+        "name": "invalid_registry_hex",
+        "input": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b7g",
+        "expected_accepted": false
+      },
+      {
+        "name": "leading_space",
+        "input": " neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "trailing_space",
+        "input": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70 ",
+        "expected_accepted": false
+      },
+      {
+        "name": "trailing_newline",
+        "input": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\n",
+        "expected_accepted": false
+      },
+      {
+        "name": "non_ascii_digit",
+        "input": "neo:１:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "expected_accepted": false
+      },
+      {
+        "name": "empty",
+        "input": "",
+        "expected_accepted": false
+      },
+      {
+        "name": "null",
+        "input": null,
+        "expected_accepted": false
+      },
+      {
+        "name": "numeric",
+        "input": 860833102,
+        "expected_accepted": false
+      }
+    ],
+    "binding_cases": [
+      {
+        "name": "wire_envelope",
+        "operation": "device_signature",
+        "input_json": "{\"$type\":\"meshline.message.envelope\",\"created_at\":1730000000,\"device_signature\":\"F2zpznueI8b_4TlHesB-8jRMuP-co0GGrKgmHkpkmNCLHowb0DQESmQaF44cJlBl6dO_lk0HRKvNNxSM_HcMAg\",\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"from_device_id\":\"dev_AAECAwQFBgcICQoLDA0ODw\",\"message_id\":\"msg_ICEiIyQlJicoKSorLC0uLw\",\"payload\":{\"alg\":\"AES-256-GCM\",\"ciphertext\":\"xA6lGmZ1_pn1PvkgeQw3NnY_hKhuQL-YeVFRndhAnp-SZMUHT4gMwTcEbNnIW_dmdMFD4NCGOOqeG_X39AelPWfgsbmNY_7_Xl3Qki0EgniY6Uokx9kehOHQT36yuYbKK66QawM9UwMqwYhjupZcCw\",\"nonce\":\"4eLj5OXm5-jp6uvs\"},\"to\":\"neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn\"}",
+        "expected": "accepted",
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.message.envelope\",\"created_at\":1730000000,\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"from_device_id\":\"dev_AAECAwQFBgcICQoLDA0ODw\",\"message_id\":\"msg_ICEiIyQlJicoKSorLC0uLw\",\"payload\":{\"alg\":\"AES-256-GCM\",\"ciphertext\":\"xA6lGmZ1_pn1PvkgeQw3NnY_hKhuQL-YeVFRndhAnp-SZMUHT4gMwTcEbNnIW_dmdMFD4NCGOOqeG_X39AelPWfgsbmNY_7_Xl3Qki0EgniY6Uokx9kehOHQT36yuYbKK66QawM9UwMqwYhjupZcCw\",\"nonce\":\"4eLj5OXm5-jp6uvs\"},\"to\":\"neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6d6573736167652e656e76656c6f7065222c22637265617465645f6174223a313733303030303030302c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c2266726f6d5f6465766963655f6964223a226465765f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f6964223a226d73675f494345694979516c4a69636f4b536f724c4330754c77222c227061796c6f6164223a7b22616c67223a224145532d3235362d47434d222c2263697068657274657874223a227841366c476d5a315f706e3150766b67655177334e6e595f684b6875514c2d59655646526e6468416e702d535a4d55485434674d77546345624e6e49575f646d644d4644344e43474f4f7165475f58333941656c5057666773626d4e595f375f586c33516b693045676e695936556f6b78396b65684f4851543336797559624b4b36365161774d3955774d717759686a75705a634377222c226e6f6e6365223a2234654c6a354f586d352d6a7036757673227d2c22746f223a226e656f3a3836303833333130323a4e51346477437579526e356f65726d646f6867773367577559446d7154395665646e227d",
+        "sha256_hex": "e95ca1e36227fa1f30ee4a2322b1aa9df84c27a51f1a818becaf6e6846dc6c1d"
+      },
+      {
+        "name": "wire_root_context_matching",
+        "operation": "device_signature",
+        "input_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.message.envelope\",\"created_at\":1730000000,\"device_signature\":\"F2zpznueI8b_4TlHesB-8jRMuP-co0GGrKgmHkpkmNCLHowb0DQESmQaF44cJlBl6dO_lk0HRKvNNxSM_HcMAg\",\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"from_device_id\":\"dev_AAECAwQFBgcICQoLDA0ODw\",\"message_id\":\"msg_ICEiIyQlJicoKSorLC0uLw\",\"payload\":{\"alg\":\"AES-256-GCM\",\"ciphertext\":\"xA6lGmZ1_pn1PvkgeQw3NnY_hKhuQL-YeVFRndhAnp-SZMUHT4gMwTcEbNnIW_dmdMFD4NCGOOqeG_X39AelPWfgsbmNY_7_Xl3Qki0EgniY6Uokx9kehOHQT36yuYbKK66QawM9UwMqwYhjupZcCw\",\"nonce\":\"4eLj5OXm5-jp6uvs\"},\"to\":\"neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn\"}",
+        "expected": "forbidden_wire_context"
+      },
+      {
+        "name": "wire_root_context_foreign",
+        "operation": "device_signature",
+        "input_json": "{\"$context\":\"neo:860833103:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.message.envelope\",\"created_at\":1730000000,\"device_signature\":\"F2zpznueI8b_4TlHesB-8jRMuP-co0GGrKgmHkpkmNCLHowb0DQESmQaF44cJlBl6dO_lk0HRKvNNxSM_HcMAg\",\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"from_device_id\":\"dev_AAECAwQFBgcICQoLDA0ODw\",\"message_id\":\"msg_ICEiIyQlJicoKSorLC0uLw\",\"payload\":{\"alg\":\"AES-256-GCM\",\"ciphertext\":\"xA6lGmZ1_pn1PvkgeQw3NnY_hKhuQL-YeVFRndhAnp-SZMUHT4gMwTcEbNnIW_dmdMFD4NCGOOqeG_X39AelPWfgsbmNY_7_Xl3Qki0EgniY6Uokx9kehOHQT36yuYbKK66QawM9UwMqwYhjupZcCw\",\"nonce\":\"4eLj5OXm5-jp6uvs\"},\"to\":\"neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn\"}",
+        "expected": "forbidden_wire_context"
+      },
+      {
+        "name": "wire_root_context_null",
+        "operation": "device_signature",
+        "input_json": "{\"$context\":null,\"$type\":\"meshline.message.envelope\",\"created_at\":1730000000,\"device_signature\":\"F2zpznueI8b_4TlHesB-8jRMuP-co0GGrKgmHkpkmNCLHowb0DQESmQaF44cJlBl6dO_lk0HRKvNNxSM_HcMAg\",\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"from_device_id\":\"dev_AAECAwQFBgcICQoLDA0ODw\",\"message_id\":\"msg_ICEiIyQlJicoKSorLC0uLw\",\"payload\":{\"alg\":\"AES-256-GCM\",\"ciphertext\":\"xA6lGmZ1_pn1PvkgeQw3NnY_hKhuQL-YeVFRndhAnp-SZMUHT4gMwTcEbNnIW_dmdMFD4NCGOOqeG_X39AelPWfgsbmNY_7_Xl3Qki0EgniY6Uokx9kehOHQT36yuYbKK66QawM9UwMqwYhjupZcCw\",\"nonce\":\"4eLj5OXm5-jp6uvs\"},\"to\":\"neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn\"}",
+        "expected": "forbidden_wire_context"
+      },
+      {
+        "name": "preserve_nested_certificate_signatures",
+        "operation": "account_signature",
+        "input_json": "{\"$type\":\"meshline.account.device.state\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"account_signature\":\"Bd6VRm84aMSVXoeqBqKlYiuO1DpApc32GJ_luTuuc0FiL4_HfNnkHbKu68Mi6sSkU4u9KR1K_5ZoRcZ3Ng5B3Q\",\"certificates\":[{\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"account_signature\":\"mo-mvcl2j1RwgZOYVYxao1W8xZhmFIGvX-8GVHkMJHJhlnQSqNaLnZSmEhavG2XlwcTS8jBSQJzb0TVXZZHjSg\",\"device_signature\":\"PGtQXsbhFoSpm6RRMis4NGdOpGQJJEqn4CxW9PsVpEjVi9v0CrOTtBZpl6MpZkCQg2Sb0hDvhyfNNbiRaqO0Bg\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}],\"revision\":1}",
+        "expected": "accepted",
+        "nested_protocol_object_paths": [
+          [
+            "certificates",
+            0
+          ]
+        ],
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.account.device.state\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"certificates\":[{\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"account_signature\":\"mo-mvcl2j1RwgZOYVYxao1W8xZhmFIGvX-8GVHkMJHJhlnQSqNaLnZSmEhavG2XlwcTS8jBSQJzb0TVXZZHjSg\",\"device_signature\":\"PGtQXsbhFoSpm6RRMis4NGdOpGQJJEqn4CxW9PsVpEjVi9v0CrOTtBZpl6MpZkCQg2Sb0hDvhyfNNbiRaqO0Bg\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}],\"revision\":1}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6163636f756e742e6465766963652e7374617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c22636572746966696361746573223a5b7b222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226163636f756e745f7369676e6174757265223a226d6f2d6d76636c326a315277675a4f59565978616f315738785a686d46494776582d384756486b4d4a484a686c6e5153714e614c6e5a536d456861764732586c77635453386a4253514a7a62305456585a5a486a5367222c226465766963655f7369676e6174757265223a225047745158736268466f53706d3652524d6973344e47644f7047514a4a45716e344378573950735670456a566939763043724f5474425a706c364d705a6b435167325362306844766879664e4e62695261714f304267222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d5d2c227265766973696f6e223a317d",
+        "sha256_hex": "08773ec420b710e494feeeff19f4d586babc4ea651fa4e728a5027f796d2bd54"
+      },
+      {
+        "name": "nested_protocol_object_context",
+        "operation": "account_signature",
+        "input_json": "{\"$type\":\"meshline.account.device.state\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"account_signature\":\"Bd6VRm84aMSVXoeqBqKlYiuO1DpApc32GJ_luTuuc0FiL4_HfNnkHbKu68Mi6sSkU4u9KR1K_5ZoRcZ3Ng5B3Q\",\"certificates\":[{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"account_signature\":\"mo-mvcl2j1RwgZOYVYxao1W8xZhmFIGvX-8GVHkMJHJhlnQSqNaLnZSmEhavG2XlwcTS8jBSQJzb0TVXZZHjSg\",\"device_signature\":\"PGtQXsbhFoSpm6RRMis4NGdOpGQJJEqn4CxW9PsVpEjVi9v0CrOTtBZpl6MpZkCQg2Sb0hDvhyfNNbiRaqO0Bg\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}],\"revision\":1}",
+        "expected": "forbidden_wire_context",
+        "nested_protocol_object_paths": [
+          [
+            "certificates",
+            0
+          ]
+        ]
+      },
+      {
+        "name": "explicit_local_context_once",
+        "operation": "local_input",
+        "input_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.dht.resource.account.route\",\"resource_id\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\"}",
+        "expected": "accepted",
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.dht.resource.account.route\",\"resource_id\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6468742e7265736f757263652e6163636f756e742e726f757465222c227265736f757263655f6964223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070227d",
+        "sha256_hex": "8f4b67c88c18a568d587650245d21d3b4fd4ef73dcca9c4e6f7ef67557e37cbc"
+      },
+      {
+        "name": "explicit_local_context_mismatch",
+        "operation": "local_input",
+        "input_json": "{\"$context\":\"neo:860833102:0x0000000000000000000000000000000000000000\",\"$type\":\"meshline.dht.resource.account.route\",\"resource_id\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\"}",
+        "expected": "context_mismatch"
+      }
+    ],
+    "signature_context": {
+      "public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+      "envelope_ref": "/object_types/signed_envelope/envelope",
+      "cases": [
+        {
+          "name": "original",
+          "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+          "expected_signature_valid": true
+        },
+        {
+          "name": "different_network",
+          "candidate_network_context": "neo:860833103:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+          "expected_signature_valid": false
+        },
+        {
+          "name": "different_registry",
+          "candidate_network_context": "neo:860833102:0x0000000000000000000000000000000000000000",
+          "expected_signature_valid": false
+        }
+      ]
+    }
+  },
+  "x25519": {
+    "scope": "X25519 shared-secret validation before key-box HKDF; primitive-only inputs do not use a network context.",
+    "cases": [
+      {
+        "name": "rfc7748_alice_to_bob",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08",
+        "expected_raw_shared_secret": "Sl2dW6TOLeFyjjv0gDUPJeB-IclH0Z4zdvCbPB4WF0I",
+        "expected_accepted": true
+      },
+      {
+        "name": "rfc7748_bob_to_alice",
+        "private_key": "XasIfmJKikt54X-Lg4AO5m87sSkmGLb9HC-LJ_-I4Os",
+        "peer_public_key": "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo",
+        "expected_raw_shared_secret": "Sl2dW6TOLeFyjjv0gDUPJeB-IclH0Z4zdvCbPB4WF0I",
+        "expected_accepted": true
+      },
+      {
+        "name": "reject_zero",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_raw_shared_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_accepted": false
+      },
+      {
+        "name": "reject_one",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_raw_shared_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_accepted": false
+      },
+      {
+        "name": "reject_p_minus_one",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "7P_______________________________________38",
+        "expected_raw_shared_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_accepted": false
+      },
+      {
+        "name": "reject_p",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "7f_______________________________________38",
+        "expected_raw_shared_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_accepted": false
+      },
+      {
+        "name": "reject_p_plus_one",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "7v_______________________________________38",
+        "expected_raw_shared_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_accepted": false
+      },
+      {
+        "name": "reject_zero_high_bit",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+        "expected_raw_shared_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_accepted": false
+      },
+      {
+        "name": "reject_one_high_bit",
+        "private_key": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo",
+        "peer_public_key": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+        "expected_raw_shared_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "expected_accepted": false
+      }
+    ]
+  },
+  "encrypted_payload": {
+    "scope": "Structural EncryptedPayload validation only. Start with encrypted_payload.input in this file. A missing path is created for set; remove deletes it. These cases do not assert AEAD or JSON business validity. Invalid containers are rejected as bad_request before acceptance; no legacy top-level ciphertext substitute is defined.",
+    "input": {
+      "alg": "AES-256-GCM",
+      "nonce": "fgjv9ieuFGzt_zIM",
+      "ciphertext": "aJC1no4MdbJYN9q2PZmm9gEP6FvYC0XNCDXkDoRKLHrZImbHvize_cXRkRdSXRpvnwjl6njcYDvhXJd9Sx9loj7-aiaKc13vajFNempi-jG_DvqUHAXK9LctdB5QzYBDfYbW_8X9CnUbBE1Q7BtlvPhvqnBdp6eCXsTuE0lPNlMsfa2rAMrIc7vCM1Lma-niZrzkPxSt_ijojymMyA7OtoP609eCoHd8FDCGt1F0IDQtuqCRhX14CI3e0GFAmVy9C4s7V0Gdp8GU9aoGuLzbbwDFsAx2MCIT3k6W3J9x8kqB5OoaosiEZO_ucdq-KzIKYmrAz1Mapw2w5J_9IlkAfOqeMJw8kxGve7rzyiIU1Ht9S6peGz84Q6_05uR9ba56DD7E23WS8nuLEPc-WIPu31T5r3XI2p7E3q-r5oJc2YFQBGSE1NKxPi1YIBlju6CSYlM6ovnXRxHNlNKZG-2xGC6qCSTDpGLAtWLlhzuh5o4UOanxYp3kWkpuHHHEr3nSOwGVduEVmNcK61W0Xlg4FA9pXL43sw73Pb4b3WYTYF8R0aTTHywBGHHHuDqZaV8RTtjCITfTVWBX"
+    },
+    "cases": [
+      {
+        "name": "valid",
+        "expected_valid": true
+      },
+      {
+        "name": "missing",
+        "path": [],
+        "remove": true,
+        "expected_valid": false
+      },
+      {
+        "name": "null",
+        "path": [],
+        "value": null,
+        "expected_valid": false
+      },
+      {
+        "name": "string",
+        "path": [],
+        "value": "ciphertext",
+        "expected_valid": false
+      },
+      {
+        "name": "array",
+        "path": [],
+        "value": [],
+        "expected_valid": false
+      },
+      {
+        "name": "missing_alg",
+        "path": [
+          "alg"
+        ],
+        "remove": true,
+        "expected_valid": false
+      },
+      {
+        "name": "unknown_alg",
+        "path": [
+          "alg"
+        ],
+        "value": "AES-128-GCM",
+        "expected_valid": false
+      },
+      {
+        "name": "missing_nonce",
+        "path": [
+          "nonce"
+        ],
+        "remove": true,
+        "expected_valid": false
+      },
+      {
+        "name": "null_nonce",
+        "path": [
+          "nonce"
+        ],
+        "value": null,
+        "expected_valid": false
+      },
+      {
+        "name": "nonce_11_bytes",
+        "path": [
+          "nonce"
+        ],
+        "value": "AAAAAAAAAAAAAAA",
+        "expected_valid": false
+      },
+      {
+        "name": "nonce_13_bytes",
+        "path": [
+          "nonce"
+        ],
+        "value": "AAAAAAAAAAAAAAAAAA",
+        "expected_valid": false
+      },
+      {
+        "name": "padded_nonce",
+        "path": [
+          "nonce"
+        ],
+        "value": "fgjv9ieuFGzt_zIM=",
+        "expected_valid": false
+      },
+      {
+        "name": "missing_ciphertext",
+        "path": [
+          "ciphertext"
+        ],
+        "remove": true,
+        "expected_valid": false
+      },
+      {
+        "name": "null_ciphertext",
+        "path": [
+          "ciphertext"
+        ],
+        "value": null,
+        "expected_valid": false
+      },
+      {
+        "name": "short_tag",
+        "path": [
+          "ciphertext"
+        ],
+        "value": "AAAAAAAAAAAAAAAAAAAA",
+        "expected_valid": false
+      },
+      {
+        "name": "tag_only_structurally_valid",
+        "path": [
+          "ciphertext"
+        ],
+        "value": "AAAAAAAAAAAAAAAAAAAAAA",
+        "expected_valid": true
+      }
+    ]
+  }
+}

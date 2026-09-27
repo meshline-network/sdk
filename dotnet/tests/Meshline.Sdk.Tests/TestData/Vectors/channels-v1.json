@@ -1,0 +1,946 @@
+{
+  "$type": "meshline.protocol.test-vectors",
+  "protocol_version": "1.0",
+  "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+  "channel_id": {
+    "id": "channel-id-v1",
+    "operation": "channel_id",
+    "input": {
+      "nonce": "EBESExQVFhcYGRobHB0eHw",
+      "creator": "neo:860833102:NUz6PKTAM7NbPJzkKJFNay3VckQtcDkgWo",
+      "relay_id": "0x0123456789abcdef0123456789abcdef01234567"
+    },
+    "expected": {
+      "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.channel.identity\",\"creator\":\"neo:860833102:NUz6PKTAM7NbPJzkKJFNay3VckQtcDkgWo\",\"nonce\":\"EBESExQVFhcYGRobHB0eHw\",\"relay_id\":\"0x0123456789abcdef0123456789abcdef01234567\"}",
+      "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e6964656e74697479222c2263726561746f72223a226e656f3a3836303833333130323a4e557a36504b54414d374e62504a7a6b4b4a464e61793356636b517463446b67576f222c226e6f6e6365223a2245424553457851564668635947526f62484230654877222c2272656c61795f6964223a22307830313233343536373839616263646566303132333435363738396162636465663031323334353637227d",
+      "utf8_base64": "eyIkY29udGV4dCI6Im5lbzo4NjA4MzMxMDI6MHg1OTc5YmE3OTQzMTY3MmEzOGExOGEzMmNkYzQ4ZmQ3MzE3ODE4YjcwIiwiJHR5cGUiOiJtZXNobGluZS5jaGFubmVsLmlkZW50aXR5IiwiY3JlYXRvciI6Im5lbzo4NjA4MzMxMDI6TlV6NlBLVEFNN05iUEp6a0tKRk5heTNWY2tRdGNEa2dXbyIsIm5vbmNlIjoiRUJFU0V4UVZGaGNZR1JvYkhCMGVIdyIsInJlbGF5X2lkIjoiMHgwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3In0=",
+      "sha256_hex": "5ba2fed5c523af1ca844f49ab24e545b2491b9e4e74fdb16db2278d16ca8a902",
+      "sha256_base64url": "W6L-1cUjrxyoRPSask5UWySRueTnT9sW2yJ40WyoqQI",
+      "channel_id": "chan_W6L-1cUjrxyoRPSask5UWw"
+    }
+  },
+  "media": {
+    "plaintext_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+    "reference": {
+      "uri": "https://example.com/one-pixel.png",
+      "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+      "content_type": "image/png",
+      "size": 68
+    }
+  },
+  "channel_signer": {
+    "private_key": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A",
+    "public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc"
+  },
+  "channel_write_cases": [
+    {
+      "name": "post_markdown_and_image",
+      "request": {
+        "$type": "meshline.channel.post",
+        "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+        "message_id": "msg_AAECAwQFBgcICQoLDA0ODw",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "## 更新公告\n\n今天发布了 **新版本**。"
+        },
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "device_signature": "6KrZ0lrEGe1FSuifau0EUyKQB3AMLE-fhxhD1fo-EboobrQPiY7Az5PkDdMVuE04v96MYLaazbqtEqb0HhG2Bw"
+      },
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f7374222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36382c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a22232320e69bb4e696b0e585ace5918a5c6e5c6ee4bb8ae5a4a9e58f91e5b883e4ba86202a2ae696b0e78988e69cac2a2ae38082227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f6964223a226d73675f41414543417751464267634943516f4c4441304f4477227d"
+    },
+    {
+      "name": "post_image_only",
+      "request": {
+        "$type": "meshline.channel.post",
+        "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+        "message_id": "msg_EBESExQVFhcYGRobHB0eHw",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "device_signature": "qPUBTyB4MdHYlf919h6bL9r_FDgsWleUcoTnl3TUbY7i92FB44M7bv6yChzr9jmZ7DhUA3Sn8L7ZQWeu9b_6AA"
+      },
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f7374222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36382c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67227d5d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f6964223a226d73675f45424553457851564668635947526f62484230654877227d"
+    },
+    {
+      "name": "edit_to_text_only",
+      "request": {
+        "$type": "meshline.channel.post.edit",
+        "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+        "target_sequence": 1,
+        "body": {
+          "content_type": "text/plain",
+          "text": "图像已更新。"
+        },
+        "attachments": null,
+        "device_signature": "uGgUc3Frm5bltq2gSJXswmKai5LKHnmK2qSltS8pDR16DlPSbTwbdAT0F3Z-0rNASoWAD3NxDwuEwQKzaxgLDQ"
+      },
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a6e756c6c2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f706c61696e222c2274657874223a22e59bbee5838fe5b7b2e69bb4e696b0e38082227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d"
+    },
+    {
+      "name": "edit_to_image_only",
+      "request": {
+        "$type": "meshline.channel.post.edit",
+        "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+        "target_sequence": 1,
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "body": null,
+        "device_signature": "7nuWB95deV5JGPrxTAX4W_gc2eVtvcsDS9AlMvpSrDuuhhuprfJSoxZ5-M8eqVetohGdSQ7-tWZjmo1WZqFUCQ"
+      },
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36382c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67227d5d2c22626f6479223a6e756c6c2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d"
+    },
+    {
+      "name": "post_with_hash_reference",
+      "request": {
+        "$type": "meshline.channel.post",
+        "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+        "message_id": "msg_0NDQ0NDQ0NDQ0NDQ0NDQ0A",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "现场照片：\n\n![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)\n\n[下载说明](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+        },
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "device_signature": "xftsn10O6GU4rW9q-hJ3iQkveUjCOy951DWtgc39u8tNu_4Qqw-pJ0TcpYvEd8NzJn4DmRgA6ayEei2Q6iyDCw"
+      },
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f7374222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36382c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67227d2c7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a22e78eb0e59cbae785a7e78987efbc9a5c6e5c6e215be78eb0e59cbae785a7e789875d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255295c6e5c6e5be4b88be8bdbde8afb4e6988e5d286e693a2f2f2f7368612d3235363b71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b417329227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f6964223a226d73675f304e4451304e4451304e4451304e4451304e44513041227d"
+    },
+    {
+      "name": "edit_reorder_preserves_hash_reference",
+      "request": {
+        "$type": "meshline.channel.post.edit",
+        "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "现场照片：\n\n![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)\n\n[下载说明](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+        },
+        "attachments": [
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          },
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "target_sequence": 1,
+        "device_signature": "BtG97W82p3xvHUGyz3nccBMw2KBChcNJ4NArgTm8mPh3Hj0iPsKC4ryE0U3vT3LmQ-kyQhd1aZjpbUhD0xxtAw"
+      },
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d2c7b22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36382c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a22e78eb0e59cbae785a7e78987efbc9a5c6e5c6e215be78eb0e59cbae785a7e789875d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255295c6e5c6e5be4b88be8bdbde8afb4e6988e5d286e693a2f2f2f7368612d3235363b71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b417329227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d"
+    },
+    {
+      "name": "edit_removes_image_and_reference",
+      "request": {
+        "$type": "meshline.channel.post.edit",
+        "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "[下载说明](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+        },
+        "attachments": [
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "target_sequence": 1,
+        "device_signature": "6tF4MTjD7TkRR8n_SEaNF3NR2AuWC-rSyzclMvIx80QGEBr00bU_RdneC0uzboWGRaXPh_gu1Vm319_Ks81bBw"
+      },
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be4b88be8bdbde8afb4e6988e5d286e693a2f2f2f7368612d3235363b71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b417329227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d"
+    }
+  ],
+  "channel_edit_sequences": [
+    {
+      "name": "omitted_attachments_keep_current_set",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "device_signature": "mZSzUQhMA5sdaCSc-IU26_fC5zLcrX6PmNOjefT9lB-xLnRPMRkPYXne3W7OHhKt4SrZcmrE6xwVrVA6t8S3CQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/one-pixel.png",
+                "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+                "content_type": "image/png",
+                "size": 68
+              },
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "resolved",
+                "index": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "replacement_then_omission_uses_latest_set",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "device_signature": "GRL8-OM46iPporitEzHvnGE75fQSgj9CDEBWmuTITLHFVOrtr4VdgPLvxNWUT3cCTP0yY1ltVQx_rXAPCx5IAg"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b417329227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "resolved",
+                "index": 0
+              }
+            ]
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "device_signature": "v-u-F4KiAc9oKc7Ry6bKcmzZr-nQr5qTlYKiAdTHudz47-8Gdlgd9I6i6HrlGqSG14pTYgs6T_1ytMjVo-VqAA"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b417329227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "no_change",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "resolved",
+                "index": 0
+              }
+            ]
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "device_signature": "mZSzUQhMA5sdaCSc-IU26_fC5zLcrX6PmNOjefT9lB-xLnRPMRkPYXne3W7OHhKt4SrZcmrE6xwVrVA6t8S3CQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "unresolved"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "delete_then_omission_does_not_restore_original_set",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "attachments": null,
+            "device_signature": "hdybygOi-2lowxsbV2VKhA3piytrMP8AN_XV8JHddn0KcARRzab2_ke5B1t9MuSzQJQTH9bjDJJPEfBz5rZAAg"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a6e756c6c2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f706c61696e222c2274657874223a22e69bb4e696b0e5908ee79a84e6ada3e69687227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "reference_results": []
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "device_signature": "mZSzUQhMA5sdaCSc-IU26_fC5zLcrX6PmNOjefT9lB-xLnRPMRkPYXne3W7OHhKt4SrZcmrE6xwVrVA6t8S3CQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "reference_results": [
+              {
+                "status": "unresolved"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "explicit_replacement_does_not_fall_back",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "device_signature": "1YpoNA1AY5ntWW-bzQGeufNrmxiMc40xfBAuaCeN7mapVDd1DP2phRttqqhy1IzTDW4gKBvUy_gkUHln30b_Bw"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "unresolved"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "empty_or_invalid_edits_leave_state_unchanged",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "device_signature": "fk2ndqf2eYcukAD6j50BMjqAgmOVoeNxTFZB4dorfO8UDlYZomUQyui6Yto3ebX5-FCj3-JIVM2sc_zdkAnKCw"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "bad_request"
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": null,
+            "attachments": null,
+            "device_signature": "U6ZJEyrQjRL1RAXYTJNFlsSxMlsrTpEIBanUVv9yjvHa5y1-5w59rxhluisR5x1oxoalPzT7-kdc7Yz41kp9CA"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a6e756c6c2c22626f6479223a6e756c6c2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "bad_request"
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": null,
+            "attachments": [],
+            "device_signature": "ZS1paOLeEXyujXhLEbI0iV4SwU4jphNXD4mQI2P9i-c0N7WrZomGPed1-2tdVWBy_dhLBpbdoi7EY58ZQN4BAg"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b5d2c22626f6479223a6e756c6c2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "bad_request"
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "attachments": 42,
+            "device_signature": "7aNde5dBuTPEUFooqddseb-uaNB0xz5EQ7sBPrDZOIBvb8CW5IaRdz86KGoqboNb0ImKyWZwbJFQI45SEMD1CQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a34322c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f706c61696e222c2274657874223a22e69bb4e696b0e5908ee79a84e6ada3e69687227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "bad_request"
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/one-pixel.png",
+                "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+                "content_type": "image/png",
+                "size": 68
+              },
+              {
+                "uri": "https://example.com/one-pixel.png",
+                "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+                "content_type": "image/png",
+                "size": 68
+              }
+            ],
+            "device_signature": "ioDVZ3lni7mJarYNE1zADnhseTOsxmYob0hF6kJrZYuNucV3I6-yzHoW5QTfWUNhqMMvUP6hj1fqt2EAaMpmAQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36382c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67227d2c7b22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36382c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f706c61696e222c2274657874223a22e69bb4e696b0e5908ee79a84e6ada3e69687227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "bad_request"
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "text": "缺少正文媒体类型"
+            },
+            "device_signature": "bwyXvKhUlLUQQW6saVWnjUYBqJu7lcp1vpVAg19k4A3o9hQlmpbBpV9UMeBgLEejLRcj756xfDQB3UfqsdhfAw"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b2274657874223a22e7bcbae5b091e6ada3e69687e5aa92e4bd93e7b1bbe59e8b227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "bad_request"
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "device_signature": "mZSzUQhMA5sdaCSc-IU26_fC5zLcrX6PmNOjefT9lB-xLnRPMRkPYXne3W7OHhKt4SrZcmrE6xwVrVA6t8S3CQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/one-pixel.png",
+                "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+                "content_type": "image/png",
+                "size": 68
+              },
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "resolved",
+                "index": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "body_omission_preserves_body",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "device_signature": "RU7AH0et4RsEdATJTYo-f7gJRD2i3Z4J9Tu-3hUGopAuM-RkIHoXyQCj94bTE0y_Xz0k1sOUW8G4-tg2LjKsBA"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d5d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "现场照片：\n\n![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)\n\n[下载说明](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "unresolved"
+              },
+              {
+                "status": "resolved",
+                "index": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "null_body_removes_it_and_omission_does_not_restore_it",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": null,
+            "device_signature": "Y4cPw3r19S7rkTp6Th1CLI2pj-yt8_5xGc1EBLhVFOAu5Y1eUd4BfJrwtGVE2P1d5CCsGg__RHincOfy5DxIBQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a6e756c6c2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "attachments": [
+              {
+                "uri": "https://example.com/one-pixel.png",
+                "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+                "content_type": "image/png",
+                "size": 68
+              },
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": []
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "device_signature": "RU7AH0et4RsEdATJTYo-f7gJRD2i3Z4J9Tu-3hUGopAuM-RkIHoXyQCj94bTE0y_Xz0k1sOUW8G4-tg2LjKsBA"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d5d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": []
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "device_signature": "ZHbJltXQJ5DJ_4XEmKMXJG-Pp9dLHsFRL2ecs8jRFKG92nwcOIlxShNYj10uNWKfJgRM1qXpC3TaEqOLhui8Bg"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f706c61696e222c2274657874223a22e69bb4e696b0e5908ee79a84e6ada3e69687227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "empty_array_and_null_have_distinct_field_presence",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "attachments": [],
+            "device_signature": "7zmWH5Y_kyWevWmZRru0jV_LzZsN__Wr3Be696_TgWJFr_McAjFGbtqOH97_RL-Fg1Q96VWDTeIbjbJCvOxEBw"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b5d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "现场照片：\n\n![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)\n\n[下载说明](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "attachments": [],
+            "reference_results": [
+              {
+                "status": "unresolved"
+              },
+              {
+                "status": "unresolved"
+              }
+            ]
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "attachments": null,
+            "device_signature": "A11MFU02SEZg5q4Nj8E2P68_6TtWn2Sn_zk0By600ux_Q0P7bXXglmKHhKN1mL5knQOg_zyFpIXnw0Wxup1FBg"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a6e756c6c2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "现场照片：\n\n![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)\n\n[下载说明](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "reference_results": [
+              {
+                "status": "unresolved"
+              },
+              {
+                "status": "unresolved"
+              }
+            ]
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "device_signature": "ZHbJltXQJ5DJ_4XEmKMXJG-Pp9dLHsFRL2ecs8jRFKG92nwcOIlxShNYj10uNWKfJgRM1qXpC3TaEqOLhui8Bg"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f706c61696e222c2274657874223a22e69bb4e696b0e5908ee79a84e6ada3e69687227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "reference_results": []
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": null,
+            "device_signature": "Y4cPw3r19S7rkTp6Th1CLI2pj-yt8_5xGc1EBLhVFOAu5Y1eUd4BfJrwtGVE2P1d5CCsGg__RHincOfy5DxIBQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a6e756c6c2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "bad_request"
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "attachments": [],
+            "device_signature": "7zmWH5Y_kyWevWmZRru0jV_LzZsN__Wr3Be696_TgWJFr_McAjFGbtqOH97_RL-Fg1Q96VWDTeIbjbJCvOxEBw"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b5d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/plain",
+              "text": "更新后的正文"
+            },
+            "attachments": [],
+            "reference_results": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "omission_before_replacement_follows_acceptance_order",
+      "post_case": "post_with_hash_reference",
+      "post_sequence": 1,
+      "steps": [
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "device_signature": "mZSzUQhMA5sdaCSc-IU26_fC5zLcrX6PmNOjefT9lB-xLnRPMRkPYXne3W7OHhKt4SrZcmrE6xwVrVA6t8S3CQ"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/one-pixel.png",
+                "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+                "content_type": "image/png",
+                "size": 68
+              },
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "resolved",
+                "index": 0
+              }
+            ]
+          }
+        },
+        {
+          "request": {
+            "$type": "meshline.channel.post.edit",
+            "channel_id": "chan_AAECAwQFBgcICQoLDA0ODw",
+            "target_sequence": 1,
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "device_signature": "GRL8-OM46iPporitEzHvnGE75fQSgj9CDEBWmuTITLHFVOrtr4VdgPLvxNWUT3cCTP0yY1ltVQx_rXAPCx5IAg"
+          },
+          "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6368616e6e656c2e706f73742e65646974222c226174746163686d656e7473223a5b7b22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32372c22757269223a2268747470733a2f2f6578616d706c652e636f6d2f766563746f722e62696e227d5d2c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a225be99984e4bbb65d286e693a2f2f2f7368612d3235363b71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b417329227d2c226368616e6e656c5f6964223a226368616e5f41414543417751464267634943516f4c4441304f4477222c227461726765745f73657175656e6365223a317d",
+          "expected": {
+            "status": "applied",
+            "body": {
+              "content_type": "text/markdown; variant=CommonMark",
+              "text": "[附件](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+            },
+            "attachments": [
+              {
+                "uri": "https://example.com/vector.bin",
+                "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+                "content_type": "application/octet-stream",
+                "size": 27
+              }
+            ],
+            "reference_results": [
+              {
+                "status": "resolved",
+                "index": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1197 @@
+{
+  "$type": "meshline.protocol.test-vectors",
+  "protocol_version": "1.0",
+  "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+  "body": {
+    "media": {
+      "plaintext_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+      "reference": {
+        "uri": "https://example.com/one-pixel.png",
+        "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "content_type": "image/png",
+        "size": 68
+      }
+    },
+    "body_cases": [
+      {
+        "name": "plain_utf8",
+        "body": {
+          "content_type": "text/plain",
+          "text": "图像已更新。"
+        },
+        "interpretation": "plain_text"
+      },
+      {
+        "name": "plain_markup_literal",
+        "body": {
+          "content_type": "text/plain",
+          "text": "**not bold**"
+        },
+        "interpretation": "plain_text"
+      },
+      {
+        "name": "commonmark",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "## 更新公告\n\n今天发布了 **新版本**。"
+        },
+        "interpretation": "commonmark_0_31_2"
+      },
+      {
+        "name": "commonmark_default_variant",
+        "body": {
+          "content_type": "text/markdown",
+          "text": "**bold**"
+        },
+        "interpretation": "commonmark_0_31_2"
+      },
+      {
+        "name": "case_insensitive_type_and_variant",
+        "body": {
+          "content_type": "Text/Markdown; Variant=commonmark",
+          "text": "**bold**"
+        },
+        "interpretation": "commonmark_0_31_2"
+      },
+      {
+        "name": "unknown_type",
+        "body": {
+          "content_type": "text/x-example",
+          "text": "<script>alert(1)</script>"
+        }
+      },
+      {
+        "name": "unknown_variant",
+        "body": {
+          "content_type": "text/markdown; variant=example",
+          "text": "**raw text**"
+        }
+      },
+      {
+        "name": "utf8_charset",
+        "body": {
+          "content_type": "text/plain; charset=utf-8",
+          "text": "message"
+        },
+        "interpretation": "plain_text"
+      },
+      {
+        "name": "markdown_utf8_charset",
+        "body": {
+          "content_type": "text/markdown; charset=utf-8; variant=CommonMark",
+          "text": "message"
+        },
+        "interpretation": "commonmark_0_31_2"
+      },
+      {
+        "name": "case_insensitive_charset",
+        "body": {
+          "content_type": "text/plain; CHARSET=UTF-8",
+          "text": "message"
+        },
+        "interpretation": "plain_text"
+      }
+    ],
+    "invalid_body_cases": [
+      {
+        "name": "legacy_string",
+        "body": "legacy text"
+      },
+      {
+        "name": "missing_content_type",
+        "body": {
+          "text": "message"
+        }
+      },
+      {
+        "name": "missing_text",
+        "body": {
+          "content_type": "text/plain"
+        }
+      },
+      {
+        "name": "empty_text",
+        "body": {
+          "content_type": "text/plain",
+          "text": ""
+        }
+      },
+      {
+        "name": "ascii_whitespace_text",
+        "body": {
+          "content_type": "text/plain",
+          "text": " \t\n\u000b\f\r"
+        }
+      },
+      {
+        "name": "unicode_whitespace_text",
+        "body": {
+          "content_type": "text/markdown",
+          "text": "\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+        }
+      },
+      {
+        "name": "non_string_text",
+        "body": {
+          "content_type": "text/plain",
+          "text": 42
+        }
+      },
+      {
+        "name": "malformed_media_type",
+        "body": {
+          "content_type": "markdown",
+          "text": "message"
+        }
+      },
+      {
+        "name": "non_utf8_charset",
+        "body": {
+          "content_type": "text/plain; charset=iso-8859-1",
+          "text": "message"
+        }
+      },
+      {
+        "name": "empty_charset_forbidden",
+        "body": {
+          "content_type": "text/plain; charset=\"\"",
+          "text": "message"
+        }
+      }
+    ],
+    "rendering_safety_cases": [
+      {
+        "name": "html_event_handler",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "<img src=\"https://example.com/tracker\" onerror=\"alert(1)\">"
+        },
+        "expected": "do_not_execute_handler"
+      },
+      {
+        "name": "unsafe_link",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "[link](javascript:alert%281%29)"
+        },
+        "expected": "do_not_execute_link"
+      }
+    ]
+  },
+  "attachment_encryption": {
+    "reference": {
+      "uri": "https://example.com/vector.bin",
+      "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+      "content_type": "application/octet-stream",
+      "size": 27,
+      "encryption": {
+        "alg": "AES-256-GCM",
+        "key": "UVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3A",
+        "nonce": "cXJzdHV2d3h5ent8"
+      }
+    },
+    "plaintext_utf8_hex": "4d6573686c696e65206174746163686d656e7420766563746f720a",
+    "aad_utf8_hex": "7b222474797065223a226d6573686c696e652e636f6e74656e742e7265666572656e63652e616164222c22616c67223a224145532d3235362d47434d222c22636f6e74656e745f74797065223a226170706c69636174696f6e2f6f637465742d73747265616d222c2268617368223a227368613235363a71707a51625a676f52656e6536505179553965596a4e64395564324872646367756f6e4779764b5f4b4173222c2273697a65223a32377d",
+    "ciphertext_and_tag": "ipNy7dm8yr-4rTyv2A63OwhcGpmTThAX6UQNp05xoe8IrZxRxmoDGWXRJg"
+  },
+  "hash_references": {
+    "uri_generation": [
+      {
+        "plaintext_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+        "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU"
+      },
+      {
+        "plaintext_base64": "",
+        "hash": "sha256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+        "uri": "ni:///sha-256;47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+      }
+    ],
+    "encrypted_attachment": {
+      "plaintext_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+      "reference": {
+        "uri": "https://example.com/one-pixel.png",
+        "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "content_type": "image/png",
+        "size": 68,
+        "encryption": {
+          "alg": "AES-256-GCM",
+          "key": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+          "nonce": "wMHCw8TFxsfIycrL"
+        }
+      },
+      "aad_utf8_hex": "7b222474797065223a226d6573686c696e652e636f6e74656e742e7265666572656e63652e616164222c22616c67223a224145532d3235362d47434d222c22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36387d",
+      "ciphertext_and_tag": "xTB1tDPK-I_uRpPBuCxQ9_DMAwREA26Iflx0vOrME-xwNC9hIHvNXigA2nYH2qH3f1PtSK68HgHdsM_5mohuxGzt6NnyG2MXlwdTs92RdUKdUJlT"
+    },
+    "re_encrypted_attachment": {
+      "plaintext_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+      "reference": {
+        "uri": "https://example.net/re-encrypted.bin",
+        "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "content_type": "image/png",
+        "size": 68,
+        "encryption": {
+          "alg": "AES-256-GCM",
+          "key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+          "nonce": "ISIjJCUmJygpKiss"
+        }
+      },
+      "aad_utf8_hex": "7b222474797065223a226d6573686c696e652e636f6e74656e742e7265666572656e63652e616164222c22616c67223a224145532d3235362d47434d222c22636f6e74656e745f74797065223a22696d6167652f706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c2273697a65223a36387d",
+      "ciphertext_and_tag": "GM1wG1nSNEztwJqrhuzWWg8ShtFm5J2-LLtlWU-5jSq4aq7gmS3VV7H4ev-fETahJWevd1Hp5fETPR4QcTGS2EQPhEM2yxM7bWPWfvBnySk33hWH"
+    },
+    "hash_cases": [
+      {
+        "name": "sha256",
+        "value": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "valid": true
+      },
+      {
+        "name": "base64url_symbols",
+        "value": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+        "valid": true
+      },
+      {
+        "name": "missing_prefix",
+        "value": "Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "valid": false
+      },
+      {
+        "name": "uri_instead_of_hash",
+        "value": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "valid": false
+      },
+      {
+        "name": "wrong_algorithm",
+        "value": "sha512:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "valid": false
+      },
+      {
+        "name": "empty",
+        "value": "",
+        "valid": false
+      },
+      {
+        "name": "non_string",
+        "value": 1,
+        "valid": false
+      },
+      {
+        "name": "truncated_digest",
+        "value": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvB",
+        "valid": false
+      },
+      {
+        "name": "padding",
+        "value": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU=",
+        "valid": false
+      },
+      {
+        "name": "noncanonical_pad_bits",
+        "value": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBV",
+        "valid": false
+      },
+      {
+        "name": "standard_base64",
+        "value": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK/KAs",
+        "valid": false
+      },
+      {
+        "name": "percent_encoding_in_field",
+        "value": "sha256:%58j04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "valid": false
+      }
+    ],
+    "resolution_cases": [
+      {
+        "name": "image",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 0
+        }
+      },
+      {
+        "name": "scheme_case_insensitive",
+        "uri": "NI:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 0
+        }
+      },
+      {
+        "name": "percent_encoded_digest",
+        "uri": "ni:///sha-256;%58j04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 0
+        }
+      },
+      {
+        "name": "percent_encoded_algorithm",
+        "uri": "ni:///%73ha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 0
+        }
+      },
+      {
+        "name": "reordered_attachments",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          },
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 1
+        }
+      },
+      {
+        "name": "relocated_attachment",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.net/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 0
+        }
+      },
+      {
+        "name": "encrypted_attachment",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68,
+            "encryption": {
+              "alg": "AES-256-GCM",
+              "key": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+              "nonce": "wMHCw8TFxsfIycrL"
+            }
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 0
+        }
+      },
+      {
+        "name": "re_encrypted_attachment",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.net/re-encrypted.bin",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68,
+            "encryption": {
+              "alg": "AES-256-GCM",
+              "key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+              "nonce": "ISIjJCUmJygpKiss"
+            }
+          }
+        ],
+        "expected": {
+          "status": "resolved",
+          "index": 0
+        }
+      },
+      {
+        "name": "missing_target",
+        "uri": "ni:///sha-256;_6Y1g9-mcGuH0oS4aw1pOhYeSECq0sXPa10nw7liH30",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "unresolved"
+        }
+      },
+      {
+        "name": "current_message_only",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "unresolved"
+        }
+      },
+      {
+        "name": "empty_attachments",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [],
+        "expected": {
+          "status": "unresolved"
+        }
+      },
+      {
+        "name": "duplicate_hash_identical",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "expected": {
+          "status": "invalid_attachments"
+        }
+      },
+      {
+        "name": "duplicate_hash_different_uri",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.net/other",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "expected": {
+          "status": "invalid_attachments"
+        }
+      },
+      {
+        "name": "duplicate_hash_different_content_type",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "application/octet-stream",
+            "size": 68
+          }
+        ],
+        "expected": {
+          "status": "invalid_attachments"
+        }
+      },
+      {
+        "name": "duplicate_hash_different_encryption",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68,
+            "encryption": {
+              "alg": "AES-256-GCM",
+              "key": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+              "nonce": "wMHCw8TFxsfIycrL"
+            }
+          },
+          {
+            "uri": "https://example.net/re-encrypted.bin",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68,
+            "encryption": {
+              "alg": "AES-256-GCM",
+              "key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+              "nonce": "ISIjJCUmJygpKiss"
+            }
+          }
+        ],
+        "expected": {
+          "status": "invalid_attachments"
+        }
+      },
+      {
+        "name": "duplicate_unreferenced_hash",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_attachments"
+        }
+      },
+      {
+        "name": "invalid_attachment_hash",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:bad",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "expected": {
+          "status": "invalid_attachments"
+        }
+      },
+      {
+        "name": "missing_attachment_hash",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "content_type": "image/png",
+            "size": 68
+          }
+        ],
+        "expected": {
+          "status": "invalid_attachments"
+        }
+      },
+      {
+        "name": "double_percent_encoding",
+        "uri": "ni:///sha-256;%2558j04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "invalid_percent_encoding",
+        "uri": "ni:///sha-256;%GGj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "digest_case_sensitive",
+        "uri": "ni:///sha-256;xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "unresolved"
+        }
+      },
+      {
+        "name": "nonempty_authority",
+        "uri": "ni://example.com/sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "extra_path",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU/part",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "query",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU?ct=image/png",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "empty_query",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU?",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "fragment",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU#part",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "wrong_algorithm",
+        "uri": "ni:///sha-512;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "truncated_algorithm",
+        "uri": "ni:///sha-256-128;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "algorithm_case_sensitive",
+        "uri": "ni:///SHA-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "truncated_digest",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvB",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "padding",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU=",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "noncanonical_pad_bits",
+        "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBV",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "missing_digest",
+        "uri": "ni:///sha-256;",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      },
+      {
+        "name": "encoded_separator",
+        "uri": "ni:///sha-256%3BXj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68
+          },
+          {
+            "uri": "https://example.com/vector.bin",
+            "hash": "sha256:qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs",
+            "content_type": "application/octet-stream",
+            "size": 27
+          }
+        ],
+        "expected": {
+          "status": "invalid_reference"
+        }
+      }
+    ],
+    "markdown_cases": [
+      {
+        "name": "image_and_link",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "现场照片：\n\n![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)\n\n[下载说明](ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs)"
+        },
+        "expected_targets": [
+          {
+            "kind": "image",
+            "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU"
+          },
+          {
+            "kind": "link",
+            "uri": "ni:///sha-256;qpzQbZgoRene6PQyU9eYjNd9Ud2HrdcguonGyvK_KAs"
+          }
+        ]
+      },
+      {
+        "name": "repeated_reference",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "![image](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU) [open](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+        },
+        "expected_targets": [
+          {
+            "kind": "image",
+            "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU"
+          },
+          {
+            "kind": "link",
+            "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU"
+          }
+        ]
+      },
+      {
+        "name": "reference_style",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "![image][photo]\n\n[photo]: ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU"
+        },
+        "expected_targets": [
+          {
+            "kind": "image",
+            "uri": "ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU"
+          }
+        ]
+      },
+      {
+        "name": "inline_code",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "`![image](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)`"
+        },
+        "expected_targets": []
+      },
+      {
+        "name": "code_block",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "```markdown\n![image](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)\n```"
+        },
+        "expected_targets": []
+      },
+      {
+        "name": "escaped_syntax",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "\\[open](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+        },
+        "expected_targets": []
+      },
+      {
+        "name": "plain_text",
+        "body": {
+          "content_type": "text/plain",
+          "text": "![image](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+        },
+        "expected_targets": []
+      },
+      {
+        "name": "unknown_type",
+        "body": {
+          "content_type": "text/x-example",
+          "text": "![image](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+        },
+        "expected_targets": []
+      },
+      {
+        "name": "unknown_variant",
+        "body": {
+          "content_type": "text/markdown; variant=example",
+          "text": "![image](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+        },
+        "expected_targets": []
+      },
+      {
+        "name": "raw_html_is_literal",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "<img src=\"ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU\">"
+        },
+        "expected_targets": []
+      }
+    ],
+    "private_message": {
+      "content": {
+        "$type": "meshline.message.direct",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+        },
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68,
+            "encryption": {
+              "alg": "AES-256-GCM",
+              "key": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+              "nonce": "wMHCw8TFxsfIycrL"
+            }
+          }
+        ]
+      },
+      "content_key": "wcLDxMXGx8jJysvMzc7P0NHS09TV1tfY2drb3N3e3-A",
+      "signing_private_key": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A",
+      "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+      "plaintext_utf8_hex": "7b222474797065223a226d6573686c696e652e6d6573736167652e646972656374222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a22215be78eb0e59cbae785a7e789875d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226174746163686d656e7473223a5b7b22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c22636f6e74656e745f74797065223a22696d6167652f706e67222c2273697a65223a36382c22656e6372797074696f6e223a7b22616c67223a224145532d3235362d47434d222c226b6579223a226f4b47696f36536c7071656f71617172724b32757237437873724f3074626133754c6d3675377939767238222c226e6f6e6365223a22774d484377385446787366497963724c227d7d5d7d",
+      "aad_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6d6573736167652e616164222c22637265617465645f6174223a313733303030303030302c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c2266726f6d5f6465766963655f6964223a226465765f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f6964223a226d73675f6348467963335231646e6434655870376648312d6677222c22746f223a226e656f3a3836303833333130323a4e51346477437579526e356f65726d646f6867773367577559446d7154395665646e227d",
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6d6573736167652e656e76656c6f7065222c22637265617465645f6174223a313733303030303030302c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c2266726f6d5f6465766963655f6964223a226465765f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f6964223a226d73675f6348467963335231646e6434655870376648312d6677222c227061796c6f6164223a7b22616c67223a224145532d3235362d47434d222c2263697068657274657874223a22685444577537584d5648746b6242675678782d577131495642737756557a53736249454e34766c697969586278455a515a6238726e7a61695346637244487168773365314d6a344975506d446364784c553656476575634d764166695a4b7a2d534b6446314f476f6334766442475a7353756d3345586d4132526f69324e79327549596d6244464c636633797569454a7875484e524f5235516f4b634a4d744f6779504a334e2d347876555a634d7345687853556c49714f63764e685037704a504343303851516b4e62384f67537633756a46562d2d59646e6f7a6f5f6132464362687a4966352d62484f746c4b354c6f4e57464a3670526a4e756c695437696f62617a6f623248306b61645936584558545f325343656b355058656d35524b44446a61485167305878634d4d732d7166532d3862365f4d7639427438663447392d6f6f65327374316731767454653955336a4751495459566c4f52354b615f64644f6a7241746b73356355675a47436e46505f4a454678786b5157645575383064664e7a4d33617373686e423645686d44387672723863725274514c6836794a716c514d71774a364f484e6e4c6530436b396342697535566c49584244795356553730655336446e4d5f724d44776a39435a77664269445748315472427872415f385032583955317a724d476d306d5a467079677566566d576757744931707536356a7a56704a635a787648477677694a306b5f79743661516f34744a325844542d374b5a6f4e4478727630466f7a6d52426d613542336d6e696d4861415f5977467a4e74524a6b797448676276334a514871413335687559354f4138705a78543752716a765f3875374c6a77222c226e6f6e6365223a226b4a47536b3553566c7065596d5a7162227d2c22746f223a226e656f3a3836303833333130323a4e51346477437579526e356f65726d646f6867773367577559446d7154395665646e227d",
+      "envelope": {
+        "$type": "meshline.message.envelope",
+        "message_id": "msg_cHFyc3R1dnd4eXp7fH1-fw",
+        "created_at": 1730000000,
+        "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "from_device_id": "dev_AAECAwQFBgcICQoLDA0ODw",
+        "to": "neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn",
+        "payload": {
+          "alg": "AES-256-GCM",
+          "nonce": "kJGSk5SVlpeYmZqb",
+          "ciphertext": "hTDWu7XMVHtkbBgVxx-Wq1IVBswVUzSsbIEN4vliyiXbxEZQZb8rnzaiSFcrDHqhw3e1Mj4IuPmDcdxLU6VGeucMvAfiZKz-SKdF1OGoc4vdBGZsSum3EXmA2Roi2Ny2uIYmbDFLcf3yuiEJxuHNROR5QoKcJMtOgyPJ3N-4xvUZcMsEhxSUlIqOcvNhP7pJPCC08QQkNb8OgSv3ujFV--Ydnozo_a2FCbhzIf5-bHOtlK5LoNWFJ6pRjNuliT7iobazob2H0kadY6XEXT_2SCek5PXem5RKDDjaHQg0XxcMMs-qfS-8b6_Mv9Bt8f4G9-ooe2st1g1vtTe9U3jGQITYVlOR5Ka_ddOjrAtks5cUgZGCnFP_JEFxxkQWdUu80dfNzM3asshnB6EhmD8vrr8crRtQLh6yJqlQMqwJ6OHNnLe0Ck9cBiu5VlIXBDySVU70eS6DnM_rMDwj9CZwfBiDWH1TrBxrA_8P2X9U1zrMGm0mZFpygufVmWgWtI1pu65jzVpJcZxvHGvwiJ0k_yt6aQo4tJ2XDT-7KZoNDxrv0FozmRBma5B3mnimHaA_YwFzNtRJkytHgbv3JQHqA35huY5OA8pZxT7Rqjv_8u7Ljw"
+        },
+        "device_signature": "9y9Gp3erVq-JbfJ3hJXiX0qcfUhtT3aaQ0VUe2GqvwSSzt60iFEXAuaZbf_s1nmPfU2kpVAKmGEpqq8450x4Dw"
+      }
+    },
+    "group_message": {
+      "content": {
+        "$type": "meshline.group.message.content",
+        "body": {
+          "content_type": "text/markdown; variant=CommonMark",
+          "text": "![现场照片](ni:///sha-256;Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU)"
+        },
+        "attachments": [
+          {
+            "uri": "https://example.com/one-pixel.png",
+            "hash": "sha256:Xj04LbTdg9WapXQnk61reQNAnoZcg7y8VINQSfBDvBU",
+            "content_type": "image/png",
+            "size": 68,
+            "encryption": {
+              "alg": "AES-256-GCM",
+              "key": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+              "nonce": "wMHCw8TFxsfIycrL"
+            }
+          }
+        ]
+      },
+      "epoch_application_secret": "sgCSx0gMRPHjniP9BIApn0MmBQlULGBfa56_93MffWg",
+      "sender_account": "neo:860833102:NUz6PKTAM7NbPJzkKJFNay3VckQtcDkgWo",
+      "sender_device_id": "dev_AQIDBAUGBwgJCgsMDQ4PEA",
+      "signing_private_key": "2Nna29zd3t_g4eLj5OXm5-jp6uvs7e7v8PHy8_T19vc",
+      "signing_public_key": "Y1aObCoGDoN4XO9q9gEdqC-5XCDevD9RzYrSrs8nEKc",
+      "plaintext_utf8_hex": "7b222474797065223a226d6573686c696e652e67726f75702e6d6573736167652e636f6e74656e74222c22626f6479223a7b22636f6e74656e745f74797065223a22746578742f6d61726b646f776e3b2076617269616e743d436f6d6d6f6e4d61726b222c2274657874223a22215be78eb0e59cbae785a7e789875d286e693a2f2f2f7368612d3235363b586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e515366424476425529227d2c226174746163686d656e7473223a5b7b22757269223a2268747470733a2f2f6578616d706c652e636f6d2f6f6e652d706978656c2e706e67222c2268617368223a227368613235363a586a30344c625464673957617058516e6b36317265514e416e6f5a636737793856494e5153664244764255222c22636f6e74656e745f74797065223a22696d6167652f706e67222c2273697a65223a36382c22656e6372797074696f6e223a7b22616c67223a224145532d3235362d47434d222c226b6579223a226f4b47696f36536c7071656f71617172724b32757237437873724f3074626133754c6d3675377939767238222c226e6f6e6365223a22774d484377385446787366497963724c227d7d5d7d",
+      "aad_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e67726f75702e6d6573736167652e616164222c22637265617465645f6174223a313733303030303030302c2265706f6368223a372c2266726f6d223a226e656f3a3836303833333130323a4e557a36504b54414d374e62504a7a6b4b4a464e61793356636b517463446b67576f222c2266726f6d5f6465766963655f6964223a226465765f41514944424155474277674a4367734d445134504541222c2267726f75705f6964223a226772705f6f6d6f4f7333565a39696f5f5a31683452747a745341222c226d6573736167655f6964223a226d73675f6749474367345346686f65496959714c6a49324f6a77227d",
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e67726f75702e6d657373616765222c22637265617465645f6174223a313733303030303030302c2265706f6368223a372c2267726f75705f6964223a226772705f6f6d6f4f7333565a39696f5f5a31683452747a745341222c226d6573736167655f6964223a226d73675f6749474367345346686f65496959714c6a49324f6a77222c227061796c6f6164223a7b22616c67223a224145532d3235362d47434d222c2263697068657274657874223a227a775f555a63455364666a624d5a484e6f31764c307443306d717034377644374e6e5272305167634365466a66475a58766571693573623573325072376e6f59647a696551626f36384b5a32742d45714a58775a4e514b414b6356703145726b394a496f7a5333546362696c4b673261465055666d4143484a444c4b4f6d527a4a6e75374554497559726750645a67416343524c5564577444586e35374d78496f62694c3169476f385a3935716f5a753056756f754e466d2d712d7a6d4f6667753035626734637034426456554d527176367630336a627a67414f42587772515235487034694958616c635048465679644f676b6368626736475872427934664d454c346b693457646634445a7465597a49386a342d6b51447143496a616c344e58396e6253724632426871654d4b53386f7a624367685a3065705750553278527143636c75686259525050507146466c56364e4d516b4245495a56734b6d3641706d734c6e45472d38576f49723163517047676f765857327831752d59507446384d31377157504c59775f686e652d455272723651393443614935464f65705549766472396f4b4c4c5f46684d6e38394b4e6644655a626f7556374c77354a6e624f575535384374487656795051314c647669685952466345654b497a3346566a394c794c324d7146544f417a49655172594d6e303543636c4d4e5f426e516f544c41557058786e5632454d4761756f70656454725335644e684d786f304559704942664638317645585962716d4a64645971786f5078686662576d6542725459396671774375323076365a736156546d4752414d6d3043546533795a623833456f477175687937544b6f2d4e7a6d6a6c4f4c757841222c226e6f6e6365223a2270696f766e6d6d54594e6d6567733659227d7d",
+      "envelope": {
+        "$type": "meshline.group.message",
+        "message_id": "msg_gIGCg4SFhoeIiYqLjI2Ojw",
+        "group_id": "grp_omoOs3VZ9io_Z1h4RtztSA",
+        "epoch": 7,
+        "created_at": 1730000000,
+        "payload": {
+          "alg": "AES-256-GCM",
+          "nonce": "piovnmmTYNmegs6Y",
+          "ciphertext": "zw_UZcESdfjbMZHNo1vL0tC0mqp47vD7NnRr0QgcCeFjfGZXveqi5sb5s2Pr7noYdzieQbo68KZ2t-EqJXwZNQKAKcVp1Erk9JIozS3TcbilKg2aFPUfmACHJDLKOmRzJnu7ETIuYrgPdZgAcCRLUdWtDXn57MxIobiL1iGo8Z95qoZu0VuouNFm-q-zmOfgu05bg4cp4BdVUMRqv6v03jbzgAOBXwrQR5Hp4iIXalcPHFVydOgkchbg6GXrBy4fMEL4ki4Wdf4DZteYzI8j4-kQDqCIjal4NX9nbSrF2BhqeMKS8ozbCghZ0epWPU2xRqCcluhbYRPPPqFFlV6NMQkBEIZVsKm6ApmsLnEG-8WoIr1cQpGgovXW2x1u-YPtF8M17qWPLYw_hne-ERrr6Q94CaI5FOepUIvdr9oKLL_FhMn89KNfDeZbouV7Lw5JnbOWU58CtHvVyPQ1LdvihYRFcEeKIz3FVj9LyL2MqFTOAzIeQrYMn05CclMN_BnQoTLAUpXxnV2EMGauopedTrS5dNhMxo0EYpIBfF81vEXYbqmJddYqxoPxhfbWmeBrTY9fqwCu20v6ZsaVTmGRAMm0CTe3yZb83EoGquhy7TKo-NzmjlOLuxA"
+        },
+        "device_signature": "WHp0GkqmxoNy_UiMWcGV2aa5P2nB_Ti12-UwebaxCFVR9IzYNp0LJcWQBYcmd3bHZerMTWlBPVr5YDSKaAFIBw"
+      },
+      "message_nonce": "piovnmmTYNmegs6Y",
+      "message_key": "UfInbKGlCmTZh9p2CLz9MKVTSHwihSs7VAMVJu577c4"
+    }
+  }
+}

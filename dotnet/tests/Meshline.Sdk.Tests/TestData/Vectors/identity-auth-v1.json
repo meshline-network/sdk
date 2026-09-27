@@ -1,0 +1,350 @@
+{
+  "$type": "meshline.protocol.test-vectors",
+  "protocol_version": "1.0",
+  "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+  "device_identity": {
+    "input": {
+      "$type": "meshline.device.identity",
+      "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+      "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+      "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk"
+    },
+    "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.identity\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+    "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6964656e74697479222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+    "hash": "sha256:nhv09l2lqfqD_WeF_UWsHpL9I6t_LgLwQQBcW18jyIQ",
+    "derived_device_id": "dev_nhv09l2lqfqD_WeF_UWsHg"
+  },
+  "device_certificate": {
+    "algorithm": "ECDSA-P256-SHA256-RFC6979",
+    "private_key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+    "public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+    "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+    "device_private_key": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A",
+    "device_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+    "unsigned_object": {
+      "$type": "meshline.device.certificate",
+      "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+      "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+      "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+      "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk",
+      "not_before": 1729990000,
+      "expires_at": 1792198000,
+      "device_signature": "",
+      "account_signature": ""
+    },
+    "device_signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+    "device_signature": "PGtQXsbhFoSpm6RRMis4NGdOpGQJJEqn4CxW9PsVpEjVi9v0CrOTtBZpl6MpZkCQg2Sb0hDvhyfNNbiRaqO0Bg",
+    "account_signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226465766963655f7369676e6174757265223a225047745158736268466f53706d3652524d6973344e47644f7047514a4a45716e344378573950735670456a566939763043724f5474425a706c364d705a6b435167325362306844766879664e4e62695261714f304267222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+    "account_signature": "mo-mvcl2j1RwgZOYVYxao1W8xZhmFIGvX-8GVHkMJHJhlnQSqNaLnZSmEhavG2XlwcTS8jBSQJzb0TVXZZHjSg"
+  },
+  "relay_origin": {
+    "normalization_cases": [
+      {
+        "name": "https_default",
+        "endpoint": "https://relay.example/meshline/v1",
+        "expected_origin": "https://relay.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c65"
+      },
+      {
+        "name": "host_case_and_explicit_default",
+        "endpoint": "https://RELAY.example:443/meshline/v1",
+        "expected_origin": "https://relay.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c65"
+      },
+      {
+        "name": "default_port_leading_zero",
+        "endpoint": "https://relay.example:0443/meshline/v1",
+        "expected_origin": "https://relay.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c65"
+      },
+      {
+        "name": "nondefault_port",
+        "endpoint": "https://relay.example:8443/meshline/v1",
+        "expected_origin": "https://relay.example:8443",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c653a38343433"
+      },
+      {
+        "name": "nondefault_port_leading_zero",
+        "endpoint": "https://relay.example:08443/meshline/v1",
+        "expected_origin": "https://relay.example:8443",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c653a38343433"
+      },
+      {
+        "name": "wss_default",
+        "endpoint": "wss://relay.example/meshline/v1",
+        "expected_origin": "https://relay.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c65"
+      },
+      {
+        "name": "wss_explicit_default",
+        "endpoint": "wss://RELAY.example:443/meshline/v1",
+        "expected_origin": "https://relay.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c65"
+      },
+      {
+        "name": "wss_nondefault_port",
+        "endpoint": "wss://relay.example:8443/meshline/v1",
+        "expected_origin": "https://relay.example:8443",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c653a38343433"
+      },
+      {
+        "name": "idna_ulabel",
+        "endpoint": "https://bücher.example/meshline/v1",
+        "expected_origin": "https://xn--bcher-kva.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f786e2d2d62636865722d6b76612e6578616d706c65"
+      },
+      {
+        "name": "idna_alabel_case",
+        "endpoint": "https://XN--BCHER-KVA.example:443/meshline/v1",
+        "expected_origin": "https://xn--bcher-kva.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f786e2d2d62636865722d6b76612e6578616d706c65"
+      },
+      {
+        "name": "idna2008_sharp_s",
+        "endpoint": "https://faß.example/meshline/v1",
+        "expected_origin": "https://xn--fa-hia.example",
+        "expected_origin_utf8_hex": "68747470733a2f2f786e2d2d66612d6869612e6578616d706c65"
+      },
+      {
+        "name": "ipv4",
+        "endpoint": "https://192.0.2.1:443/meshline/v1",
+        "expected_origin": "https://192.0.2.1",
+        "expected_origin_utf8_hex": "68747470733a2f2f3139322e302e322e31"
+      },
+      {
+        "name": "ipv6_expanded",
+        "endpoint": "https://[2001:0DB8:0000:0000:0000:0000:0000:0001]:443/meshline/v1",
+        "expected_origin": "https://[2001:db8::1]",
+        "expected_origin_utf8_hex": "68747470733a2f2f5b323030313a6462383a3a315d"
+      },
+      {
+        "name": "ipv6_wss_nondefault",
+        "endpoint": "wss://[2001:db8::1]:8443/meshline/v1",
+        "expected_origin": "https://[2001:db8::1]:8443",
+        "expected_origin_utf8_hex": "68747470733a2f2f5b323030313a6462383a3a315d3a38343433"
+      },
+      {
+        "name": "ipv6_equal_zero_runs",
+        "endpoint": "https://[2001:db8:0:0:1:0:0:1]/meshline/v1",
+        "expected_origin": "https://[2001:db8::1:0:0:1]",
+        "expected_origin_utf8_hex": "68747470733a2f2f5b323030313a6462383a3a313a303a303a315d"
+      },
+      {
+        "name": "ipv6_embedded_ipv4",
+        "endpoint": "https://[::ffff:192.0.2.1]/meshline/v1",
+        "expected_origin": "https://[::ffff:c000:201]",
+        "expected_origin_utf8_hex": "68747470733a2f2f5b3a3a666666663a633030303a3230315d"
+      },
+      {
+        "name": "domain_trailing_dot",
+        "endpoint": "https://relay.example./meshline/v1",
+        "expected_origin": "https://relay.example.",
+        "expected_origin_utf8_hex": "68747470733a2f2f72656c61792e6578616d706c652e"
+      }
+    ],
+    "comparison_cases": [
+      {
+        "name": "case_and_default_port",
+        "left_endpoint": "https://RELAY.example:443/meshline/v1",
+        "right_endpoint": "https://relay.example/meshline/v1",
+        "expected_same_origin": true
+      },
+      {
+        "name": "wss_mapping",
+        "left_endpoint": "wss://relay.example/meshline/v1",
+        "right_endpoint": "https://relay.example/meshline/v1",
+        "expected_same_origin": true
+      },
+      {
+        "name": "wss_nondefault_mapping",
+        "left_endpoint": "wss://relay.example:8443/meshline/v1",
+        "right_endpoint": "https://relay.example:8443/meshline/v1",
+        "expected_same_origin": true
+      },
+      {
+        "name": "idna_equivalence",
+        "left_endpoint": "https://bücher.example/meshline/v1",
+        "right_endpoint": "https://XN--BCHER-KVA.example:443/meshline/v1",
+        "expected_same_origin": true
+      },
+      {
+        "name": "different_port",
+        "left_endpoint": "https://relay.example/meshline/v1",
+        "right_endpoint": "https://relay.example:8443/meshline/v1",
+        "expected_same_origin": false
+      },
+      {
+        "name": "dns_trailing_dot_preserved",
+        "left_endpoint": "https://relay.example/meshline/v1",
+        "right_endpoint": "https://relay.example./meshline/v1",
+        "expected_same_origin": false
+      },
+      {
+        "name": "different_host",
+        "left_endpoint": "https://relay.example/meshline/v1",
+        "right_endpoint": "https://other.example/meshline/v1",
+        "expected_same_origin": false
+      }
+    ]
+  },
+  "session_auth": {
+    "signers": {
+      "source": "device_certificate and device_identity in this file",
+      "account_ref": "/device_certificate/account",
+      "account_private_key_ref": "/device_certificate/private_key",
+      "account_public_key_ref": "/device_certificate/public_key",
+      "device_private_key_ref": "/device_certificate/device_private_key",
+      "device_public_key_ref": "/device_certificate/device_public_key",
+      "device_id_ref": "/device_identity/derived_device_id"
+    },
+    "target": {
+      "relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+      "endpoint": "https://relay.example/a/meshline/v1"
+    },
+    "challenge": {
+      "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "created_at": 1730000000,
+      "expires_at": 1730000300
+    },
+    "device_auth": {
+      "auth_payload": {
+        "$type": "meshline.relay.auth",
+        "relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "origin": "https://relay.example",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "device_id": "dev_nhv09l2lqfqD_WeF_UWsHg",
+        "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+        "timestamp": 1730000000
+      },
+      "signing_input_canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.relay.auth\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"device_id\":\"dev_nhv09l2lqfqD_WeF_UWsHg\",\"nonce\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"origin\":\"https://relay.example\",\"relay_id\":\"0x1234567890abcdef1234567890abcdef12345678\",\"timestamp\":1730000000}",
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e72656c61792e61757468222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226465766963655f6964223a226465765f6e687630396c326c716671445f5765465f5557734867222c226e6f6e6365223a2241414543417751464267634943516f4c4441304f4478415245684d554652595847426b6147787764486838222c226f726967696e223a2268747470733a2f2f72656c61792e6578616d706c65222c2272656c61795f6964223a22307831323334353637383930616263646566313233343536373839306162636465663132333435363738222c2274696d657374616d70223a313733303030303030307d",
+      "signing_input_sha256_hex": "0b3fec766cd58ea7cb9eed48814b67182edcd697de02852760da0653fc692e53",
+      "signature": "61LjDqIWJB46WiXmxM1h7pGj5qyBl34DEPeS7N-vDVxsqATflKtVycbrF9aN70r74IPK37raPWv8p33e6taGAg",
+      "legacy_signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e72656c61792e61757468222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226465766963655f6964223a226465765f6e687630396c326c716671445f5765465f5557734867222c226e6f6e6365223a2241414543417751464267634943516f4c4441304f4478415245684d554652595847426b6147787764486838222c226f726967696e223a2268747470733a2f2f72656c61792e6578616d706c65222c2274696d657374616d70223a313733303030303030307d",
+      "legacy_signature": "bCFMbJ8dfiHRtNXIT_3vFxAOcBrTgD5cmzK3IZEHvbke4NxTYLiDnaxqbSc87bHn1H36yS2B336qMU4QfGTOCQ",
+      "request": {
+        "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+        "timestamp": 1730000000,
+        "device_signature": "61LjDqIWJB46WiXmxM1h7pGj5qyBl34DEPeS7N-vDVxsqATflKtVycbrF9aN70r74IPK37raPWv8p33e6taGAg",
+        "signer_certificate": {
+          "$type": "meshline.device.certificate",
+          "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+          "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+          "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+          "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk",
+          "not_before": 1729990000,
+          "expires_at": 1792198000,
+          "device_signature": "PGtQXsbhFoSpm6RRMis4NGdOpGQJJEqn4CxW9PsVpEjVi9v0CrOTtBZpl6MpZkCQg2Sb0hDvhyfNNbiRaqO0Bg",
+          "account_signature": "mo-mvcl2j1RwgZOYVYxao1W8xZhmFIGvX-8GVHkMJHJhlnQSqNaLnZSmEhavG2XlwcTS8jBSQJzb0TVXZZHjSg"
+        }
+      }
+    },
+    "account_auth": {
+      "auth_payload": {
+        "$type": "meshline.relay.account_auth",
+        "relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "origin": "https://relay.example",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+        "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+      },
+      "signing_input_canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.relay.account_auth\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"nonce\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"origin\":\"https://relay.example\",\"relay_id\":\"0x1234567890abcdef1234567890abcdef12345678\"}",
+      "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e72656c61792e6163636f756e745f61757468222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226e6f6e6365223a2241414543417751464267634943516f4c4441304f4478415245684d554652595847426b6147787764486838222c226f726967696e223a2268747470733a2f2f72656c61792e6578616d706c65222c2272656c61795f6964223a22307831323334353637383930616263646566313233343536373839306162636465663132333435363738227d",
+      "signing_input_sha256_hex": "08e30327d760ef12b130afef4cf72d88995064f25d405aaa53ea329ff8b89f75",
+      "signature": "U8az5blnhx23Ye17LmYzBhBY0MUO6OF56mU9JMpyDzStBWvmJMoiC7T-zI8_GdGI61VSD_LsmJlmCXDDXMVpew",
+      "legacy_signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e72656c61792e6163636f756e745f61757468222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226e6f6e6365223a2241414543417751464267634943516f4c4441304f4478415245684d554652595847426b6147787764486838222c226f726967696e223a2268747470733a2f2f72656c61792e6578616d706c65227d",
+      "legacy_signature": "x2KGspB_gJgoJnBwu1IIzFTbZcsBfCSuxn-V4GKVpEnWEi1_opa3SMKJpICPvvGEAzcFXS5IyLlFFQJFQy__4Q",
+      "request": {
+        "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+        "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+        "account_signature": "U8az5blnhx23Ye17LmYzBhBY0MUO6OF56mU9JMpyDzStBWvmJMoiC7T-zI8_GdGI61VSD_LsmJlmCXDDXMVpew"
+      }
+    },
+    "verification_cases": [
+      {
+        "name": "original_target",
+        "trusted_relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "endpoint": "https://relay.example/a/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "expected_signature_valid": true
+      },
+      {
+        "name": "same_relay_https_alias",
+        "trusted_relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "endpoint": "https://RELAY.example:443/alternate/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "expected_signature_valid": true
+      },
+      {
+        "name": "same_relay_wss",
+        "trusted_relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "endpoint": "wss://relay.example/a/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "expected_signature_valid": true
+      },
+      {
+        "name": "different_relay_same_origin",
+        "trusted_relay_id": "0xabcdef1234567890abcdef1234567890abcdef12",
+        "endpoint": "https://relay.example/b/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "expected_signature_valid": false
+      },
+      {
+        "name": "different_relay_wss_same_origin",
+        "trusted_relay_id": "0xabcdef1234567890abcdef1234567890abcdef12",
+        "endpoint": "wss://relay.example/b/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "expected_signature_valid": false
+      },
+      {
+        "name": "same_relay_different_origin",
+        "trusted_relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "endpoint": "https://other.example/a/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "expected_signature_valid": false
+      },
+      {
+        "name": "different_network_context",
+        "trusted_relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "endpoint": "https://relay.example/a/meshline/v1",
+        "network_context": "neo:860833103:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "expected_signature_valid": false
+      },
+      {
+        "name": "different_nonce",
+        "trusted_relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "endpoint": "https://relay.example/a/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "nonce_override": "Hx4dHBsaGRgXFhUUExIREA8ODQwLCgkIBwYFBAMCAQA",
+        "expected_signature_valid": false
+      },
+      {
+        "name": "legacy_signature_without_relay_id",
+        "trusted_relay_id": "0x1234567890abcdef1234567890abcdef12345678",
+        "endpoint": "https://relay.example/a/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "legacy_signature",
+        "expected_signature_valid": false
+      },
+      {
+        "name": "request_relay_id_cannot_override_local_identity",
+        "trusted_relay_id": "0xabcdef1234567890abcdef1234567890abcdef12",
+        "endpoint": "https://relay.example/b/meshline/v1",
+        "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "signature_field": "signature",
+        "request_extra_fields": {
+          "relay_id": "0x1234567890abcdef1234567890abcdef12345678"
+        },
+        "expected_signature_valid": false
+      }
+    ]
+  }
+}

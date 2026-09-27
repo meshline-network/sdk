@@ -1,0 +1,25 @@
+{
+  "source": "meshline-network/protocol/v1/test-vectors",
+  "commit": "d3f358afe650afd5fecb777b35cebfeec5bd147d",
+  "working_tree": [
+    "M  v1/en/client-relay/concepts/account-and-device-lifecycle.md",
+    "M  v1/en/client-relay/concepts/message-timeline.md",
+    "M  v1/en/client-relay/groups/core-objects.md",
+    "M  v1/en/client-relay/groups/methods/lifecycle-and-sync.md",
+    "M  v1/en/client-relay/groups/methods/properties-and-roles.md",
+    "M  v1/maintenance/translations.json",
+    "M  v1/zh-Hans/client-relay/concepts/account-and-device-lifecycle.md",
+    "M  v1/zh-Hans/client-relay/concepts/message-timeline.md",
+    "M  v1/zh-Hans/client-relay/groups/core-objects.md",
+    "M  v1/zh-Hans/client-relay/groups/methods/lifecycle-and-sync.md"
+  ],
+  "files": {
+    "channels-v1.json": "2f70c1a5754e0d862e453aafa4ca8122399e2d0c375df4e6b83973adbdf3b105",
+    "common-v1.json": "ac8ae251cfefc1d3c1e3595121931e83f036c5204d5d879094be1de71cebbc3c",
+    "contacts-v1.json": "7391800f5fba895aa29004a0f11d935ac919f498518deb2dbc01d434133c6b19",
+    "groups-v1.json": "fe29509a435d4654d3991f09c8496b2e922cd04c8d6a7a6fbcdccabf816bda9f",
+    "identity-auth-v1.json": "bd3216a576de2babe2fd55352f59942d2c99d93392015dcedf3299957124efc9",
+    "message-content-v1.json": "bc56656082e7e6b69efc20e7875e9f7ec0c9ed9c91af8a859792515392d6aca6",
+    "message-encryption-v1.json": "7f1e63e7fe881c48057b23f2970cae0dad918bdec0a79afbfee8d239160bae77"
+  }
+}

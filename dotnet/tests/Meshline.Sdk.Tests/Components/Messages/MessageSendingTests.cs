@@ -1,0 +1,103 @@
+using Meshline.Models.Client;
+using Meshline.Models.Protocol;
+using Meshline.Tests.Support;
+using System.Collections.Concurrent;
+
+namespace Meshline.Tests.Components.Messages;
+
+public sealed class MessageSendingTests
+{
+    static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    static DirectMessageDraft Draft(string text = "hello") => new()
+    {
+        Body = new()
+        {
+            ContentType = "text/plain",
+            Text = text
+        }
+    };
+    [Fact]
+    public async Task Queued_message_can_be_canceled()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+
+        var manager = fixture.Client.MessageManager;
+        var queued = await manager.SendMessageAsync(fixture.Account.AccountId, Draft(), Token);
+
+        Assert.Equal(MessageSendState.Queued, queued.State);
+        Assert.True(await manager.CancelMessageAsync(queued.MessageId, Token));
+        Assert.Equal(MessageSendState.Canceled, (await manager.GetSendStatusAsync(queued.MessageId, Token))!.State);
+    }
+
+    [Fact]
+    public async Task Inflight_state_recovers_after_restart_and_cannot_be_canceled()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+
+        var manager = fixture.Client.MessageManager;
+
+        var pending = await manager.SendMessageAsync(fixture.Account.AccountId, Draft("inflight"), Token);
+        await using (var db = fixture.Database.Open())
+        {
+            var row = await db.MessageOutbox.FindAsync([pending.MessageId], Token);
+            row!.State = MessageSendState.Submitting;
+            await db.SaveChangesAsync(Token);
+        }
+
+        await fixture.ReopenAsync();
+
+        Assert.Equal(MessageSendState.SubmissionUnknown, (await fixture.Client.MessageManager.GetSendStatusAsync(pending.MessageId, Token))!.State);
+        Assert.False(await fixture.Client.MessageManager.CancelMessageAsync(pending.MessageId, Token));
+    }
+
+    [Fact]
+    public async Task Failed_send_retries_same_ciphertext_and_reports_completion()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+
+        var manager = fixture.Client.MessageManager;
+        var queued = await manager.SendMessageAsync(fixture.Account.AccountId, Draft(), Token);
+        var failed = AsyncTest.Signal();
+        var completed = AsyncTest.Signal();
+        var bodies = new ConcurrentQueue<string>();
+        manager.SendStatusChanged += (_, change) =>
+        {
+            if (change.Status.MessageId != queued.MessageId)
+                return;
+            if (change.Status.State == MessageSendState.SubmissionUnknown)
+                failed.TrySetResult();
+            if (change.Status.State == MessageSendState.TargetAccepted)
+                completed.TrySetResult();
+        };
+        fixture.Relay.Handler = (request, _) =>
+        {
+            if (request.Method == "message.send" && ProtocolModel.FromJson<MessageSendRequest>(request.Body!)!.Envelope.MessageId == queued.MessageId)
+            {
+                bodies.Enqueue(request.Body!);
+                if (bodies.Count == 1)
+                    throw new HttpRequestException("Connection lost after submission");
+            }
+
+            return Task.FromResult(fixture.Relay.Respond(request));
+        };
+        await manager.StartAsync(Token);
+        await failed.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        // Stop drains the sender before advancing time, making the retry boundary deterministic.
+        await manager.StopAsync(Token);
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(15));
+        await manager.StartAsync(Token);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        await manager.StopAsync(Token);
+
+        Assert.Equal(2, bodies.Count);
+        Assert.Single(bodies.Distinct());
+        Assert.Null(await manager.GetSendStatusAsync(queued.MessageId, Token));
+    }
+}
