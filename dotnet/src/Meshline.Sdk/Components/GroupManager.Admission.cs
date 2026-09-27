@@ -23,8 +23,17 @@ sealed partial class GroupManager
         var now = Clock.UtcNow.ToUnixTimeSeconds();
         var limits = (await relay.GetInfoAsync(token).ConfigureAwait(false)).Limits;
         if (expiry.ToUnixTimeSeconds() - now > limits.MaxGroupInviteTtl) throw new ArgumentOutOfRangeException(nameof(expiry), "The invitation lifetime exceeds the hosting relay limit.");
-        var invite = await SignAsync(new SignedInvite { InviteId = Identifiers.CreateInviteId(), GroupId = group.GroupId, Inviter = Options.AccountId, Invitee = invitee,
-            MaxUses = maxUses, CreatedAt = now, ExpiresAt = expiry.ToUnixTimeSeconds(), DeviceSignature = [] }, token).ConfigureAwait(false);
+        var invite = await SignAsync(new SignedInvite
+        {
+            InviteId = Identifiers.CreateInviteId(),
+            GroupId = group.GroupId,
+            Inviter = Options.AccountId,
+            Invitee = invitee,
+            MaxUses = maxUses,
+            CreatedAt = now,
+            ExpiresAt = expiry.ToUnixTimeSeconds(),
+            DeviceSignature = []
+        }, token).ConfigureAwait(false);
         var operation = NewOperation(group, "group.invite.create", invite);
         await SaveOperationAsync(operation, token).ConfigureAwait(false);
         await SubmitOperationAsync(operation, recovering: false, token).ConfigureAwait(false);
@@ -149,8 +158,14 @@ sealed partial class GroupManager
         }
         finally { CryptographicOperations.ZeroMemory(privateKey); }
         var result = (GroupRecoverySubmitResult)(await SubmitOperationAsync(operation, recovering: false, cancellationToken).ConfigureAwait(false))!;
-        var info = new GroupKeyRecoveryInfo { Group = group, Request = ProtocolModel.FromJson<GroupMemberRecoveryRequest>(operation.RequestJson)!, SignerCertificate = Certificate,
-            AcceptedAt = DateTimeOffset.FromUnixTimeSeconds(result.AcceptedAt), ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(result.ExpiresAt) };
+        var info = new GroupKeyRecoveryInfo
+        {
+            Group = group,
+            Request = ProtocolModel.FromJson<GroupMemberRecoveryRequest>(operation.RequestJson)!,
+            SignerCertificate = Certificate,
+            AcceptedAt = DateTimeOffset.FromUnixTimeSeconds(result.AcceptedAt),
+            ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(result.ExpiresAt)
+        };
         return info;
     }
 
