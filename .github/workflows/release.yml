@@ -1,0 +1,203 @@
+name: Release .NET SDK
+
+on:
+  push:
+    branches: [main]
+
+# Serialize version checks and publishing; never cancel a release in progress.
+concurrency:
+  group: release-dotnet-sdk
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  SDK_PROJECT: dotnet/src/Meshline.Sdk/Meshline.Sdk.csproj
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the pushed commit and tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read Version and check the GitHub Release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [xml] $project = Get-Content $env:SDK_PROJECT -Raw
+          $declaredVersions = @($project.SelectNodes('/Project/PropertyGroup/Version') |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.InnerText) })
+          $declaredPrefixes = @($project.SelectNodes('/Project/PropertyGroup/VersionPrefix') |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.InnerText) })
+          if ($declaredVersions.Count -eq 0) {
+            if ($declaredPrefixes.Count -eq 0) {
+              throw 'The SDK project must declare Version or VersionPrefix.'
+            }
+            # VersionPrefix is reserved for the future MyGet publishing workflow.
+            # Check declarations before MSBuild derives Version from VersionPrefix.
+            'publish=false' >> $env:GITHUB_OUTPUT
+            'VersionPrefix is configured without Version; skipping GitHub Release and NuGet publication.' >> $env:GITHUB_STEP_SUMMARY
+            exit 0
+          }
+          if ($declaredVersions.Count -ne 1) {
+            throw 'The SDK project must declare exactly one non-empty Version property for release publishing.'
+          }
+
+          $json = dotnet msbuild $env:SDK_PROJECT -nologo -getProperty:Version,PackageVersion,PackageId
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to read SDK package properties.' }
+          $properties = ($json | ConvertFrom-Json).Properties
+          $version = $properties.Version
+          # Canonical SemVer without build metadata keeps NuGet identity and tag names aligned.
+          $number = '(0|[1-9][0-9]*)'
+          $identifier = '(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+          if ($version -cnotmatch "^$number\.$number\.$number(-$identifier(\.$identifier)*)?$") {
+            throw 'Version must be major.minor.patch, optionally followed by a SemVer prerelease suffix.'
+          }
+          if ($properties.PackageVersion -cne $version -or $properties.PackageId -cne 'Meshline.Sdk') {
+            throw 'Meshline.Sdk PackageVersion must match Version.'
+          }
+
+          $tag = "v$version"
+          # The list endpoint includes drafts for this token and --paginate covers older releases.
+          $filter = '.[] | select(.tag_name == "' + $tag + '")'
+          $releaseJson = gh api --paginate "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --jq $filter
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release lookup failed.' }
+          $draft = $false
+          if ($releaseJson) {
+            $release = $releaseJson | ConvertFrom-Json
+            if (-not $release.draft) {
+              'publish=false' >> $env:GITHUB_OUTPUT
+              "Release $tag already exists; skipping publication." >> $env:GITHUB_STEP_SUMMARY
+              exit 0
+            }
+            $draft = $true
+            if ($release.target_commitish -ne $env:GITHUB_SHA) {
+              throw "Draft $tag targets another commit; inspect it before retrying."
+            }
+          }
+
+          # A pre-existing tag must never cause a release to describe another commit.
+          $tagCommit = git rev-parse --verify --quiet "refs/tags/$tag^{commit}"
+          if ($LASTEXITCODE -eq 0 -and $tagCommit -ne $env:GITHUB_SHA) {
+            throw "Tag $tag already points to another commit."
+          }
+          if ($LASTEXITCODE -notin 0, 1) { throw 'Failed to inspect the release tag.' }
+          $global:LASTEXITCODE = 0
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "draft=$($draft.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          'publish=true' >> $env:GITHUB_OUTPUT
+
+      - name: Check NuGet publishing configuration
+        if: steps.version.outputs.publish == 'true'
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_USER)) {
+            throw 'Configure the repository Actions variable NUGET_USER with your nuget.org username (not email).'
+          }
+
+      - name: Restore
+        if: steps.version.outputs.publish == 'true'
+        run: dotnet restore dotnet/Meshline.Sdk.slnx
+
+      - name: Build Release
+        if: steps.version.outputs.publish == 'true'
+        run: dotnet build dotnet/Meshline.Sdk.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Run the complete offline test suite
+        if: steps.version.outputs.publish == 'true'
+        run: >-
+          dotnet run --project dotnet/tests/Meshline.Sdk.Tests -c Release --no-build --
+          --minimum-expected-tests 1 --fail-skips on --report-xunit-trx
+          --results-directory "${{ runner.temp }}/test-results"
+
+      - name: Pack
+        if: steps.version.outputs.publish == 'true'
+        run: >-
+          dotnet pack $env:SDK_PROJECT -c Release --no-build --no-restore
+          -p:ContinuousIntegrationBuild=true --output "$env:RUNNER_TEMP/packages"
+
+      # Configure a nuget.org Trusted Publishing policy for meshline-network/sdk,
+      # workflow file release.yml, with Environment left empty.
+      - name: Authenticate to NuGet with Trusted Publishing
+        if: steps.version.outputs.publish == 'true'
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish NuGet package
+        if: steps.version.outputs.publish == 'true'
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.version }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          $package = "$env:RUNNER_TEMP/packages/Meshline.Sdk.$env:SDK_VERSION.nupkg"
+          if (-not (Test-Path -LiteralPath $package)) { throw "Missing package: $package" }
+
+          # Recover a NuGet-success / GitHub-failure run only for the same source commit.
+          $normalizedVersion = $env:SDK_VERSION.ToLowerInvariant()
+          $uri = "https://api.nuget.org/v3-flatcontainer/meshline.sdk/$normalizedVersion/meshline.sdk.nuspec"
+          $response = Invoke-WebRequest $uri -SkipHttpErrorCheck -TimeoutSec 30
+          switch ([int] $response.StatusCode) {
+            200 {
+              [xml] $nuspec = $response.Content
+              $repository = $nuspec.SelectSingleNode('//*[local-name()="metadata"]/*[local-name()="repository"]')
+              if ($null -eq $repository -or $repository.commit -ne $env:GITHUB_SHA) {
+                throw 'This NuGet version belongs to another source commit. Bump Version before publishing.'
+              }
+              Write-Host 'This commit is already on NuGet; continuing with the GitHub Release.'
+            }
+            404 {
+              dotnet nuget push $package --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json
+              if ($LASTEXITCODE -ne 0) {
+                throw 'NuGet publishing failed. If the package was already accepted, wait for indexing and rerun this workflow run.'
+              }
+            }
+            default { throw "NuGet version lookup failed: HTTP $($response.StatusCode)." }
+          }
+
+      # Publish the Release last so a failed NuGet upload cannot suppress future attempts.
+      - name: Publish GitHub Release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SDK_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RESUME_DRAFT: ${{ steps.version.outputs.draft }}
+        run: |
+          $package = "$env:RUNNER_TEMP/packages/Meshline.Sdk.$env:SDK_VERSION.nupkg"
+          $prerelease = $env:SDK_VERSION.Contains('-').ToString().ToLowerInvariant()
+          if ($env:RESUME_DRAFT -eq 'true') {
+            # gh release create may leave a draft if its asset upload or final publication failed.
+            gh release upload $env:RELEASE_TAG $package --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to upload the package to the draft release.' }
+            gh release edit $env:RELEASE_TAG --draft=false "--prerelease=$prerelease"
+          } else {
+            gh release create $env:RELEASE_TAG $package --target $env:GITHUB_SHA `
+              --title "Meshline.Sdk $env:SDK_VERSION" --generate-notes "--prerelease=$prerelease"
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release publication failed; rerun this workflow run to recover.' }
+          "Published Meshline.Sdk $env:SDK_VERSION to NuGet and GitHub Releases." >> $env:GITHUB_STEP_SUMMARY

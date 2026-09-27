@@ -31,8 +31,13 @@ sealed partial class GroupManager
             try
             {
                 var commitment = Commitment(group.GroupId, secret);
-                rotation = new() { GroupId = group.GroupId, BaseCommitment = state.Commitment!, Commitment = commitment,
-                    ProtectedSecret = await secretProtector.ProtectAsync(secret, SecretPurpose(group.GroupId, "rotation", commitment), cancellationToken).ConfigureAwait(false) };
+                rotation = new()
+                {
+                    GroupId = group.GroupId,
+                    BaseCommitment = state.Commitment!,
+                    Commitment = commitment,
+                    ProtectedSecret = await secretProtector.ProtectAsync(secret, SecretPurpose(group.GroupId, "rotation", commitment), cancellationToken).ConfigureAwait(false)
+                };
                 if (rotateOwnerKey)
                 {
                     var privateKey = RandomNumberGenerator.GetBytes(32);
@@ -63,8 +68,14 @@ sealed partial class GroupManager
                 await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                 after = members[^1].AccountId;
             }
-            var request = await SignAsync(new GroupSecretRotation { GroupId = group.GroupId, PrevHash = state.ManagementHash!, ClientSecretCommitment = rotation.Commitment,
-                OwnerEncryptionPublicKey = rotation.OwnerPublicKey is { } key ? [.. key] : null, DeviceSignature = [] }, cancellationToken).ConfigureAwait(false);
+            var request = await SignAsync(new GroupSecretRotation
+            {
+                GroupId = group.GroupId,
+                PrevHash = state.ManagementHash!,
+                ClientSecretCommitment = rotation.Commitment,
+                OwnerEncryptionPublicKey = rotation.OwnerPublicKey is { } key ? [.. key] : null,
+                DeviceSignature = []
+            }, cancellationToken).ConfigureAwait(false);
             await CheckManagementAsync(group, request, cancellationToken).ConfigureAwait(false);
             var operation = NewOperation(group, "group.secret.rotation.commit", request);
             await SaveOperationAsync(operation, cancellationToken).ConfigureAwait(false);
