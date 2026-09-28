@@ -2,6 +2,8 @@
 
 **Version 1.0.0** · **.NET 10** · Assembly: `Meshline.Sdk` · Root namespace: `Meshline`
 
+[NuGet package](https://www.nuget.org/packages/Meshline.Sdk) · [Release notes](https://github.com/meshline-network/sdk/releases/tag/v1.0.0) · [Source](https://github.com/meshline-network/sdk)
+
 Meshline is a decentralized messaging and social protocol built around self-sovereign identity. Its .NET SDK provides the client workflows and protocol primitives for building applications on a Meshline network:
 
 - Account routes, home-relay migration, device authorization, and profiles.
@@ -28,7 +30,7 @@ dotnet add path/to/MyApp.csproj reference path/to/sdk/dotnet/src/Meshline.Sdk/Me
 
 SQLite and its EF Core provider are included. The application needs a writable directory for each local database and access to its chosen Meshline network. A named HTTP client registered through Microsoft DI additionally requires `Microsoft.Extensions.Http` 10.x; see [HTTP configuration](#http-configuration).
 
-Version 1.0.0 is validated by the [offline test suite](#offline-tests). Live-relay interoperability and cross-platform release validation, including mobile, browser, and NativeAOT environments, remain pending. Relay-server/DHT behavior and application content rendering are outside the SDK test suite.
+Version 1.0.0 is validated by the [offline test suite](#validation-scope). Live-relay interoperability and cross-platform release validation, including mobile, browser, and NativeAOT environments, remain pending. Relay-server/DHT behavior and application content rendering are outside the SDK test suite.
 
 ## Application integrations
 
@@ -192,17 +194,7 @@ SQLite is the built-in storage engine; other database providers are not supporte
 
 Use a separate database for each network, account, and device. The application chooses and creates the parent directory and calls `MeshlineDatabase.MigrateAsync` to create or upgrade the database. Startup never migrates or deletes it automatically. `ISecretProtector` protects stored device and group secrets; it does not encrypt the entire SQLite database.
 
-The existing `InitialCreate` migration is the **1.0.0 database baseline**. Preserve it and add incremental migrations for subsequent model changes. Generate migrations and model snapshots with `dotnet-ef`, rather than editing them by hand. The test project hosts the design-time factory and EF Core design tools.
-
-Run from this directory (`dotnet/`) after changing the model, replacing `DescribeSchemaChange` with a descriptive migration name:
-
-```sh
-dotnet tool restore
-dotnet ef migrations add DescribeSchemaChange --project src/Meshline.Sdk --startup-project tests/Meshline.Sdk.Tests --context MeshlineDbContext --output-dir Storage/Migrations
-dotnet ef migrations has-pending-model-changes --project src/Meshline.Sdk --startup-project tests/Meshline.Sdk.Tests --context MeshlineDbContext
-```
-
-The factory uses an in-memory SQLite database, so generating migrations does not modify application databases. Verify both a fresh database and an upgrade from the previous schema when introducing a migration. Pre-1.0 development databases built from a different initial migration are not covered by this upgrade baseline.
+The existing `InitialCreate` migration is the **1.0.0 database baseline**. Pre-1.0 development databases built from a different initial migration are not covered by this upgrade baseline. Preserve the database and the matching secret-protection keys when moving or restoring an application's local state.
 
 ## Relay connections
 
@@ -268,29 +260,26 @@ This configuration describes one account/network. Each scope owns a pool for an 
 
 `AddHttpClient(name)` alone configures the factory but does not enable keyed injection. If no matching keyed client is registered, the optional constructor argument is null and the pool creates its own client. Unkeyed clients or other names are not selected. Errors resolving a registered keyed client propagate to the caller.
 
-## Build and package
+## Use the source project
 
-Run from this directory (`dotnet/`):
+To use a local checkout, run from this directory (`dotnet/`):
 
 ```sh
 dotnet restore Meshline.Sdk.slnx
 dotnet build Meshline.Sdk.slnx -c Release --no-restore
-dotnet pack src/Meshline.Sdk/Meshline.Sdk.csproj -c Release --no-build --no-restore
 ```
 
-Packing creates `src/Meshline.Sdk/bin/Release/Meshline.Sdk.1.0.0.nupkg` locally. It does not publish a package. The SDK project explicitly sets version `1.0.0`; assembly and file versions are derived as `1.0.0.0`.
+Then add the [project reference](#requirements-and-installation) to your application. The NuGet package is the usual installation path when you do not need to modify the SDK.
 
-Builds also generate `Meshline.Sdk.xml` beside the SDK assembly, and packing includes it for IntelliSense in consuming applications. Public and protected APIs document their purpose, parameters, return values, and relevant lifecycle, ownership, validation, and paging constraints. XML documentation diagnostics, including missing public-member comments, fail the build under the existing warnings-as-errors policy.
+The package includes XML API documentation for IntelliSense, covering parameters, return values, lifecycle, ownership, validation, and paging constraints.
 
-## Offline tests
+## Validation scope
 
-After restoring and building, run the xUnit v3 / Microsoft Testing Platform suite:
+Version 1.0.0 passed 542 offline tests covering protocol and cryptographic vectors, transport, SQLite persistence, account and device workflows, contacts, messaging, channels, groups, and lifecycle behavior. These tests use in-memory relay peers and isolated local databases.
 
-```sh
-dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --minimum-expected-tests 1 --fail-skips on --report-xunit-trx --results-directory TestResults
-```
+This does not establish live-relay interoperability or support for mobile, browser, or NativeAOT environments. Applications remain responsible for account signing, network registry access, secret protection, content retrieval, and rendering.
 
-The [test guide](https://github.com/meshline-network/sdk/blob/main/dotnet/TESTING.md) covers test organization, filters, concurrency checks, fixtures, validation scope, and protocol vector provenance and applicability.
+The [test guide](https://github.com/meshline-network/sdk/blob/main/dotnet/TESTING.md) describes the coverage and protocol-vector provenance. For SDK contributions, local checks, and package releases, see the [maintenance guide](https://github.com/meshline-network/sdk/blob/main/MAINTENANCE.md).
 
 ## Source layout
 
@@ -299,5 +288,8 @@ The [source project](https://github.com/meshline-network/sdk/tree/main/dotnet/sr
 ## Source and license
 
 - [Source repository](https://github.com/meshline-network/sdk)
+- [NuGet package](https://www.nuget.org/packages/Meshline.Sdk)
+- [Meshline developer resources](https://meshline.org/en/resources)
 - [Meshline protocol](https://github.com/meshline-network/protocol)
+- [Registry reference contracts](https://github.com/meshline-network/contracts)
 - [MIT license](https://github.com/meshline-network/sdk/blob/main/LICENSE); the full license text is also included in the NuGet package as `LICENSE`.

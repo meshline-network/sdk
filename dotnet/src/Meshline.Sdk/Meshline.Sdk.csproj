@@ -4,6 +4,8 @@
     <Authors>Meshline</Authors>
     <Description>Client SDK for the Meshline protocol, with self-sovereign accounts, encrypted messaging, groups, channels, relay connectivity, and SQLite persistence.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageTags>meshline;messaging;encrypted-messaging;decentralized;protocol;sdk</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/meshline-network/sdk</PackageProjectUrl>
     <RepositoryUrl>https://github.com/meshline-network/sdk</RepositoryUrl>
@@ -25,5 +27,6 @@
   <ItemGroup>
     <None Include="../../README.md" Link="README.md" Pack="true" PackagePath="" />
     <None Include="../../../LICENSE" Pack="true" PackagePath="" />
+    <None Include="../../../assets/icon.png" Pack="true" PackagePath="" />
   </ItemGroup>
 </Project>

@@ -2,16 +2,22 @@
 
 Meshline is a decentralized messaging and social protocol built around self-sovereign identity. This repository contains its client SDKs, organized by language.
 
-The **.NET SDK 1.0.0** provides account and device management, profiles, contacts, encrypted direct and group messaging, channels, relay connectivity, and SQLite persistence. Start with the [.NET SDK guide](dotnet/README.md) for requirements, source integration, examples, and build instructions.
+## Available SDKs
 
-| SDK | Location | Status |
+Choose an SDK for its requirements, installation instructions, integration examples, and validation scope.
+
+| SDK | Documentation | Status |
 | --- | --- | --- |
-| .NET | [dotnet](dotnet/README.md) | **1.0.0** |
-| TypeScript | Planned: `typescript/` | Development will follow the .NET SDK. |
+| .NET | [Guide and examples](dotnet/README.md) | Released |
+| TypeScript | Not yet available | Planned |
 
-Each SDK keeps its source, tests, dependencies, and build configuration in its own directory. Repository-wide formatting and Git conventions live at the root.
+## Related resources
 
-The .NET guide also describes validation coverage and the application integrations needed to connect to a Meshline network.
+- [Meshline website and developer resources](https://meshline.org/en/resources)
+- [Protocol specification](https://github.com/meshline-network/protocol) and [online reader](https://meshline.org/protocol/v1/en/index.html)
+- [Registry reference contracts](https://github.com/meshline-network/contracts)
+
+For changes to the SDK itself, see the [maintenance guide](MAINTENANCE.md).
 
 ## License
 
