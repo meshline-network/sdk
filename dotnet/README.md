@@ -4,6 +4,8 @@
 
 [NuGet package](https://www.nuget.org/packages/Meshline.Sdk) · [Release notes](https://github.com/meshline-network/sdk/releases/tag/v1.0.0) · [Source](https://github.com/meshline-network/sdk)
 
+[Developer guide](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/README.md) · [Complete API reference](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/api/README.md) · [Compilable examples](https://github.com/meshline-network/sdk/blob/main/dotnet/samples/README.md)
+
 Meshline is a decentralized messaging and social protocol built around self-sovereign identity. Its .NET SDK provides the client workflows and protocol primitives for building applications on a Meshline network:
 
 - Account routes, home-relay migration, device authorization, and profiles.
@@ -271,7 +273,7 @@ dotnet build Meshline.Sdk.slnx -c Release --no-restore
 
 Then add the [project reference](#requirements-and-installation) to your application. The NuGet package is the usual installation path when you do not need to modify the SDK.
 
-The package includes XML API documentation for IntelliSense, covering parameters, return values, lifecycle, ownership, validation, and paging constraints.
+The package includes XML API documentation for IntelliSense, covering parameters, return values, lifecycle, ownership, validation, and paging constraints. The [developer guide](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/README.md) expands the workflows into chapters, and the [API reference](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/api/README.md) presents the public surface as generated Markdown. Both follow the source checkout; consult the matching release tag when integrating a different package version.
 
 ## Validation scope
 

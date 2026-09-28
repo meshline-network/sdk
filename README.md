@@ -8,7 +8,7 @@ Choose an SDK for its requirements, installation instructions, integration examp
 
 | SDK | Documentation | Status |
 | --- | --- | --- |
-| .NET | [Guide and examples](dotnet/README.md) | Released |
+| .NET | [Installation](dotnet/README.md) · [Developer guide](dotnet/docs/README.md) · [API reference](dotnet/docs/api/README.md) | Released |
 | TypeScript | Not yet available | Planned |
 
 ## Related resources

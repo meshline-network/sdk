@@ -63,3 +63,26 @@ The release job has `id-token: write` for authentication and `contents: write` f
 ## Documentation
 
 Keep README files, website copy, and Release notes focused on installation, integration, capabilities, and limits for SDK consumers. Keep build, testing, publishing, and contributor procedures in this guide or the test guide.
+
+The [developer guide](dotnet/docs/README.md) is hand-written English Markdown. The [API reference](dotnet/docs/api/README.md) is generated with the repository-local `DefaultDocumentation.Console` tool, pinned to 1.2.5 in `dotnet/docs/dotnet-tools.json`. The documentation script runs from that directory to resolve its own tool manifest; the EF migration manifest remains at `dotnet/dotnet-tools.json`. Do not edit generated pages. Change the SDK's XML comments to correct API explanations, or the generator configuration to change presentation.
+
+Use PowerShell 7.6 or later and the .NET 10 SDK. PowerShell must run on .NET 10 to load the SDK's metadata inspection library. From the **SDK repository root**, run:
+
+```powershell
+pwsh -NoProfile -File dotnet/docs/scripts/Invoke-Documentation.ps1 -Mode Generate
+pwsh -NoProfile -File dotnet/docs/scripts/Invoke-Documentation.ps1 -Mode Check
+```
+
+Both commands restore the pinned local tool and compile the SDK and examples in Release. [The PowerShell entry point](dotnet/docs/scripts/Invoke-Documentation.ps1) and its helpers, `ApiSurface.ps1` and `Markdown.ps1`, are kept together in `dotnet/docs/scripts/` for API inspection, XML inheritance, snippet synchronization, link checking and output comparison. It uses PowerShell's built-in `ConvertFrom-Markdown` parser and the .NET SDK's `System.Reflection.MetadataLoadContext` library; it does not compile custom C# helpers or restore a separate Markdown package. MSBuild supplies the resolved reference paths so API inspection reads metadata without executing SDK code. Documentation checks run independently of the SDK test project and do not build or invoke it. `Generate` writes the API reference and synchronizes named C# snippets into the guides. `Check` generates into a unique temporary directory and compares the full output, including missing or obsolete files, without rewriting authored or generated documentation. Temporary output is removed after either command, including failures.
+
+The API reference uses the generator's native `FileNameFactory: FullName` layout. All pages are placed directly in `api/`, with fully qualified names such as `Meshline.Components.AccountManager.md`; the assembly index is `api/README.md`. Members stay on their type page. The generator produces the filenames and cross-references directly. `api/coverage.json` maps XML member IDs to the generated URLs; use it when updating links from guides.
+
+Maintain each public namespace's summary in an `internal static class NamespaceDoc` in that namespace's `NamespaceDoc.cs` file. The script preserves these XML comments for DefaultDocumentation to populate the namespace page and assembly index. The helper classes are not part of the public API inventory.
+
+The utility derives a coverage inventory from the public assembly surface and XML member IDs. It includes protected extension points on inheritable types and labels EF Core migrations as infrastructure. Internal types, compiler-generated record helpers, and protected implementation overrides on sealed types are excluded. Inherited documentation is expanded before rendering so local exception descriptions survive. Missing XML summaries and unresolved inheritance fail generation; do not silence them by excluding an application API. Compiler-supplied default constructors are not separate documentation entries.
+
+Examples live in [the sample project](dotnet/samples/README.md). Add a uniquely named `#region` for a complete method or coherent group of methods, then reference it in a guide with paired `<!-- snippet: name -->` and `<!-- /snippet -->` markers. The generated fenced code comes from that region. The utility rejects missing, duplicate, malformed, and unused snippets. Source imports remain in the linked C# file. Build compilation verifies API use; it does not execute wallet or network operations.
+
+The checker parses Markdown links and heading anchors, verifies generated API coverage, and requires deterministic LF output. It rejects missing, stale or obsolete output, broken links, missing API symbols and snippet drift. PR documentation checks run in a dedicated job on Windows and Linux. The separate unit-test job verifies SDK behavior without documentation-tool dependencies or checks. External website availability is not a CI dependency; review external destinations when adding or changing links. API source and test changes continue through the existing format, Release build, and offline behavioral checks.
+
+Keep the SDK's package README useful on NuGet: retain installation and minimal startup examples, and use absolute GitHub links to the extended guide. Documentation edits do not require a package version bump or an immediate release. New NuGet packages embed the then-current package README; an existing package's embedded README does not update when GitHub documentation changes.

@@ -1,0 +1,11 @@
+{
+  "AssemblyPageName": "README",
+  "FileNameFactory": "FullName",
+  "GeneratedAccessModifiers": "Api",
+  "GeneratedPages": "Assembly,Namespaces,Types",
+  "IncludeUndocumentedItems": true,
+  "DocItemGenerators": ["Exclude"],
+  "Markdown.RemoveFileExtensionFromUrl": false,
+  "Markdown.UrlFormat": "[{0}]({1})",
+  "Markdown.HandleLineBreak": true
+}

@@ -20,6 +20,30 @@ defaults:
     working-directory: dotnet
 
 jobs:
+  documentation:
+    name: Documentation (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Verify API reference, compiled examples, and Markdown links
+        shell: pwsh
+        working-directory: .
+        run: ./dotnet/docs/scripts/Invoke-Documentation.ps1 -Mode Check
+
   format:
     name: Code format
     runs-on: ubuntu-latest
