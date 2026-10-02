@@ -31,7 +31,7 @@ public static async Task RecoverAsync(
 ```
 <!-- /snippet -->
 
-Source: [Sessions.cs](../../samples/Meshline.Sdk.Examples/Sessions.cs). After recovery completes, start the client and observe synchronization. `AccountRecoveryOptions` can carry verified `PreviousDeviceState` and explicit device-state and route revisions when the application needs them. Otherwise the SDK selects recovery revisions. A supplied previous state can preserve devices; do not invent previous state or assume every old device is preserved when that state is unavailable.
+Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). After recovery completes, start the client and observe synchronization. `AccountRecoveryOptions` can carry verified `PreviousDeviceState` and explicit device-state and route revisions when the application needs them. Otherwise the SDK selects recovery revisions. A supplied previous state can preserve devices; do not invent previous state or assume every old device is preserved when that state is unavailable.
 
 Recovery publishes device state and an account route. It is not a read-only probe and must not run automatically whenever initialization, a request, or socket connection fails. Diagnose storage access, network binding, secret decryption, and relay availability first.
 

@@ -61,7 +61,7 @@ function Assert-DocumentationLinks($Pages, [string]$DocsRoot, [string]$Repositor
     foreach ($name in $Pages.Keys) {
         if ($name.EndsWith('.md', [StringComparison]::Ordinal)) { $documents.Add([IO.Path]::GetFullPath((Join-Path $DocsRoot $name)), $Pages[$name]) }
     }
-    foreach ($name in @('README.md', 'MAINTENANCE.md', 'dotnet/README.md', 'dotnet/samples/README.md')) {
+    foreach ($name in @('README.md', 'MAINTENANCE.md', 'dotnet/README.md', 'dotnet/examples/README.md')) {
         $file = Join-Path $RepositoryRoot $name
         if ([IO.File]::Exists($file)) { $documents[$file] = [IO.File]::ReadAllText($file) }
     }
@@ -137,7 +137,7 @@ function Complete-Documentation([string]$Mode, [string]$DocsRoot, [string]$Repos
     $options.WriteIndented = $true
     $pages['api/coverage.json'] = ConvertTo-DocumentationText $json.ToJsonString($options)
 
-    $snippets = Get-DocumentationSnippets (Join-Path $RepositoryRoot 'dotnet/samples/Meshline.Sdk.Examples')
+    $snippets = Get-DocumentationSnippets (Join-Path $RepositoryRoot 'dotnet/examples/Meshline.Sdk.Examples')
     $used = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $pattern = [regex]::new('<!-- snippet: ([a-z0-9-]+) -->.*?<!-- /snippet -->', [Text.RegularExpressions.RegexOptions]::Singleline)
     foreach ($file in [IO.Directory]::EnumerateFiles($DocsRoot, '*.md', [IO.SearchOption]::AllDirectories)) {

@@ -17,7 +17,7 @@ public static ClientOptions CreateOptions(IRelayRegistry registry, IAccountSigne
 ```
 <!-- /snippet -->
 
-Source: [Integration.cs](../../samples/Meshline.Sdk.Examples/Integration.cs). Validation checks the identifiers; it does not prove that a network or relay is reachable. The built-in account adapter supports the Neo account namespace. An arbitrary CAIP identifier does not imply support for that chain's signing rules.
+Source: [Integration.cs](../../examples/Meshline.Sdk.Examples/Integration.cs). Validation checks the identifiers; it does not prove that a network or relay is reachable. The built-in account adapter supports the Neo account namespace. An arbitrary CAIP identifier does not imply support for that chain's signing rules.
 
 ## Implement the boundaries
 

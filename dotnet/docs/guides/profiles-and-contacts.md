@@ -21,7 +21,7 @@ public static Task<AccountProfile> UpdateProfileAsync(
 ```
 <!-- /snippet -->
 
-Source: [Messaging.cs](../../samples/Meshline.Sdk.Examples/Messaging.cs), which imports `Meshline.Models`, `Meshline.Models.Client`, and `Meshline.Models.Protocol`. This changes the nickname, removes the biography, and leaves avatar and public-discovery preference unchanged. A content reference does not upload the avatar; the application provides content hosting and retrieval.
+Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs), which imports `Meshline.Models`, `Meshline.Models.Client`, and `Meshline.Models.Protocol`. This changes the nickname, removes the biography, and leaves avatar and public-discovery preference unchanged. A content reference does not upload the avatar; the application provides content hosting and retrieval.
 
 ## Exchange contact requests
 

@@ -49,7 +49,7 @@ public static async Task RunExistingDeviceAsync(
 ```
 <!-- /snippet -->
 
-Source: [Sessions.cs](../../samples/Meshline.Sdk.Examples/Sessions.cs). The database's parent directory must exist. If startup fails, inspect the actual error and [authorization state](accounts-and-devices.md) before deciding whether recovery is appropriate.
+Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). The database's parent directory must exist. If startup fails, inspect the actual error and [authorization state](accounts-and-devices.md) before deciding whether recovery is appropriate.
 
 ## Resource ownership
 

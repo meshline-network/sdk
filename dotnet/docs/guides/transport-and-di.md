@@ -37,7 +37,7 @@ public static async Task WithHttpAsync(
 ```
 <!-- /snippet -->
 
-Source: [Integration.cs](../../samples/Meshline.Sdk.Examples/Integration.cs). The SDK does not change a supplied client's configuration. Disable automatic redirects, cookies, and implicit retry handlers. An infinite timeout leaves deadlines to SDK cancellation and request handling; finite HTTP timeouts can end requests and WebSocket handshakes sooner. Long-lived socket traffic uses session cancellation and request deadlines.
+Source: [Integration.cs](../../examples/Meshline.Sdk.Examples/Integration.cs). The SDK does not change a supplied client's configuration. Disable automatic redirects, cookies, and implicit retry handlers. An infinite timeout leaves deadlines to SDK cancellation and request handling; finite HTTP timeouts can end requests and WebSocket handshakes sooner. Long-lived socket traffic uses session cancellation and request deadlines.
 
 ## Register Microsoft DI services
 

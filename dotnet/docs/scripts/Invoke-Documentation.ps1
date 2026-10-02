@@ -21,7 +21,7 @@ $previousUICulture = [Globalization.CultureInfo]::CurrentUICulture
 Push-Location $docsRoot
 try {
     dotnet tool restore
-    dotnet build (Join-Path $dotnetRoot 'samples/Meshline.Sdk.Examples/Meshline.Sdk.Examples.csproj') -c Release --nologo
+    dotnet build (Join-Path $dotnetRoot 'examples/Meshline.Sdk.Examples/Meshline.Sdk.Examples.csproj') -c Release --nologo
     $references = dotnet msbuild $project -nologo -target:ResolveReferences -property:Configuration=Release -getProperty:MSBuildToolsPath -getItem:ReferencePath | ConvertFrom-Json
     [Globalization.CultureInfo]::CurrentCulture = [Globalization.CultureInfo]::InvariantCulture
     [Globalization.CultureInfo]::CurrentUICulture = [Globalization.CultureInfo]::InvariantCulture

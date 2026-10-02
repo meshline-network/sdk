@@ -1,6 +1,6 @@
 <Solution>
-  <Folder Name="/samples/">
-    <Project Path="samples/Meshline.Sdk.Examples/Meshline.Sdk.Examples.csproj" />
+  <Folder Name="/examples/">
+    <Project Path="examples/Meshline.Sdk.Examples/Meshline.Sdk.Examples.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Meshline.Sdk/Meshline.Sdk.csproj" />

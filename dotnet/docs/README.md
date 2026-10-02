@@ -33,7 +33,7 @@ The [API reference](api/README.md) documents public types and members, including
 
 ## Working with the examples
 
-Code blocks marked as snippets are synchronized from the [compilable examples](../samples/README.md). They are methods to incorporate into an application, with dependencies supplied as arguments. Use the linked source files for their namespace imports. They are not a ready-to-run wallet, registry client, or Relay server.
+Code blocks marked as snippets are synchronized from the [compilable examples](../examples/README.md). They are methods to incorporate into an application, with dependencies supplied as arguments. Use the linked source files for their namespace imports. They are not a ready-to-run wallet, registry client, or Relay server.
 
 There are three distinct validation levels:
 

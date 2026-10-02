@@ -24,7 +24,7 @@ public static async Task<MessageSendStatus> SendTextAsync(
 ```
 <!-- /snippet -->
 
-Source: [Messaging.cs](../../samples/Meshline.Sdk.Examples/Messaging.cs). `SendMessageAsync` queues a local outbox operation and returns `MessageSendStatus`. The running component submits pending messages. Retain the message ID to query `GetSendStatusAsync` and observe `SendStatusChanged` for progress.
+Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs). `SendMessageAsync` queues a local outbox operation and returns `MessageSendStatus`. The running component submits pending messages. Retain the message ID to query `GetSendStatusAsync` and observe `SendStatusChanged` for progress.
 
 ## Interpret send status
 

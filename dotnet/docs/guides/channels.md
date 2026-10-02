@@ -23,7 +23,7 @@ public static async Task<ChannelInfo> CreateChannelAsync(
 ```
 <!-- /snippet -->
 
-Source: [Spaces.cs](../../samples/Meshline.Sdk.Examples/Spaces.cs). Following controls this device's local following state and background synchronization. `UnfollowAsync` removes that follow; it does not close the channel for other users.
+Source: [Spaces.cs](../../examples/Meshline.Sdk.Examples/Spaces.cs). Following controls this device's local following state and background synchronization. `UnfollowAsync` removes that follow; it does not close the channel for other users.
 
 ## Read history and local posts
 

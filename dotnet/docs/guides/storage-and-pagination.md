@@ -32,7 +32,7 @@ public static async Task PrintLocalHistoryAsync(
 ```
 <!-- /snippet -->
 
-Source: [Messaging.cs](../../samples/Meshline.Sdk.Examples/Messaging.cs). Pass a positive batch size. An empty batch marks completion. Dispose the reader on completion, cancellation, or navigation. A newly arrived message does not extend the existing snapshot; open another reader to refresh. Leaving readers open retains their transactions and database connections.
+Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs). Pass a positive batch size. An empty batch marks completion. Dispose the reader on completion, cancellation, or navigation. A newly arrived message does not extend the existing snapshot; open another reader to refresh. Leaving readers open retains their transactions and database connections.
 
 ## Relay-backed cursors
 

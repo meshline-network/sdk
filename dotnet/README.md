@@ -4,7 +4,7 @@
 
 [NuGet package](https://www.nuget.org/packages/Meshline.Sdk) · [Release notes](https://github.com/meshline-network/sdk/releases/tag/v1.0.0) · [Source](https://github.com/meshline-network/sdk)
 
-[Developer guide](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/README.md) · [Complete API reference](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/api/README.md) · [Compilable examples](https://github.com/meshline-network/sdk/blob/main/dotnet/samples/README.md)
+[Developer guide](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/README.md) · [Complete API reference](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/api/README.md) · [Compilable examples](https://github.com/meshline-network/sdk/blob/main/dotnet/examples/README.md)
 
 Meshline is a decentralized messaging and social protocol built around self-sovereign identity. Its .NET SDK provides the client workflows and protocol primitives for building applications on a Meshline network:
 

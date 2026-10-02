@@ -31,7 +31,7 @@ public static Task MarkConversationReadAsync(
 ```
 <!-- /snippet -->
 
-Source: [Messaging.cs](../../samples/Meshline.Sdk.Examples/Messaging.cs). The list method only displays unread counts. Call the separate read-position method after the user has actually viewed the conversation according to your application's UX. `MarkReadAsync` updates a local read position; it does not send a recipient read receipt to another account.
+Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs). The list method only displays unread counts. Call the separate read-position method after the user has actually viewed the conversation according to your application's UX. `MarkReadAsync` updates a local read position; it does not send a recipient read receipt to another account.
 
 ## Refresh after changes
 

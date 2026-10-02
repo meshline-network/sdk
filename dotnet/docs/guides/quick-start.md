@@ -16,7 +16,7 @@ Before connecting, obtain a `NetworkContext` and registered relays from your int
 
 ## Establish a new account
 
-The following method opens a new account session and invokes your application's asynchronous loop. The loop ends when the user signs out or the application exits. Use the imports in [Sessions.cs](../../samples/Meshline.Sdk.Examples/Sessions.cs): `Meshline`, `Meshline.Interactions`, `Meshline.Models.Client`, `Meshline.Storage`, and `Meshline.Transport`.
+The following method opens a new account session and invokes your application's asynchronous loop. The loop ends when the user signs out or the application exits. Use the imports in [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs): `Meshline`, `Meshline.Interactions`, `Meshline.Models.Client`, `Meshline.Storage`, and `Meshline.Transport`.
 
 <!-- snippet: new-account -->
 ```csharp

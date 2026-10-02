@@ -40,7 +40,7 @@ public static async Task ObserveAsync(
 ```
 <!-- /snippet -->
 
-Source: [Integration.cs](../../samples/Meshline.Sdk.Examples/Integration.cs). To observe the earliest synchronization events, attach handlers before starting the client. UI applications should dispatch state updates onto their UI thread. Keep handlers short, avoid blocking the component's background work, and observe exceptions from any tasks the application starts in response.
+Source: [Integration.cs](../../examples/Meshline.Sdk.Examples/Integration.cs). To observe the earliest synchronization events, attach handlers before starting the client. UI applications should dispatch state updates onto their UI thread. Keep handlers short, avoid blocking the component's background work, and observe exceptions from any tasks the application starts in response.
 
 Events indicate changes; local queries provide the durable current view. Use `ConversationChanged` for the conversation list, contact events for contacts and requests, channel events for followed timelines, and group events for membership, applications, timelines, and key recovery. Reopening the database does not replay every historical UI event.
 

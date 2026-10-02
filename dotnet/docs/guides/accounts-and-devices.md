@@ -30,7 +30,7 @@ public static async Task RenewDeviceAsync(
 ```
 <!-- /snippet -->
 
-Source: [Sessions.cs](../../samples/Meshline.Sdk.Examples/Sessions.cs). Inspect `DeviceStatePublishResult.Status`: a relay can temporarily stage a state instead of accepting it as authoritative. `StagedUntil` describes that temporary state when available. Do not present a staged publication as completed authorization.
+Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). Inspect `DeviceStatePublishResult.Status`: a relay can temporarily stage a state instead of accepting it as authoritative. `StagedUntil` describes that temporary state when available. Do not present a staged publication as completed authorization.
 
 `GetAuthorizationState(deviceId)` distinguishes authorization conditions for a known device. `GetCertificate(deviceId)` retrieves a known certificate. `DeviceChanged` and `DeviceStateChanged` notify applications about changes; query current state again when updating UI.
 
