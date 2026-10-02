@@ -78,11 +78,11 @@ sealed partial class GroupManager
     async Task ApplyAsync(ClientInvite invite, CancellationToken cancellationToken)
     {
         var group = invite.Group;
-        var input = invite.Document.ToJson();
+        if (invite.Document.Validate(Context) is { } violation) throw new InvalidDataException(violation.Message);
+        if (invite.Document.Invitee is { } target && target != Options.AccountId) throw new InvalidDataException("The invitation does not authorize this application.");
         await EnsureNoPendingOperationAsync(group, "group.application.submit", cancellationToken).ConfigureAwait(false);
         GroupOperationRecord operation;
-        var current = await ReadInviteAsync(new(group, invite.Document.InviteId), cancellationToken).ConfigureAwait(false);
-        if (current.Invite.Document.ToJson() != input || invite.Document.Invitee is { } target && target != Options.AccountId) throw new InvalidDataException("The invitation does not authorize this application.");
+        // The host checks its accepted invitation by ID; invitation-record reads require membership.
         var relay = await GetRelayAsync(group.RelayId, cancellationToken).ConfigureAwait(false);
         var preview = await relay.SendHttpAsync<GroupState>(HttpMethod.Get, "group.resolve", new GroupResolveQuery { GroupId = group.GroupId, InviteId = invite.Document.InviteId }, cancellationToken: cancellationToken).ConfigureAwait(false);
         CheckPreview(preview, group);

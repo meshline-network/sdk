@@ -121,7 +121,7 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The resolved group state or invitation preview with the locally known membership information.</returns>
     /// <remarks>
-    /// The group-reference overload synchronizes group state. The invitation overload verifies the invitation and retrieves a preview; it does not apply for membership automatically.
+    /// The group-reference overload synchronizes group state. The invitation overload retrieves a preview using the invitation ID, whose applicability is checked by the hosting relay; it does not apply for membership automatically.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
@@ -148,14 +148,14 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The resolved group state or invitation preview with the locally known membership information.</returns>
     /// <remarks>
-    /// The group-reference overload synchronizes group state. The invitation overload verifies the invitation and retrieves a preview; it does not apply for membership automatically.
+    /// Validates the supplied invitation's fields and recipient, then retrieves a preview using its ID. The hosting relay checks the invitation it previously accepted. This does not independently verify the supplied document's signature or apply for membership automatically.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
-    /// <exception cref="InvalidDataException">Relay evidence or returned state is missing, inconsistent, or fails protocol validation. The supplied invitation differs from the relay document or the group is already bound to another relay.</exception>
+    /// <exception cref="InvalidDataException">The supplied invitation or returned state fails protocol validation, or the group is already bound to another relay.</exception>
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     /// <exception cref="DecoderFallbackException">A relay response contains bytes that are not valid UTF-8.</exception>
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
@@ -165,8 +165,7 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <exception cref="UnauthorizedAccessException">The invitation is restricted to another account.</exception>
     public Task<GroupInfo> GetGroupAsync(ClientInvite invite, CancellationToken cancellationToken = default) => RunAsync(async token =>
     {
-        var verified = await ReadInviteAsync(new(invite.Group, invite.Document.InviteId), token).ConfigureAwait(false);
-        if (verified.Invite.Document.ToJson() != invite.Document.ToJson()) throw new InvalidDataException("The relay invitation differs from the supplied invitation.");
+        if (invite.Document.Validate(Context) is { } violation) throw new InvalidDataException(violation.Message);
         if (invite.Document.Invitee is { } target && target != Options.AccountId) throw new UnauthorizedAccessException("The invitation is intended for another account.");
         var relay = await GetRelayAsync(invite.Group.RelayId, token).ConfigureAwait(false);
         var preview = await relay.SendHttpAsync<GroupState>(HttpMethod.Get, "group.resolve", new GroupResolveQuery { GroupId = invite.Group.GroupId, InviteId = invite.Document.InviteId }, cancellationToken: token).ConfigureAwait(false);
@@ -467,6 +466,7 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <returns>A task that completes when the operation finishes.</returns>
     /// <remarks>
     /// Admission remains pending until an authorized group administrator approves it. The operation retains the local member key needed to receive the group's encrypted secrets.
+    /// The hosting relay checks its accepted invitation by ID. Local validation checks the supplied document's fields and recipient, not its signature independently.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>

@@ -198,7 +198,8 @@ The hosting relay does not advertise group hosting\.
 The supplied group fields, account list, invitation, or message content violates the operation's protocol constraints\.
 
 ### Remarks
-Admission remains pending until an authorized group administrator approves it\. The operation retains the local member key needed to receive the group's encrypted secrets\.
+Admission remains pending until an authorized group administrator approves it\. The operation retains the local member key needed to receive the group's encrypted secrets\.<br>
+The hosting relay checks its accepted invitation by ID\. Local validation checks the supplied document's fields and recipient, not its signature independently\.
 
 <a name='Meshline.Components.GroupManager.ApproveApplicationsAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken)'></a>
 
@@ -923,7 +924,7 @@ Relay discovery, authentication, or the HTTP request fails at the transport laye
 The relay rejects the operation with a structured protocol error that is not handled by this method\.
 
 [System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
-Relay evidence or returned state is missing, inconsistent, or fails protocol validation\. The supplied invitation differs from the relay document or the group is already bound to another relay\.
+The supplied invitation or returned state fails protocol validation, or the group is already bound to another relay\.
 
 [System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
 A stored or received protocol document cannot be serialized or deserialized\.
@@ -947,7 +948,7 @@ The hosting relay does not advertise group hosting\.
 The invitation is restricted to another account\.
 
 ### Remarks
-The group\-reference overload synchronizes group state\. The invitation overload verifies the invitation and retrieves a preview; it does not apply for membership automatically\.
+Validates the supplied invitation's fields and recipient, then retrieves a preview using its ID\. The hosting relay checks the invitation it previously accepted\. This does not independently verify the supplied document's signature or apply for membership automatically\.
 
 <a name='Meshline.Components.GroupManager.GetGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)'></a>
 
@@ -1015,7 +1016,7 @@ The local device key cannot be validated against its certificate, or cryptograph
 The relay does not host groups, or the verified management history contains an unsupported operation\.
 
 ### Remarks
-The group\-reference overload synchronizes group state\. The invitation overload verifies the invitation and retrieves a preview; it does not apply for membership automatically\.
+The group\-reference overload synchronizes group state\. The invitation overload retrieves a preview using the invitation ID, whose applicability is checked by the hosting relay; it does not apply for membership automatically\.
 
 <a name='Meshline.Components.GroupManager.GetGroupsAsync(System.Nullable_Meshline.Models.Client.GroupMembershipState_,System.Nullable_Meshline.Models.Protocol.GroupRole_,string,System.Threading.CancellationToken)'></a>
 
