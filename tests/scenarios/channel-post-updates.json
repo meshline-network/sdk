@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "channel-post-replacement-omission-and-deletion",
+      "initial": {
+        "body": {
+          "content_type": "text/plain",
+          "text": "original 原文",
+          "future": {
+            "revision": 1
+          }
+        },
+        "attachments": [
+          {
+            "uri": "https://content.example.test/attachment",
+            "hash": "sha256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+            "content_type": "application/octet-stream",
+            "size": 0
+          }
+        ]
+      },
+      "steps": [
+        {
+          "id": "replace-body-preserve-attachments",
+          "update": {
+            "body": {
+              "content_type": "text/plain",
+              "text": "edited 编辑 😀",
+              "future": {
+                "revision": 2
+              }
+            }
+          },
+          "expected": {
+            "body": {
+              "content_type": "text/plain",
+              "text": "edited 编辑 😀",
+              "future": {
+                "revision": 2
+              }
+            },
+            "attachments": [
+              {
+                "uri": "https://content.example.test/attachment",
+                "hash": "sha256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+                "content_type": "application/octet-stream",
+                "size": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "delete-attachments-preserve-body-extensions",
+          "update": {
+            "attachments": null
+          },
+          "expected": {
+            "body": {
+              "content_type": "text/plain",
+              "text": "edited 编辑 😀",
+              "future": {
+                "revision": 2
+              }
+            },
+            "attachments": []
+          }
+        },
+        {
+          "id": "replace-whole-body-removes-old-extensions",
+          "update": {
+            "body": {
+              "content_type": "text/plain",
+              "text": "replacement without extension"
+            }
+          },
+          "expected": {
+            "body": {
+              "content_type": "text/plain",
+              "text": "replacement without extension"
+            },
+            "attachments": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "channel-post-clear-and-restore-body",
+      "initial": {
+        "body": {
+          "content_type": "text/plain",
+          "text": "original 原文",
+          "future": {
+            "revision": 1
+          }
+        },
+        "attachments": [
+          {
+            "uri": "https://content.example.test/attachment",
+            "hash": "sha256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+            "content_type": "application/octet-stream",
+            "size": 0
+          }
+        ]
+      },
+      "steps": [
+        {
+          "id": "delete-body-preserve-attachment",
+          "update": {
+            "body": null
+          },
+          "expected": {
+            "body": null,
+            "attachments": [
+              {
+                "uri": "https://content.example.test/attachment",
+                "hash": "sha256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+                "content_type": "application/octet-stream",
+                "size": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "restore-body-preserve-attachment",
+          "update": {
+            "body": {
+              "content_type": "text/plain",
+              "text": "edited 编辑 😀",
+              "future": {
+                "revision": 2
+              }
+            }
+          },
+          "expected": {
+            "body": {
+              "content_type": "text/plain",
+              "text": "edited 编辑 😀",
+              "future": {
+                "revision": 2
+              }
+            },
+            "attachments": [
+              {
+                "uri": "https://content.example.test/attachment",
+                "hash": "sha256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+                "content_type": "application/octet-stream",
+                "size": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

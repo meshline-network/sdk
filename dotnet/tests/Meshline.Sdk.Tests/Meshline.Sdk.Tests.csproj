@@ -11,7 +11,8 @@
     <ProjectReference Include="../../src/Meshline.Sdk/Meshline.Sdk.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="TestData/**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../tests/vectors/*.json" Link="TestData/Vectors/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../tests/scenarios/*.json" Link="TestData/Scenarios/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

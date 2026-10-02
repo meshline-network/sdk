@@ -22,7 +22,8 @@ Paths in the table and code references below are relative to `tests/Meshline.Sdk
 | `Components/Lifecycle/` | Component start/stop, cancellation, draining and background errors. |
 | `ClockScopeTests.cs` | The SDK's shared clock scope, nesting and execution-flow isolation. |
 | `Support/` | Reusable setup and scripted peers; contains no test classes. |
-| `TestData/` | Immutable protocol vector snapshots and their provenance. |
+| `Conformance/` | Native adapters for the shared SDK behavior scenarios. |
+| `../../../tests/` | Shared protocol vector snapshots and behavior scenarios; see the [shared test guide](../tests/README.md). |
 
 Choose the layer by the behavior under test, not by whether its input happens to be a vector. Component tests may use isolated storage to seed a documented crash boundary. Keep private SDK helpers private.
 
@@ -87,11 +88,11 @@ Acceptance uses behavioral checks without an overall coverage-percentage thresho
 
 ## Protocol vector snapshots
 
-`tests/Meshline.Sdk.Tests/TestData/Vectors/*.json` are byte-for-byte snapshots from the protocol repository's `v1/test-vectors` directory, at commit `d3f358afe650afd5fecb777b35cebfeec5bd147d`. The source checkout contained documentation changes at capture time; the exact status and each file's SHA-256 are recorded in [the vector manifest](tests/Meshline.Sdk.Tests/TestData/Vectors/manifest.json). The vector files themselves were clean. `SerializationTests.Snapshot_files_match_recorded_hashes` checks their integrity on every test run.
+`../tests/vectors/*.json` are byte-for-byte snapshots from the protocol repository's `v1/test-vectors` directory, at commit `d3f358afe650afd5fecb777b35cebfeec5bd147d`. The source checkout contained documentation changes at capture time; the exact status and each file's SHA-256 are recorded in [the vector manifest](../tests/vectors/manifest.json). The vector files themselves were clean. `SerializationTests.Snapshot_files_match_recorded_hashes` checks their integrity on every test run.
 
 Expected bytes, hashes, ciphertext, keys, and signatures come from these snapshots, never from an SDK-generated golden-file update. Dynamic workflow fixtures sign their own requests and compare observable behavior; they complement these independent known-answer tests. Do not regenerate expected vectors using the SDK under test.
 
-Vector adapters follow the tested behavior: pure signing and serialization checks live in `Protocol`; real authentication lives in `Transport/AuthenticationVectorTests`; key agreement, message reception and group recovery live in `Components/Devices/DeviceKeyAgreementTests`, `Components/Messages/MessageEncryptionTests` and `Components/Groups/GroupEncryptionTests`. `Support/ProtocolVectors` reads the snapshots, and `Support/EncryptionVectorSetup` only seeds the device state needed by the public API tests. The test organization and fixture rules above also apply to vector adapters.
+Vector adapters follow the tested behavior: pure signing and serialization checks live in `Protocol`; real authentication lives in `Transport/AuthenticationVectorTests`; key agreement, message reception and group recovery live in `Components/Devices/DeviceKeyAgreementTests`, `Components/Messages/MessageEncryptionTests` and `Components/Groups/GroupEncryptionTests`. MSBuild copies the shared vectors and scenarios into `TestData/` in the test output. `Support/ProtocolVectors` reads those copies, and `Support/EncryptionVectorSetup` only seeds the device state needed by the public API tests. The test organization and fixture rules above also apply to vector adapters.
 
 ### Applied sections
 
