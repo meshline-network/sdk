@@ -18,7 +18,8 @@ for (const entry of packages) {
 const workspace = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 await writeFile(join(consumer, 'package.json'), JSON.stringify({ name: 'meshline-packed-consumer', version: '0.0.0', private: true, type: 'module', dependencies, devDependencies: { '@types/node': workspace.devDependencies['@types/node'] } }, null, 2) + '\n');
 function run(args) { const result = spawnSync(process.execPath, args, { cwd: consumer, encoding: 'utf8', windowsHide: true }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(result.stdout + result.stderr); return result.stdout.trim(); }
-run([npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund', '--offline']);
+// A fresh CI cache may contain locked tarballs but not registry metadata.
+run([npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline']);
 for (const name of Object.keys(dependencies)) {
     const installed = await realpath(join(consumer, 'node_modules', name)); if (!installed.startsWith(consumer + sep)) throw new Error(`Consumer escaped its independent installation: ${name}`);
 }
