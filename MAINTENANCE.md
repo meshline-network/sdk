@@ -95,6 +95,61 @@ The workflow authenticates with `NuGet/login@v1` and GitHub OIDC. It requires th
 
 The release job has `id-token: write` for authentication and `contents: write` for GitHub Releases. No long-lived NuGet API key secret is required. The workflow uses the temporary key returned by the login action.
 
+### TypeScript npm releases
+
+[release-typescript.yml](.github/workflows/release-typescript.yml) runs on pushes
+to `main` and can be rerun manually on `main`. All five `@meshline/*` packages
+share one version. Update their `version` fields and internal peer dependencies
+together, then run `npm install --package-lock-only` from `typescript/` and commit
+the resulting lockfile with the release changes. Keep installation examples in
+the package READMEs and guides aligned with the version being released.
+
+The workflow validates the workspace and lockfile, skips an existing published
+`typescript-v<version>` Release, and otherwise builds and checks the SDK on
+Windows. Its gates include offline and interoperability tests, documentation,
+compiled examples, independent packed consumers, Expo Metro/Hermes bundles and
+Chromium/Firefox acceptance. WebKit remains in the separate TypeScript checks;
+the known Windows cookie failure does not establish Safari behavior. This release
+workflow does not perform Android/iOS native acceptance.
+
+The publication job downloads the same five tested tarballs, verifies SHA-256
+and npm integrity, then publishes core before its adapters with npm provenance.
+`-alpha.*`, `-beta.*` and `-rc.*` versions use their matching npm dist-tags;
+stable versions use `latest`. Other prerelease channels and SemVer build metadata
+are rejected. The workflow refuses to move a channel back to an older version.
+
+Before the first automated release, configure
+[npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) separately
+for `@meshline/sdk`, `@meshline/storage-node`, `@meshline/storage-browser`,
+`@meshline/transport-node` and `@meshline/expo`:
+
+- Provider: GitHub Actions
+- Organization: `meshline-network` (the GitHub owner, not the npm scope)
+- Repository: `sdk`
+- Workflow filename: `release-typescript.yml`
+- Environment: empty
+- Allowed actions: enable direct `npm publish`
+
+The GitHub-hosted publication job uses `id-token: write`; no `NPM_TOKEN` secret
+or interactive npm login is needed. The workflow must be committed before its
+authorization can be used. This file does not configure the npm package settings.
+
+A GitHub draft reserves the source commit before npm uploads begin. If a run
+fails partway through, rerun that same Actions run: identical npm archives are
+skipped, missing packages are published, and the GitHub Release becomes public
+only after all five packages are available. After uploading, the workflow polls
+for availability every 30 seconds with a shared 20-minute wait budget, allowing
+for npm's publish-time scanning. If that budget expires, inspect npm status and
+rerun the same workflow once the packages are available. A different archive for an existing
+version, a conflicting tag/draft commit, or an unexpected npm dist-tag stops the
+run for inspection. npm publication is not atomic across packages; already
+published versions are not rolled back. After npm succeeds, the Release attaches
+the five tarballs and `SHA256SUMS`, marks prereleases appropriately, and leaves
+the repository-wide GitHub `Latest` selection unchanged.
+
+For local release-logic tests without publication, run `npm run test:release`
+from `typescript/`. These tests also run within `npm run check`.
+
 ## Documentation
 
 Keep README files, website copy, and Release notes focused on installation, integration, capabilities, and limits for SDK consumers. Keep build, testing, publishing, and contributor procedures in this guide or the test guide.

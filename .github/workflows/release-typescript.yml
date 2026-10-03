@@ -1,0 +1,131 @@
+name: Release TypeScript SDK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialize npm uploads; never cancel a release already in progress.
+concurrency:
+  group: release-typescript-sdk
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+defaults:
+  run:
+    working-directory: typescript
+
+jobs:
+  prepare:
+    if: github.repository == 'meshline-network/sdk' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    outputs:
+      publish: ${{ steps.release.outputs.publish }}
+    steps:
+      - name: Check out the source and tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.16.0
+          package-manager-cache: false
+
+      - name: Check package versions and existing release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release -- check
+
+      - name: Set up .NET interoperability host
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install locked dependencies
+        if: steps.release.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Restore interoperability dependencies
+        if: steps.release.outputs.publish == 'true'
+        run: npm run restore:interop
+
+      - name: Build, check documentation and examples, and run offline tests
+        if: steps.release.outputs.publish == 'true'
+        run: npm run check
+
+      - name: Pack and verify independent consumers
+        if: steps.release.outputs.publish == 'true'
+        run: |
+          npm run pack:local
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run check:packages
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run check:expo-bundle
+
+      - name: Install release browser runtimes
+        if: steps.release.outputs.publish == 'true'
+        run: npx playwright install chromium firefox
+
+      # Windows WebKit's known cookie failure stays visible in typescript.yml.
+      # This release gate covers Chromium/Firefox; it does not certify Safari.
+      - name: Run Chromium and Firefox acceptance
+        if: steps.release.outputs.publish == 'true'
+        run: npm run test:browser -- --project=chromium --project=firefox --reporter=line
+
+      - name: Retain the exact packages to publish
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: typescript-release-packages
+          path: |
+            typescript/artifacts/packages/*.tgz
+            typescript/artifacts/packages/manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Check out the same source and tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js for npm Trusted Publishing
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.16.0
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Download the verified packages from this run
+        uses: actions/download-artifact@v8
+        with:
+          name: typescript-release-packages
+          path: typescript/artifacts/packages
+
+      # Configure this filename on all five npm packages, allow npm publish,
+      # and leave Environment empty. No NPM_TOKEN secret is used.
+      - name: Publish npm packages and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release -- publish
