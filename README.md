@@ -8,8 +8,8 @@ Choose an SDK for its requirements, installation instructions, and application g
 
 | SDK | Documentation | Status |
 | --- | --- | --- |
-| .NET | [Installation](dotnet/README.md) · [Developer guide](dotnet/docs/README.md) · [API reference](dotnet/docs/api/README.md) | Released |
-| TypeScript | [Installation](typescript/README.md) · [Application guide](typescript/docs/README.md) · [Platform requirements](typescript/docs/platforms.md) | Alpha |
+| .NET | [Installation](dotnet/README.md) · [Developer guide](dotnet/docs/README.md) · [API reference](dotnet/docs/api/README.md) · [Online guide](https://meshline.org/sdk/dotnet/index.html) | Released |
+| TypeScript | [Installation](typescript/README.md) · [Application guide](typescript/docs/README.md) · [Platform requirements](typescript/docs/platforms.md) · [Online guide](https://meshline.org/sdk/typescript/index.html) | Alpha |
 
 ## Related resources
 
