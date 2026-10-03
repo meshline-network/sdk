@@ -6,7 +6,13 @@
 
 ## Meshline\.Interactions Namespace
 
-Application\-supplied interfaces for account and device signing, relay discovery, and local secret protection\.
+Application\-supplied interfaces for signing, relay discovery, and local secret protection, with optional Neo RPC and NEP\-6 implementations\.
+
+| Classes | |
+| :--- | :--- |
+| [Nep6AccountSigner](Meshline.Interactions.Nep6AccountSigner.md 'Meshline\.Interactions\.Nep6AccountSigner') | Signs Meshline account input with a Neo N3 single\-signature account from a NEP\-6 wallet\. |
+| [RpcRelayRegistry](Meshline.Interactions.RpcRelayRegistry.md 'Meshline\.Interactions\.RpcRelayRegistry') | Read\-only implementation of the protocol Registry ABI over Neo N3 JSON\-RPC\. |
+| [RpcRelayRegistryOptions](Meshline.Interactions.RpcRelayRegistryOptions.md 'Meshline\.Interactions\.RpcRelayRegistryOptions') | Explicit configuration for read\-only Neo N3 Registry RPC access\. |
 
 | Interfaces | |
 | :--- | :--- |

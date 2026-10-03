@@ -1,7 +1,7 @@
 namespace Meshline.Interactions;
 
 /// <summary>
-/// Application-supplied interfaces for account and device signing, relay discovery, and local secret protection.
+/// Application-supplied interfaces for signing, relay discovery, and local secret protection, with optional Neo RPC and NEP-6 implementations.
 /// </summary>
 internal static class NamespaceDoc
 {

@@ -11,7 +11,7 @@
 | [Meshline](Meshline.md 'Meshline') | The application\-facing client for coordinating account lifecycle, messaging, conversations, channels, and groups\. |
 | [Meshline\.Components](Meshline.Components.md 'Meshline\.Components') | Lifecycle\-managed components and events for accounts, devices, profiles, contacts, direct messages, channels, and groups\. |
 | [Meshline\.Identity](Meshline.Identity.md 'Meshline\.Identity') | Utilities for deriving account and relay identifiers and verifying their signatures\. |
-| [Meshline\.Interactions](Meshline.Interactions.md 'Meshline\.Interactions') | Application\-supplied interfaces for account and device signing, relay discovery, and local secret protection\. |
+| [Meshline\.Interactions](Meshline.Interactions.md 'Meshline\.Interactions') | Application\-supplied interfaces for signing, relay discovery, and local secret protection, with optional Neo RPC and NEP\-6 implementations\. |
 | [Meshline\.Models](Meshline.Models.md 'Meshline\.Models') | Shared models for network identity and optional field updates\. |
 | [Meshline\.Models\.Client](Meshline.Models.Client.md 'Meshline\.Models\.Client') | Application\-facing options, drafts, queries, result models, and pagination types used by the client components\. |
 | [Meshline\.Models\.Protocol](Meshline.Models.Protocol.md 'Meshline\.Models\.Protocol') | Protocol documents, requests, responses, and notifications exchanged with relays, with JSON serialization and validation support\. |

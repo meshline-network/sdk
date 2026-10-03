@@ -22,6 +22,9 @@ Provides network identity and relay discovery from the application's registry in
 public interface IRelayRegistry
 ```
 
+Derived<br>
+↳ [RpcRelayRegistry](Meshline.Interactions.RpcRelayRegistry.md 'Meshline\.Interactions\.RpcRelayRegistry')
+
 ### Remarks
 Return entries for the declared network context and preserve their registry status\. Relay selection and transport validate whether an entry is usable for the requested operation\.
 ### Properties

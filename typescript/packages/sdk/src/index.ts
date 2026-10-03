@@ -15,6 +15,8 @@ export * from './transport/endpoint.js';
 export * from './transport/relay-error.js';
 export * from './transport/http.js';
 export * from './interactions.js';
+export * from './integrations/rpc-relay-registry.js';
+export * from './integrations/nep6-account-signer.js';
 export * from './transport/session.js';
 export * from './transport/rpc.js';
 export * from './transport/socket.js';

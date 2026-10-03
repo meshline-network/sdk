@@ -15,6 +15,13 @@ do not load a moving sibling protocol checkout or regenerate expected answers wi
 the implementation being tested. Both language test suites verify the vector
 manifest. Platform acceptance also consumes this same snapshot.
 
+The additional [NEP-6 wallet fixtures](vectors/nep6-wallets.json) are SDK integration
+vectors generated with the official Neo 3.10.1 wallet implementation, independent
+of either SDK adapter. They cover two accounts, standard and non-default scrypt
+costs, and Unicode password normalization. Their private scalars are public test
+values (1 and 2); never fund these accounts. They are separate from the pinned
+protocol manifest and are consumed by both SDKs' integration tests.
+
 Native adapters load the common cases and call their own SDK, without consulting
 another implementation for expected answers. They must execute every supported
 case and fail on an unsupported suite version or operation. Case IDs appear in

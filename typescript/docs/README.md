@@ -32,7 +32,8 @@ Check [platform requirements and limits](platforms.md) for your runtime.
 | [Events and troubleshooting](guides/events-and-troubleshooting.md) | Subscribe to updates, handle cancellation, and diagnose failures. |
 
 The [examples](../examples/README.md) are functions to incorporate into an
-application. Supply your own signer, registry, secret protector, and network
-configuration. They do not include a wallet or a deployed relay service.
+application. Select the optional NEP-6 signer and Neo RPC registry or supply your
+own implementations, then provide a secret protector and trusted network
+configuration. The examples do not include a funded wallet or a deployed relay service.
 
 [SDK overview and installation](../README.md)

@@ -1,5 +1,20 @@
 [
   {
+    "type": "Meshline.Interactions.RpcRelayRegistry",
+    "path": "packages/sdk/src/integrations/rpc-relay-registry.ts",
+    "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
+  },
+  {
+    "type": "Meshline.Interactions.RpcRelayRegistryOptions",
+    "path": "packages/sdk/src/integrations/rpc-relay-registry.ts",
+    "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
+  },
+  {
+    "type": "Meshline.Interactions.Nep6AccountSigner",
+    "path": "packages/sdk/src/integrations/nep6-account-signer.ts",
+    "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+  },
+  {
     "type": "Meshline.Models.Client.GroupInvite",
     "path": "packages/sdk/src/components/group.ts",
     "notes": "Invitation client references and usage snapshots; client GroupInvite is named GroupInvitation to distinguish the signed protocol object."

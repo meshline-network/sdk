@@ -17,7 +17,7 @@ relay pool, and storage binding. A pool belongs to one network/account/local dev
 
 ## Account signing
 
-Implement `AccountSigner` with `accountId`, `publicKey`, and
+Use `Nep6AccountSigner` below, or implement `AccountSigner` with `accountId`, `publicKey`, and
 `sign(input, signal?)`. Sign the exact supplied bytes using Neo P-256/SHA-256.
 The SDK never requests the account private key; keep it in your wallet or signing
 integration. Account authority is required for establishment, recovery, and
@@ -31,7 +31,7 @@ manages its own randomness. If an Expo integration uses the low-level
 
 ## Relay registry
 
-Implement `RelayRegistry.context`, `getRelay(relayId, signal?)`, and the async
+Use `RpcRelayRegistry` below, or implement `RelayRegistry.context`, `getRelay(relayId, signal?)`, and the async
 iterator `getRelays(signal?)` using the registry for your chosen network.
 `RelayEntry` includes the relay ID, discovery endpoint, status, and `updatedAt`.
 That registry timestamp is a `bigint` in Unix **milliseconds**; protocol JSON
@@ -40,6 +40,46 @@ timestamps normally use integer Unix **seconds**.
 Discovery requires an active registry entry and verifies the relay's signed
 descriptor against the trusted context and requested identity. Use registry
 access for discovery; do not substitute an unverified endpoint for a relay ID.
+
+## Optional Neo implementations
+
+Both implementations are exported by `@meshline/sdk`. The application explicitly
+constructs and passes them to its client/pool; no implementation is selected automatically.
+See the compiled [Neo example](../../examples/neo-integrations.ts).
+
+```typescript
+import { RpcRelayRegistry, Nep6AccountSigner } from '@meshline/sdk';
+
+const registry = new RpcRelayRegistry({ context, rpcUrl });
+const signer = await Nep6AccountSigner.fromJson(walletJson, password, { context });
+// Pass registry and signer to your session. After disposing dependent clients:
+signer.dispose();
+```
+
+`RpcRelayRegistry` verifies network magic before querying the configured contract,
+preserves inactive entries, and releases iterator sessions on completion,
+cancellation, or early exit. It defaults to 100 entries per page and a 15000 ms
+timeout per RPC request. An RPC node must support iterator sessions or explicitly
+complete inline results. Inject `fetch` for platform transport configuration,
+including `createNodeRelayFetch` or `expoRelayFetch`; custom transports must honor
+request cancellation. Query errors propagate. Session cleanup errors go to
+`onSessionCleanupError` (default: `console.warn`) without replacing the query failure.
+The adapter only reads the Registry; it does not submit transactions.
+
+`Nep6AccountSigner.fromJson` accepts Neo N3 NEP-6 version 1.0 JSON loaded by the
+application, so it requires no Node filesystem API. Pass `accountIndex` to select
+an account; the default is 0 in file order, irrespective of `isDefault`. It never
+tries another account when the selected one fails. Only standard single-signature
+accounts with matching address, contract, and encrypted key are accepted.
+Watch-only, deployed, and multisignature accounts are unsupported.
+
+Decryption uses the wallet's scrypt parameters and NEP-2 NFC password normalization.
+Both SDKs limit imported costs to 256 MiB estimated memory and
+`n * r * p <= 16777216`; standard NEP-6 parameters fit these limits. Loading never
+changes the wallet. Supply passwords at runtime and dispose the signer after use.
+On Expo, pass `random: expoRandom`. Disposal clears owned private-key buffers on a
+best-effort basis; JavaScript cannot guarantee erasure of every runtime copy.
+Keep using a custom `AccountSigner` for external or hardware wallets.
 
 ## Secret protection
 

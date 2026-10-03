@@ -1,0 +1,98 @@
+{
+  "provenance": "Generated with Neo 3.10.1 NEP6Wallet.CreateAccount and Save. Public test private scalars 1 and 2; never fund these accounts. Includes non-default and standard scrypt costs.",
+  "vectors": [
+    {
+      "name": "fast-multi-account",
+      "password": "Meshline test caf\u00E9",
+      "publicKeys": [
+        "036b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296",
+        "037cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978"
+      ],
+      "wallet": {
+        "name": "PUBLIC TEST KEYS - NEVER USE FOR FUNDS",
+        "version": "1.0",
+        "scrypt": {
+          "n": 16,
+          "r": 8,
+          "p": 1
+        },
+        "accounts": [
+          {
+            "address": "NVHt5YtAnadMwntAVAJLUy36M2nLYKHUeK",
+            "label": null,
+            "isDefault": false,
+            "lock": false,
+            "key": "6PYQY227hpYjjeHVVZB2cUjBAQ8U7ZfAiVeb5sV4FaNxmvabqhQqek7cPN",
+            "contract": {
+              "script": "DCEDaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZBVuezJw==",
+              "parameters": [
+                {
+                  "name": "signature",
+                  "type": "Signature"
+                }
+              ],
+              "deployed": false
+            },
+            "extra": null
+          },
+          {
+            "address": "NLveEWWA7cAAKZ2pQMZraQ9TqMJbtMiGSm",
+            "label": null,
+            "isDefault": true,
+            "lock": false,
+            "key": "6PYQfy32ZvYVcgfrV9jF9oNZzWpigLAMsti6LnjxSu2D8iRX8p1UreYv5b",
+            "contract": {
+              "script": "DCEDfPJ7GI0DT36KUjgDBLUaw8CJaeJ38hs1pgtI/EdmmXhBVuezJw==",
+              "parameters": [
+                {
+                  "name": "signature",
+                  "type": "Signature"
+                }
+              ],
+              "deployed": false
+            },
+            "extra": null
+          }
+        ],
+        "extra": null
+      }
+    },
+    {
+      "name": "standard-scrypt",
+      "password": "Meshline test caf\u00E9",
+      "publicKeys": [
+        "036b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296"
+      ],
+      "wallet": {
+        "name": "PUBLIC TEST KEYS - NEVER USE FOR FUNDS",
+        "version": "1.0",
+        "scrypt": {
+          "n": 16384,
+          "r": 8,
+          "p": 8
+        },
+        "accounts": [
+          {
+            "address": "NVHt5YtAnadMwntAVAJLUy36M2nLYKHUeK",
+            "label": null,
+            "isDefault": false,
+            "lock": false,
+            "key": "6PYQY227hcvdaaccEpkxMCzg2YT7t26pVJg3me8mrjVCJjRJjq27mKH4hT",
+            "contract": {
+              "script": "DCEDaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZBVuezJw==",
+              "parameters": [
+                {
+                  "name": "signature",
+                  "type": "Signature"
+                }
+              ],
+              "deployed": false
+            },
+            "extra": null
+          }
+        ],
+        "extra": null
+      }
+    }
+  ]
+}

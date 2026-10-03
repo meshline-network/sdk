@@ -22,6 +22,9 @@ Supplies an account identity and signs protocol input using its account key\.
 public interface IAccountSigner
 ```
 
+Derived<br>
+↳ [Nep6AccountSigner](Meshline.Interactions.Nep6AccountSigner.md 'Meshline\.Interactions\.Nep6AccountSigner')
+
 ### Remarks
 The implementation retains ownership of private key material\. Sign the supplied protocol input using the account namespace's signing rules; the SDK verifies the resulting signature against the advertised identity\.
 ### Properties

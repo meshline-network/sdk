@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "0b4b5f07f46b0d5f4d812d77cb5e6a4b084236b9cf65b9d6ca211892fe7f2f1c",
+  "sourceSha256": "e32cb966e08cba07af2afadde4e09b5e92aeba40f2172aad2144b6df50c2a012",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1796,6 +1796,55 @@
       "notes": "SecretProtector provides asynchronous protect/unprotect with a purpose string and optional AbortSignal."
     },
     {
+      "symbol": "M:Meshline.Interactions.Nep6AccountSigner.Dispose",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md#Meshline.Interactions.Nep6AccountSigner.Dispose()",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "M:Meshline.Interactions.Nep6AccountSigner.Load(System.String,System.String,Meshline.Models.NetworkContext,System.Int32)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md#Meshline.Interactions.Nep6AccountSigner.Load(string,string,Meshline.Models.NetworkContext,int)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "M:Meshline.Interactions.Nep6AccountSigner.Parse(System.String,System.String,Meshline.Models.NetworkContext,System.Int32)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md#Meshline.Interactions.Nep6AccountSigner.Parse(string,string,Meshline.Models.NetworkContext,int)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "M:Meshline.Interactions.Nep6AccountSigner.SignAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md#Meshline.Interactions.Nep6AccountSigner.SignAsync(System.ReadOnlyMemory_byte_,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "M:Meshline.Interactions.RpcRelayRegistry.#ctor(System.Net.Http.HttpClient,Meshline.Interactions.RpcRelayRegistryOptions)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistry.md#Meshline.Interactions.RpcRelayRegistry.RpcRelayRegistry(System.Net.Http.HttpClient,Meshline.Interactions.RpcRelayRegistryOptions)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
+    },
+    {
+      "symbol": "M:Meshline.Interactions.RpcRelayRegistry.GetRelayAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistry.md#Meshline.Interactions.RpcRelayRegistry.GetRelayAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
+    },
+    {
+      "symbol": "M:Meshline.Interactions.RpcRelayRegistry.GetRelaysAsync(System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistry.md#Meshline.Interactions.RpcRelayRegistry.GetRelaysAsync(System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
+    },
+    {
       "symbol": "M:Meshline.MeshlineClient.#ctor(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Interactions.ISecretProtector,Meshline.Interactions.IAccountSigner)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.MeshlineClient(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Interactions.ISecretProtector,Meshline.Interactions.IAccountSigner)",
       "status": "mapped-requires-behavior-review",
@@ -3523,6 +3572,62 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/interactions.ts",
       "notes": "RelayRegistry exposes context, getRelay and AsyncIterable getRelays. Missing entries use undefined."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.Nep6AccountSigner.AccountId",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md#Meshline.Interactions.Nep6AccountSigner.AccountId",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.Nep6AccountSigner.Address",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md#Meshline.Interactions.Nep6AccountSigner.Address",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.Nep6AccountSigner.PublicKey",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md#Meshline.Interactions.Nep6AccountSigner.PublicKey",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.RpcRelayRegistry.Context",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistry.md#Meshline.Interactions.RpcRelayRegistry.Context",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.RpcRelayRegistryOptions.Context",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistryOptions.md#Meshline.Interactions.RpcRelayRegistryOptions.Context",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.RpcRelayRegistryOptions.IteratorPageSize",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistryOptions.md#Meshline.Interactions.RpcRelayRegistryOptions.IteratorPageSize",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.RpcRelayRegistryOptions.RequestTimeout",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistryOptions.md#Meshline.Interactions.RpcRelayRegistryOptions.RequestTimeout",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.RpcRelayRegistryOptions.RpcUrl",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistryOptions.md#Meshline.Interactions.RpcRelayRegistryOptions.RpcUrl",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.AccountManager",
@@ -7452,6 +7557,27 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/interactions.ts",
       "notes": "SecretProtector provides asynchronous protect/unprotect with a purpose string and optional AbortSignal."
+    },
+    {
+      "symbol": "T:Meshline.Interactions.Nep6AccountSigner",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.Nep6AccountSigner.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/nep6-account-signer.ts",
+      "notes": "Optional Neo N3 NEP-6 signer with explicit account index; TypeScript consumes caller-loaded JSON and exposes dispose."
+    },
+    {
+      "symbol": "T:Meshline.Interactions.RpcRelayRegistry",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistry.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
+    },
+    {
+      "symbol": "T:Meshline.Interactions.RpcRelayRegistryOptions",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.RpcRelayRegistryOptions.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/integrations/rpc-relay-registry.ts",
+      "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
     },
     {
       "symbol": "T:Meshline.MeshlineClient",

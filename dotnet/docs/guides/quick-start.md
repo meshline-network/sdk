@@ -12,7 +12,7 @@ dotnet add package Meshline.Sdk --version 1.0.0
 
 For source development, use a project reference to the SDK instead of also referencing the NuGet package. The [SDK README](../../README.md#requirements-and-installation) shows that command.
 
-Before connecting, obtain a `NetworkContext` and registered relays from your intended Meshline network. Implement `IAccountSigner`, `IRelayRegistry`, and `ISecretProtector` as described in [Application integrations](integrations.md). Choose a writable database path dedicated to this network/account/device. There is no built-in default public network or wallet implementation.
+Before connecting, obtain a `NetworkContext` and registered relays from your intended Meshline network. Explicitly select `IAccountSigner` and `IRelayRegistry` implementations: the SDK supplies optional NEP-6 wallet and Neo RPC adapters, or you can provide your own. Supply `ISecretProtector` as described in [Application integrations](integrations.md). Choose a writable database path dedicated to this network/account/device. No public network or integration is selected automatically.
 
 ## Establish a new account
 
