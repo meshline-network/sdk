@@ -1,0 +1,90 @@
+name: TypeScript SDK checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: typescript-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+defaults:
+  run:
+    working-directory: typescript
+
+jobs:
+  acceptance:
+    name: TypeScript (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.16.0
+          cache: npm
+          cache-dependency-path: |
+            typescript/package-lock.json
+            tests/interop/typescript/package-lock.json
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Restore .NET host and independent interoperability test dependencies
+        run: npm run restore:interop
+
+      - name: Build, type-check examples and run offline tests
+        run: npm run check
+
+      - name: Pack local npm artifacts
+        run: npm run pack:local
+
+      - name: Verify independent package consumers
+        run: npm run check:packages
+
+      - name: Compile installed Expo consumer with Metro and Hermes
+        run: npm run check:expo-bundle
+
+      - name: Install browser runtimes
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      # Known platform failures remain failures; do not silently skip or invert them.
+      - name: Run browser acceptance
+        run: npm run test:browser -- --reporter=line,html
+
+      - name: Retain local packages and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: typescript-${{ matrix.os }}
+          path: |
+            typescript/artifacts/packages/
+            typescript/artifacts/api/
+            typescript/artifacts/consumers/expo-*/bundle-android/
+            typescript/artifacts/consumers/expo-*/bundle-ios/
+            typescript/playwright-report/
+            typescript/test-results/
+          retention-days: 14
+          if-no-files-found: warn

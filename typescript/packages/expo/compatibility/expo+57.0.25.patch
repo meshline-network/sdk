@@ -1,0 +1,13 @@
+diff --git a/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeRequest.kt b/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeRequest.kt
+--- a/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeRequest.kt
++++ b/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeRequest.kt
+@@ -73,8 +73,8 @@ internal class NativeRequest(appContext: AppContext, internal val response: NativeR
+     this.requestHolder.request = request
+ 
+     this.task = newClient.newCall(request)
+-    this.task?.enqueue(this.response)
+     response.onStarted()
++    this.task?.enqueue(this.response)
+   }
+ 
+   fun cancel() {

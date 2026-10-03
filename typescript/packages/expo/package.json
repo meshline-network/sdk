@@ -1,0 +1,56 @@
+{
+  "name": "@meshline/expo",
+  "version": "0.1.0-alpha.1",
+  "description": "Expo native adapters for the Meshline TypeScript SDK",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src",
+    "android",
+    "ios",
+    "compatibility",
+    "expo-module.config.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "meshline-expo-android-compat": "compatibility/apply-android-fix.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "peerDependencies": {
+    "@meshline/sdk": "0.1.0-alpha.1",
+    "expo": "57.0.25",
+    "expo-crypto": "^57.0.3",
+    "expo-file-system": "^57.0.7",
+    "expo-modules-core": "57.0.19",
+    "expo-sqlite": "^57.0.3",
+    "react-native": ">=0.86.3 <0.87.0"
+  },
+  "devDependencies": {
+    "expo": "57.0.25",
+    "expo-crypto": "57.0.3",
+    "expo-file-system": "57.0.7",
+    "expo-modules-core": "57.0.19",
+    "expo-sqlite": "57.0.3",
+    "react-native": "0.86.3",
+    "react": "19.2.3",
+    "@types/react-native__assets-registry": "0.84.0",
+    "@types/react": "^19.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meshline-network/sdk.git",
+    "directory": "typescript/packages/expo"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  }
+}

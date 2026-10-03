@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true, "rootDir": "src", "outDir": "dist",
+    "module": "ESNext", "moduleResolution": "Bundler", "customConditions": ["react-native"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["react-native"],
+    "skipLibCheck": true
+  },
+  "references": [{ "path": "../sdk" }],
+  "include": ["src/**/*.ts"]
+}

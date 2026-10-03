@@ -1,0 +1,20 @@
+{
+  "name": "meshline-sdk-interop-tests",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@meshline/sdk": "file:../../../typescript/packages/sdk",
+    "@meshline/storage-node": "file:../../../typescript/packages/storage-node",
+    "@meshline/transport-node": "file:../../../typescript/packages/transport-node",
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2",
+    "vite": "8.0.16",
+    "vitest": "4.1.10"
+  }
+}

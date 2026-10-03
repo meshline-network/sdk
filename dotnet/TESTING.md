@@ -23,7 +23,7 @@ Paths in the table and code references below are relative to `tests/Meshline.Sdk
 | `ClockScopeTests.cs` | The SDK's shared clock scope, nesting and execution-flow isolation. |
 | `Support/` | Reusable setup and scripted peers; contains no test classes. |
 | `Conformance/` | Native adapters for the shared SDK behavior scenarios. |
-| `../../../tests/` | Shared protocol vector snapshots and behavior scenarios; see the [shared test guide](../tests/README.md). |
+| `../../../tests/` | Shared protocol vector snapshots, behavior scenarios and cross-language tests; see the [shared test guide](../tests/README.md). |
 
 Choose the layer by the behavior under test, not by whether its input happens to be a vector. Component tests may use isolated storage to seed a documented crash boundary. Keep private SDK helpers private.
 

@@ -1,0 +1,4 @@
+{
+  "files": [],
+  "references": [{ "path": "packages/sdk" }, { "path": "packages/storage-node" }, { "path": "packages/storage-browser" }, { "path": "packages/transport-node" }, { "path": "packages/expo" }]
+}

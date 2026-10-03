@@ -1,6 +1,6 @@
 # SDK maintenance
 
-This guide is for contributors to this repository. Application developers should start with the [.NET SDK guide](dotnet/README.md).
+This guide is for contributors to this repository. Application developers should start with the [SDK guides](README.md#available-sdks).
 
 ## Local checks
 
@@ -15,6 +15,10 @@ dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --minimum
 
 Every pull request runs the format check and full offline test suite in separate jobs. Tests use xUnit v3 with Microsoft Testing Platform; use the `dotnet run` invocation above. See [TESTING.md](dotnet/TESTING.md) for fixtures, filters, concurrency checks, and protocol-vector provenance.
 
+Keep language-neutral vectors and behavior cases in [shared tests](tests/README.md).
+Each SDK executes them through its own native test adapters. Cross-language
+interoperability has a separate [test project](tests/interop/README.md).
+
 ## Local packages
 
 After a Release build, run from `dotnet/`:
@@ -24,6 +28,37 @@ dotnet pack src/Meshline.Sdk/Meshline.Sdk.csproj -c Release --no-build --no-rest
 ```
 
 This writes a package under `src/Meshline.Sdk/bin/Release/` without publishing it. The package includes the SDK guide as `README.md`, the MIT license, `assets/icon.png`, and XML API documentation. Changes to these embedded files reach NuGet with a new package version; editing GitHub documentation alone does not update an existing NuGet package.
+
+## TypeScript SDK checks and local packages
+
+Use Node.js 24 and .NET 10, then run from `typescript/`:
+
+```sh
+npm ci
+npm run restore:interop
+npm run check
+npm run pack:local
+npm run check:packages
+npm run check:expo-bundle
+npx playwright install --with-deps chromium firefox webkit
+npm run test:browser
+```
+
+The checks compile the SDK and examples, verify documentation and client method
+destinations, and run the offline suite with the actual .NET interoperability
+driver. Package checks install the five tarballs into independent consumers;
+Expo bundle checks compile JavaScript with Metro and Hermes for Android and iOS.
+These commands do not publish packages or establish native runtime acceptance.
+
+[typescript.yml](.github/workflows/typescript.yml) configures Windows, Linux and
+macOS checks. See [platform requirements and limits](typescript/docs/platforms.md)
+for the known Windows WebKit cookie issue and unverified runtimes; a workflow
+definition alone does not prove a platform passed.
+
+Generated API mappings are review aids. Update `typescript/scripts/api/api-map.json`,
+run `npm run inventory:api`, and inspect the resulting inventory when reviewing
+the .NET surface. `npm run check:inventory`, included in `npm run check`, rejects
+stale inventory output, duplicate/unmatched mappings and missing destination files.
 
 ## Database schema changes
 

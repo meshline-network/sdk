@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'org.meshline.expo'
+version = '0.1.0-alpha.1'
+
+android {
+  namespace 'org.meshline.expo'
+  defaultConfig {
+    versionCode 1
+    versionName project.version.toString()
+  }
+}
+
+dependencies {
+  // Align with the React Native 0.86.3 dependency, without using its shared client.
+  implementation 'com.squareup.okhttp3:okhttp:4.9.2'
+}

@@ -1,0 +1,1092 @@
+[
+  {
+    "type": "Meshline.Models.Client.GroupInvite",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Invitation client references and usage snapshots; client GroupInvite is named GroupInvitation to distinguish the signed protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupInviteRef",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Invitation client references and usage snapshots; client GroupInvite is named GroupInvitation to distinguish the signed protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupInviteInfo",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Invitation client references and usage snapshots; client GroupInvite is named GroupInvitation to distinguish the signed protocol object."
+  },
+  {
+    "type": "Meshline.Components.GroupManager",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupInfo",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupCreateOptions",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupMembershipState",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupMemberInfo",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupMessageDraft",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupUpdate",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupMessageInfo",
+    "path": "packages/sdk/src/groups/messages.ts",
+    "notes": "Authenticated decrypted message snapshot with sender identity and accepted sequence."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupListQuery",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupInviteQuery",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupResolveQuery",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupAccountsRequest",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupInviteResolveResult",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupInviteEntry",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupInvitePage",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupApplicationEntry",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupApplicationPage",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRecoverySubmitResult",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRecoveryEntry",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRecoveryPage",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupApplicationApproveRequest",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRecoveryApproveRequest",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupSubscriptionRequest",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupApplicationChangedNotification",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRecoveryChangedNotification",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupTimelineChangedNotification",
+    "path": "packages/sdk/src/models/group-admission.ts",
+    "notes": "Explicit wire codec and validation; application/recovery notifications share GroupChangedNotification. Historical identities, pagination and exact box-recipient bindings are validated; public admission and member-key recovery workflows are implemented in GroupManager."
+  },
+  {
+    "type": "Meshline.Components.ClientComponent",
+    "path": "packages/sdk/src/components/component.ts",
+    "notes": "initialize/start/stop/dispose, operation cancellation and lifecycle events. onLifecycle exposes lifecycle events; background observer failures are retained in lastBackgroundError."
+  },
+  {
+    "type": "Meshline.Components.AccountManager",
+    "path": "packages/sdk/src/components/account.ts",
+    "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+  },
+  {
+    "type": "Meshline.Components.DeviceManager",
+    "path": "packages/sdk/src/components/device.ts",
+    "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+  },
+  {
+    "type": "Meshline.Components.ProfileManager",
+    "path": "packages/sdk/src/components/profile.ts",
+    "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+  },
+  {
+    "type": "Meshline.Transport.RelayClientPool",
+    "path": "packages/sdk/src/transport/pool.ts",
+    "notes": "get/clients/invalidateDevice/dispose and typed events. MeshlineClient now coordinates durable home migration."
+  },
+  {
+    "type": "Meshline.Transport.RelayClient",
+    "path": "packages/sdk/src/transport/client.ts",
+    "notes": "HTTP/WSS, authentication, notifications, renewal and createSubscription full replacement streams with bounded disposal. Browser wire close-code limitations remain."
+  },
+  {
+    "type": "Meshline.Models.NetworkContext",
+    "path": "packages/sdk/src/protocol/context.ts",
+    "notes": "Immutable context, canonical text and bound signing inputs."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DeviceCertificate",
+    "path": "packages/sdk/src/models/identity.ts",
+    "notes": "Explicit codec, signatures, validation and certificateId; current authorization is separate."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountDeviceState",
+    "path": "packages/sdk/src/models/identity.ts",
+    "notes": "Explicit codec, deviceStateInput, validateDeviceState, authorizedDevice and safe revisions."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountRoute",
+    "path": "packages/sdk/src/models/identity.ts",
+    "notes": "Explicit codec, account/relay inputs, validation and revision comparison."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountProfile",
+    "path": "packages/sdk/src/models/profile.ts",
+    "notes": "Explicit codec, profileInput and field validation; validateProfileResult verifies historical signer evidence."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ProfileResolveResult",
+    "path": "packages/sdk/src/models/profile.ts",
+    "notes": "Explicit codec and complete independent certificate/profile signature verification."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ContentReference",
+    "path": "packages/sdk/src/models/content.ts",
+    "notes": "Codec, HTTPS/hash/media validation, ni lookup, plaintext verification and AES-GCM helpers. Rendering/download policy is application-owned."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ContentEncryption",
+    "path": "packages/sdk/src/models/content.ts",
+    "notes": "Codec and AES-256-GCM key/nonce validation."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageBody",
+    "path": "packages/sdk/src/models/content.ts",
+    "notes": "Codec, media-type/UTF-8 charset and protocol whitespace validation. Body rendering belongs to the application; this model preserves content."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RelayDescriptor",
+    "path": "packages/sdk/src/models/relay.ts",
+    "notes": "Codec, complete signed extensions, endpoint/peer identity validation and registry-bound discovery."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DeviceStatePublishResponse",
+    "path": "packages/sdk/src/models/device-state.ts",
+    "notes": "Accepted and staged responses are validated separately; staging never grants authoritative authorization."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ContactGrant",
+    "path": "packages/sdk/src/models/contacts.ts",
+    "notes": "Codec, signature/authorization checks, filtering and grant selection match independent vectors, including null-extension rejection."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ContactInvite",
+    "path": "packages/sdk/src/models/contacts.ts",
+    "notes": "Codec, type/signature binding and current device authorization checks."
+  },
+  {
+    "type": "Meshline.Models.Protocol.SignedDeviceStateQuery",
+    "path": "packages/sdk/src/models/contacts.ts",
+    "notes": "Codec, signed query projection, complete request validation and device manager POST queries."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ContactConsent",
+    "path": "packages/sdk/src/models/contacts.ts",
+    "notes": "Codec, note limits, grantor binding, current signature validation and MessageManager consent exchange."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ContactRecord",
+    "path": "packages/sdk/src/models/contacts.ts",
+    "notes": "Codec, state/alias/time/grant checks and atomic contact/sync persistence."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountContactSync",
+    "path": "packages/sdk/src/models/contacts.ts",
+    "notes": "Codec, scope/duplicate/deletion checks and encrypted multi-device snapshot/signature synchronization."
+  },
+  {
+    "type": "Meshline.Models.Protocol.EncryptedPayload",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Explicit codec and AES-256-GCM nonce/nonempty ciphertext validation."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageEnvelope",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Explicit codec, complete-object byte limit, signed extensions and historical signing-certificate verification. crypto/messages.ts supplies fixed AAD and authenticated encryption/decryption."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageKeyBox",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Explicit codec and length/algorithm/duplicate checks. Fresh X25519 ephemeral keys, HKDF and AES-GCM binding implemented in crypto/messages.ts."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageSendRequest",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec and account/self-delivery constraints; authorization signature checks belong to the calling workflow."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DirectMessage",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec, body/attachment and reply validation. MessageManager provides authorized encrypted sending, receiving and history."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DirectMessageReference",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec and sender/message identifier validation."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageTimelineEntry",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec; messages/receiver.ts and repository.ts implement verified reception and atomic cursor/message effects internally."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageTimelinePage",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec, strict sequence ordering, signer-certificate coverage and account binding, retention gaps and empty-page checks."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageTimelineQuery",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec and safe cursor/page-limit validation."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageDeliveryQuery",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Explicit delivery query codec; original accepting relay is retained by the internal outbox."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageDeliveryStatus",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec and status/error/acceptance-time consistency; internal outbox preserves uncertainty and stable acceptance evidence."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DeviceStateChanged",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec, revision validation and MessageManager contact refresh dispatch."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageTimelineChangedNotification",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "Codec, head validation and MessageManager notification-driven catch-up."
+  },
+  {
+    "type": "Meshline.Components.MessageManager",
+    "path": "packages/sdk/src/components/message.ts",
+    "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+  },
+  {
+    "type": "Meshline.Components.ChannelManager",
+    "path": "packages/sdk/src/components/channel.ts",
+    "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Client.ContactInfo",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "Idiomatic contact snapshots and string unions; event payloads use current snapshots and identifiers rather than .NET event argument classes."
+  },
+  {
+    "type": "Meshline.Models.Client.ContactGrantState",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "Idiomatic contact snapshots and string unions; event payloads use current snapshots and identifiers rather than .NET event argument classes."
+  },
+  {
+    "type": "Meshline.Models.Client.ContactRequestInfo",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "Idiomatic contact snapshots and string unions; event payloads use current snapshots and identifiers rather than .NET event argument classes."
+  },
+  {
+    "type": "Meshline.Models.Client.ContactRequestDirection",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "Idiomatic contact snapshots and string unions; event payloads use current snapshots and identifiers rather than .NET event argument classes."
+  },
+  {
+    "type": "Meshline.Models.Client.MessageSendStatus",
+    "path": "packages/sdk/src/messages/outbox.ts",
+    "notes": "Durable delivery-state projection, uncertainty and accepted-relay binding."
+  },
+  {
+    "type": "Meshline.Models.Client.MessageSendState",
+    "path": "packages/sdk/src/messages/outbox.ts",
+    "notes": "Durable delivery-state projection, uncertainty and accepted-relay binding."
+  },
+  {
+    "type": "Meshline.Models.Client.MessageInfo",
+    "path": "packages/sdk/src/messages/repository.ts",
+    "notes": "Local direct-message snapshot with sender/device/recipient identity and immutable query-reader snapshots."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelDescriptor",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelPost",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelPostEdit",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelPostDelete",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelEvent",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelResolveQuery",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelResolveResult",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelReadQuery",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelReadPage",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelCloseRequest",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelReportRequest",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelSubscriptionRequest",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelTimelineChangedNotification",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ChannelStatus",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Explicit channel codec, signing inputs and semantic validators. Event payloads use a discriminated kind/value union; edits preserve omission and root deletion markers."
+  },
+  {
+    "type": "Meshline.Models.Client.ChannelRef",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Readonly structural references with explicit resource/sequence validation."
+  },
+  {
+    "type": "Meshline.Models.Client.ChannelPostRef",
+    "path": "packages/sdk/src/models/channels.ts",
+    "notes": "Readonly structural references with explicit resource/sequence validation."
+  },
+  {
+    "type": "Meshline.Models.Client.ChannelInfo",
+    "path": "packages/sdk/src/channels/repository.ts",
+    "notes": "Verified local channel/post snapshots; stored projections retain original author and acceptance time."
+  },
+  {
+    "type": "Meshline.Models.Client.ChannelPostInfo",
+    "path": "packages/sdk/src/channels/repository.ts",
+    "notes": "Verified local channel/post snapshots; stored projections retain original author and acceptance time."
+  },
+  {
+    "type": "Meshline.Models.Client.ChannelUpdate",
+    "path": "packages/sdk/src/components/channel.ts",
+    "notes": "Readonly camelCase inputs; undefined retains optional update fields, null deletes them."
+  },
+  {
+    "type": "Meshline.Models.Client.ChannelPostDraft",
+    "path": "packages/sdk/src/components/channel.ts",
+    "notes": "Readonly camelCase inputs; undefined retains optional update fields, null deletes them."
+  },
+  {
+    "type": "Meshline.Models.Client.ChannelPostUpdate",
+    "path": "packages/sdk/src/components/channel.ts",
+    "notes": "Readonly camelCase inputs; undefined retains optional update fields, null deletes them."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupSecretBox",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMessageEnvelope",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMessage",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberNicknameUpdate",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberKey",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupHistorySecret",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberPrivateState",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountGroupHistorySecretSync",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountGroupPrivateStateSync",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountGroupPrivateStateRequest",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupStatus",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRole",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupInvitePolicy",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupCreate",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupCreateRequest",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupManagementOperation",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupUpdate",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupApplicationApproval",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberRecoveryApproval",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRoleUpdate",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupOwnerTransfer",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberLeave",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberRemoval",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberBan",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberUnban",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupSecretRotation",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupClose",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupKeyRotated",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupInvite",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupApplication",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMemberRecoveryRequest",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupState",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupMember",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupSequenceQuery",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupEvent",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupSyncPage",
+    "path": "packages/sdk/src/models/group-management.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupKeyEntry",
+    "path": "packages/sdk/src/models/group-keys.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupKeyPage",
+    "path": "packages/sdk/src/models/group-keys.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRotationPrepareRequest",
+    "path": "packages/sdk/src/models/group-keys.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Protocol.GroupRotationPrepareResult",
+    "path": "packages/sdk/src/models/group-keys.ts",
+    "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupApplicationInfo",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Client reference or authenticated admission/recovery snapshot; retained protocol entries expose their historical signer certificates and acceptance interval."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupKeyRecoveryInfo",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "Client reference or authenticated admission/recovery snapshot; retained protocol entries expose their historical signer certificates and acceptance interval."
+  },
+  {
+    "type": "Meshline.Models.Client.GroupRef",
+    "path": "packages/sdk/src/models/groups.ts",
+    "notes": "Client reference or authenticated admission/recovery snapshot; retained protocol entries expose their historical signer certificates and acceptance interval."
+  },
+  {
+    "type": "Meshline.MeshlineClient",
+    "path": "packages/sdk/src/client.ts",
+    "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+  },
+  {
+    "type": "Meshline.Models.Client.AccountEstablishmentOptions",
+    "path": "packages/sdk/src/client/account-operations.ts",
+    "notes": "TypeScript duration values use integer seconds; establishment requires staged initial device authorization."
+  },
+  {
+    "type": "Meshline.Models.Client.AccountRecoveryOptions",
+    "path": "packages/sdk/src/client/account-operations.ts",
+    "notes": "Explicit recovery accepts previous device state and revision overrides; does not run as a startup fallback."
+  },
+  {
+    "type": "Meshline.Models.Client.Conversation",
+    "path": "packages/sdk/src/client/conversations.ts",
+    "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
+  },
+  {
+    "type": "Meshline.Models.Client.ConversationKind",
+    "path": "packages/sdk/src/client/conversations.ts",
+    "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
+  },
+  {
+    "type": "Meshline.Models.Client.ConversationQuery",
+    "path": "packages/sdk/src/client/conversations.ts",
+    "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
+  },
+  {
+    "type": "Meshline.Models.Client.ConversationSummary",
+    "path": "packages/sdk/src/client/conversations.ts",
+    "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
+  },
+  {
+    "type": "Meshline.Components.ContactChangedEventArgs",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "ContactChange contains accountId, a committed contact snapshot (absent when deleted), and string kinds replacing .NET flags. Grant states use transaction-cached device states."
+  },
+  {
+    "type": "Meshline.Components.ContactChangeKind",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "ContactChange.kinds represents relationship, alias, authorization and deleted as a string array."
+  },
+  {
+    "type": "Meshline.Components.ContactRequestChangedEventArgs",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "ContactRequestChange carries accountId, direction, kind and the committed request snapshot. Removed requests omit request; delivery events preserve each committed send state."
+  },
+  {
+    "type": "Meshline.Components.ContactRequestChangeKind",
+    "path": "packages/sdk/src/messages/contacts.ts",
+    "notes": "ContactRequestChange.kind uses added, updated and removed. No request event is emitted for an absent dismissal or an unrelated protocol send."
+  },
+  {
+    "type": "Meshline.Components.GroupChangedEventArgs",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "GroupChange extends GroupInfo with kinds; committed page, nickname and local membership/status snapshots replace the nested .NET event wrapper. Ordinary messages do not emit groupChanged."
+  },
+  {
+    "type": "Meshline.Components.GroupChangeKind",
+    "path": "packages/sdk/src/groups/state.ts",
+    "notes": "GroupChange.kinds represents properties, members, roles, bans, nickname and status. Verified management changes are combined per committed page."
+  },
+  {
+    "type": "Meshline.Components.ConversationChangedEventArgs",
+    "path": "packages/sdk/src/client/conversations.ts",
+    "notes": "Typed ConversationChange payload uses conversationId and kind created/updated/removed; notifications do not await application observers."
+  },
+  {
+    "type": "Meshline.Components.ConversationChangeKind",
+    "path": "packages/sdk/src/client/conversations.ts",
+    "notes": "Typed ConversationChange payload uses conversationId and kind created/updated/removed; notifications do not await application observers."
+  },
+  {
+    "type": "Meshline.Components.AccountState",
+    "path": "packages/sdk/src/components/account.ts",
+    "notes": "AccountState uses the string states unknown, notEstablished and established."
+  },
+  {
+    "type": "Meshline.Components.BackgroundErrorEventArgs",
+    "path": "packages/sdk/src/components/component.ts",
+    "notes": "BackgroundFailure carries operation, optional resource and the original unknown error. onLifecycle replaces the .NET event wrapper."
+  },
+  {
+    "type": "Meshline.Components.BackgroundOperation",
+    "path": "packages/sdk/src/components/component.ts",
+    "notes": "BackgroundFailure.operation is an open descriptive string, including observer diagnostics, rather than the three-value .NET enum."
+  },
+  {
+    "type": "Meshline.Components.ComponentState",
+    "path": "packages/sdk/src/components/component.ts",
+    "notes": "ComponentState uses uninitialized, stopped, running, stopping and disposed string values."
+  },
+  {
+    "type": "Meshline.Components.ComponentStateChangedEventArgs",
+    "path": "packages/sdk/src/components/component.ts",
+    "notes": "ComponentEvents.stateChanged carries previous and current lifecycle states."
+  },
+  {
+    "type": "Meshline.Components.ChannelFollowChangedEventArgs",
+    "path": "packages/sdk/src/components/channel.ts",
+    "notes": "ChannelEvents.followChanged carries the full channel reference and isFollowed; channel.channelId is the .NET ChannelId equivalent."
+  },
+  {
+    "type": "Meshline.Components.ChannelPostChange",
+    "path": "packages/sdk/src/channels/repository.ts",
+    "notes": "ChannelPostChange carries ref, kind and optional info from the committed post projection."
+  },
+  {
+    "type": "Meshline.Components.ChannelPostChangeKind",
+    "path": "packages/sdk/src/channels/repository.ts",
+    "notes": "ChannelPostChange.kind uses added, edited and deleted string values."
+  },
+  {
+    "type": "Meshline.Components.ChannelTimelineChangedEventArgs",
+    "path": "packages/sdk/src/components/channel.ts",
+    "notes": "ChannelEvents.timelineChanged carries channel and a changes array."
+  },
+  {
+    "type": "Meshline.Components.DeviceAuthorizationState",
+    "path": "packages/sdk/src/components/device.ts",
+    "notes": "DeviceAuthorizationState uses unknown, notRegistered, notYetValid, expired and authorized."
+  },
+  {
+    "type": "Meshline.Components.DeviceChangedEventArgs",
+    "path": "packages/sdk/src/components/device.ts",
+    "notes": "DeviceEvents.deviceChanged passes the device ID string directly."
+  },
+  {
+    "type": "Meshline.Components.GroupApplicationsChangedEventArgs",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "GroupEvents.applicationsChanged passes the GroupRef directly."
+  },
+  {
+    "type": "Meshline.Components.GroupKeyRecoveryChangedEventArgs",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "GroupEvents.keyRecoveryChanged passes the GroupRef directly."
+  },
+  {
+    "type": "Meshline.Components.GroupTimelineChangedEventArgs",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "GroupEvents.timelineChanged emits one processed sequence with group and optional message. Filter for message to collect the .NET Messages-array equivalent; nickname/rejection progress may have no message."
+  },
+  {
+    "type": "Meshline.Components.MessageReceivedEventArgs",
+    "path": "packages/sdk/src/components/message.ts",
+    "notes": "MessageEvents.messageReceived passes the readonly MessageInfo array directly."
+  },
+  {
+    "type": "Meshline.Components.MessageSendStatusChangedEventArgs",
+    "path": "packages/sdk/src/components/message.ts",
+    "notes": "MessageEvents.sendStatusChanged passes MessageSendStatus directly."
+  },
+  {
+    "type": "Meshline.Interactions.IAccountSigner",
+    "path": "packages/sdk/src/interactions.ts",
+    "notes": "AccountSigner exposes accountId, publicKey and asynchronous sign with optional AbortSignal."
+  },
+  {
+    "type": "Meshline.Interactions.IDeviceSigner",
+    "path": "packages/sdk/src/interactions.ts",
+    "notes": "DeviceSigner exposes certificate and asynchronous sign with optional AbortSignal."
+  },
+  {
+    "type": "Meshline.Interactions.IRelayRegistry",
+    "path": "packages/sdk/src/interactions.ts",
+    "notes": "RelayRegistry exposes context, getRelay and AsyncIterable getRelays. Missing entries use undefined."
+  },
+  {
+    "type": "Meshline.Interactions.ISecretProtector",
+    "path": "packages/sdk/src/interactions.ts",
+    "notes": "SecretProtector provides asynchronous protect/unprotect with a purpose string and optional AbortSignal."
+  },
+  {
+    "type": "Meshline.Models.Client.DeviceStatePublishOptions",
+    "path": "packages/sdk/src/components/device.ts",
+    "notes": "PublishDeviceStateOptions has previousState, recovery and revision; it also supports explicit certificates and signal."
+  },
+  {
+    "type": "Meshline.Models.Client.DeviceStatePublishResult",
+    "path": "packages/sdk/src/components/device.ts",
+    "notes": "DeviceStatePublishResult extends the validated accepted/staged response with deviceState."
+  },
+  {
+    "type": "Meshline.Models.Client.DirectMessageDraft",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "DirectMessage is the structural draft passed to MessageManager.sendMessage, including body, attachments and replyTo."
+  },
+  {
+    "type": "Meshline.Models.Client.MessageRef",
+    "path": "packages/sdk/src/messages/repository.ts",
+    "notes": "MessageKey carries sender and messageId for persisted direct-message lookup."
+  },
+  {
+    "type": "Meshline.Models.Client.PageRequest",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "GroupPageRequest has cursor/limit; channel history exposes the same fields as ChannelHistoryRequest."
+  },
+  {
+    "type": "Meshline.Models.Client.Page`1",
+    "path": "packages/sdk/src/components/group.ts",
+    "notes": "GroupPage<T> carries readonly items and optional nextCursor; ChannelHistoryPage specializes the same shape for channel posts."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountAuthenticationRequest",
+    "path": "packages/sdk/src/models/authentication.ts",
+    "notes": "Structural request, explicit wire codec and accountAuthenticationInput replace the .NET instance signing helper."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AuthenticationChallenge",
+    "path": "packages/sdk/src/models/authentication.ts",
+    "notes": "Structural challenge, wire codec and validateChallenge; timestamps use integer Unix seconds."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DeviceAuthenticationRequest",
+    "path": "packages/sdk/src/models/authentication.ts",
+    "notes": "Structural request, explicit wire codec and deviceAuthenticationInput replace the .NET instance signing helper."
+  },
+  {
+    "type": "Meshline.Models.Protocol.SessionCredentials",
+    "path": "packages/sdk/src/models/authentication.ts",
+    "notes": "Structural credentials, wire codec and validateSession, including token, mode and expiresAt."
+  },
+  {
+    "type": "Meshline.Models.Protocol.SessionMode",
+    "path": "packages/sdk/src/models/authentication.ts",
+    "notes": "SessionMode is the account/device string union."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DeviceStatePublishStatus",
+    "path": "packages/sdk/src/models/device-state.ts",
+    "notes": "DeviceStatePublishResponse.status is the accepted/staged string union."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RelayInfo",
+    "path": "packages/sdk/src/models/relay.ts",
+    "notes": "RelayInfo has an explicit codec and validateRelayInfo; the descriptor may supply additional capability constraints."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RelayLimits",
+    "path": "packages/sdk/src/models/relay.ts",
+    "notes": "RelayLimits has an explicit codec; numeric limits are validated by validateRelayInfo and discovery."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RouteComparison",
+    "path": "packages/sdk/src/models/identity.ts",
+    "notes": "compareRoutes returns older, newer, equivalent or conflict."
+  },
+  {
+    "type": "Meshline.Models.Registry.RelayEntry",
+    "path": "packages/sdk/src/interactions.ts",
+    "notes": "RelayEntry retains relayId, endpoint, status and UInt64 updatedAt as bigint milliseconds."
+  },
+  {
+    "type": "Meshline.Models.Registry.RelayStatus",
+    "path": "packages/sdk/src/interactions.ts",
+    "notes": "RelayEntry.status is the active/disabled/suspended string union."
+  },
+  {
+    "type": "Meshline.Transport.RelayAuthenticationState",
+    "path": "packages/sdk/src/transport/client.ts",
+    "notes": "RelayAuthenticationState includes none, authenticating, account, device, expired and rejected. Rejection is independent of observer diagnostics and clears on new authentication; recoverable socket renewal errors can retain the accepted session."
+  },
+  {
+    "type": "Meshline.Transport.RelayConnectionState",
+    "path": "packages/sdk/src/transport/client.ts",
+    "notes": "RelayConnectionState uses disconnected, connecting and connected string values."
+  },
+  {
+    "type": "Meshline.Storage.QueryReader`1",
+    "path": "packages/sdk/src/storage/store.ts",
+    "notes": "QueryReader<T> exposes readNext(count, signal) and dispose with fixed snapshot semantics; implementations validate counts and cancellation."
+  },
+  {
+    "type": "Meshline.Identity.AccountAdapter",
+    "path": "packages/sdk/src/identity/neo.ts",
+    "notes": "Neo identity uses getAccountId, validateAccountId and matchesAccount; raw signature verification is verifyAccount in crypto/primitives.ts. Identity-bound verification composes signature and identity checks. No adapter class/registry, protected subclass hooks or standalone generic CAIP-10 GetChainId equivalent is exported; this is not one-to-one utility API parity."
+  },
+  {
+    "type": "Meshline.Identity.RelayIdentity",
+    "path": "packages/sdk/src/identity/neo.ts",
+    "notes": "getRelayId, validateRelayId and verifyRelay provide relay identity operations; verifyAccount provides raw P-256 signature verification."
+  },
+  {
+    "type": "Meshline.Models.Client.ClientOptions",
+    "path": "packages/sdk/src/components/component.ts",
+    "notes": "ClientOptions retains context/accountId and adds an injectable clock. Constructors validate arguments; no separate options.Validate method is exposed."
+  },
+  {
+    "type": "Meshline.Models.Client.ProfileUpdate",
+    "path": "packages/sdk/src/components/profile.ts",
+    "notes": "ProfileUpdate uses optional fields; null clears nickname/avatar/bio, while publicDiscovery accepts a boolean. Omission leaves a value unchanged."
+  },
+  {
+    "type": "Meshline.Models.FieldUpdate`1",
+    "path": "packages/sdk/src/protocol/codec.ts",
+    "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+  },
+  {
+    "type": "Meshline.Models.Protocol.AccountQuery",
+    "path": "packages/sdk/src/components/account.ts",
+    "notes": "Account/profile/device resolution uses validated account arguments and the { account } JSON query directly; no standalone AccountQuery class is required."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ContactRelationshipState",
+    "path": "packages/sdk/src/models/contacts.ts",
+    "notes": "ContactRecord.status is the active/deleted string union, validated by contactRecordCodec."
+  },
+  {
+    "type": "Meshline.Models.Protocol.DeviceStateChangedNotification",
+    "path": "packages/sdk/src/components/device.ts",
+    "notes": "DeviceManager validates the notification revision as a nonnegative safe integer before synchronization; raw notifications use RpcNotification and JsonObject rather than a separate DTO."
+  },
+  {
+    "type": "Meshline.Models.Protocol.Identifiers",
+    "path": "packages/sdk/src/identity/identifiers.ts",
+    "notes": "createIdentifier, validateIdentifier, deriveDeviceId and deriveResourceId consolidate per-kind helpers with a discriminant. certificateId in models/identity.ts derives a device ID from its certificate."
+  },
+  {
+    "type": "Meshline.Models.Protocol.MessageDeliveryState",
+    "path": "packages/sdk/src/models/messages.ts",
+    "notes": "MessageDeliveryStatus.status uses delivering/target_accepted/failed wire values, distinct from local MessageSendState."
+  },
+  {
+    "type": "Meshline.Models.Protocol.ProtocolModel",
+    "path": "packages/sdk/src/protocol/codec.ts",
+    "notes": "Readonly structural models, ExtensibleModel and explicit ProtocolCodec objects replace CLR inheritance and ToJson/FromJson. Semantic validation remains an explicit per-model function; the internal codec factory is not a public subclassing API."
+  },
+  {
+    "type": "Meshline.Models.Protocol.TypedProtocolModel",
+    "path": "packages/sdk/src/protocol/context.ts",
+    "notes": "Typed codecs preserve $type; signingInput and per-model input helpers apply network/domain separation and field exclusions. There is no public base-class constructor."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RelayError",
+    "path": "packages/sdk/src/transport/relay-error.ts",
+    "notes": "The wire model is RelayFailure with relayFailureCodec; retryAfter and rpcErrorCodes expose retry/code metadata. The JavaScript RelayError exception retains failure and isDefinitiveRejection."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RpcError",
+    "path": "packages/sdk/src/transport/rpc.ts",
+    "notes": "The error payload is named RpcFailure. rpcFailureError maps recognized numeric codes to RelayError; unrecognized codes become ProtocolError('unknown_rpc_error'), rather than a nullable code lookup."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RpcRequest",
+    "path": "packages/sdk/src/transport/rpc.ts",
+    "notes": "encodeRpcRequest validates and serializes outbound calls. Inbound notifications use RpcNotification. Request IDs and notification discrimination are represented structurally; no mutable RpcRequest DTO is exported."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RpcResponse",
+    "path": "packages/sdk/src/transport/rpc.ts",
+    "notes": "decodeRpcMessage returns the discriminated RpcMessage success/failure variants; no response base class is exported."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RpcSuccess",
+    "path": "packages/sdk/src/transport/rpc.ts",
+    "notes": "RpcMessage with kind: success retains the request ID and JSON result."
+  },
+  {
+    "type": "Meshline.Models.Protocol.RpcFailure",
+    "path": "packages/sdk/src/transport/rpc.ts",
+    "notes": "RpcMessage with kind: failure retains ID (including null) and error. The TypeScript RpcFailure name instead denotes the inner error payload."
+  },
+  {
+    "type": "Meshline.Models.Protocol.SequenceResult",
+    "path": "packages/sdk/src/components/channel.ts",
+    "notes": "Channel publication validates the accepted sequence before persisting its acknowledgement; group operations also validate sequence results. The one-field reply is consumed as JsonObject rather than a separate exported DTO."
+  },
+  {
+    "type": "Meshline.Storage.DatabaseOptions",
+    "path": "packages/storage-node/src/index.ts",
+    "notes": "NodeSqliteStore accepts a filename; browser and Expo stores have platform-specific configuration. There is no shared .NET DatabaseOptions class or database-file compatibility promise."
+  },
+  {
+    "type": "Meshline.Storage.MeshlineDatabase",
+    "path": "packages/sdk/src/storage/store.ts",
+    "notes": "MeshlineStore.migrate provides the explicit migration capability, implemented separately by each platform adapter. Initialization does not create a missing database."
+  },
+  {
+    "type": "Meshline.Storage.Migrations.InitialCreate",
+    "path": "packages/storage-node/src/index.ts",
+    "notes": "EF Core Up/Down/model-builder hooks are CLR infrastructure, not TypeScript exports. Each adapter owns its schema/migrate implementation; .NET migration and database compatibility are not supported."
+  },
+  {
+    "type": "Meshline.Transport.RelayException",
+    "path": "packages/sdk/src/transport/relay-error.ts",
+    "notes": "RelayError extends Error and retains the cloned RelayFailure, optional HTTP/RPC code, retry metadata and definitive-rejection classification."
+  },
+  {
+    "type": "Meshline.Validation.ProtocolViolation",
+    "path": "packages/sdk/src/errors.ts",
+    "notes": "Validators throw ProtocolError with a string code/message instead of returning a nullable violation record. Some argument errors use TypeError/RangeError. Exception behavior is an explicit language adaptation."
+  },
+  {
+    "type": "Meshline.Validation.ProtocolViolationKind",
+    "path": "packages/sdk/src/errors.ts",
+    "notes": "ProtocolError codes identify individual validation failures; the eight-value CLR classification enum is not separately exported. Codes are not a one-to-one rename of that enum."
+  }
+]

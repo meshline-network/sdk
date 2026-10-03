@@ -5,24 +5,24 @@ vectors. Expected results are authored from the behavior contract, never capture
 from one SDK and used as the oracle for another.
 
 The first suite is [channel-post-updates.json](channel-post-updates.json), version 1.
-The [.NET adapter](../../dotnet/tests/Meshline.Sdk.Tests/Conformance/ChannelPostUpdateTests.cs)
-executes the suite through the public SDK.
+Its native adapters are the [.NET tests](../../dotnet/tests/Meshline.Sdk.Tests/Conformance/ChannelPostUpdateTests.cs)
+and [TypeScript tests](../../typescript/tests/conformance/channel-post-updates.test.ts).
 
 Each case has a stable `id`, an `initial` post and ordered `steps`. Each step has a
 stable `id`, an `update`, and the complete expected content after the edit. Content
 uses protocol field names. `body: null` means no body; `attachments: []` means no
 attachments. These are normalized observations, not signed wire envelopes.
 
-The adapter creates a channel and publishes the initial post through the public SDK.
-For each step it calls the public edit API, compares body and attachment content,
-and checks that the post reference, message ID and author stay unchanged. After the
-last step it reopens persistent storage and verifies the same post and content.
+The adapters create a channel and publish the initial post through the public SDK.
+For each step they call the public edit API, compare body and attachment content,
+and check that the post reference, message ID and author stay unchanged. After the
+last step they reopen persistent storage and verify the same post and content.
 No attachment download or live relay is needed; the attachment names a public test
 location and the known SHA-256 digest of empty content.
 
 Version 1 supports only `body` and `attachments` updates. An omitted field stays
 unchanged, JSON null deletes it, and a supplied value replaces the entire field.
-Nested extension fields are part of that value. The adapter rejects unknown
+Nested extension fields are part of that value. Both adapters reject unknown
 update fields, rather than silently skipping an operation. Each case starts with
 fresh state; steps within a case share that state.
 

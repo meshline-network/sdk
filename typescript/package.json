@@ -1,0 +1,42 @@
+{
+  "name": "meshline-typescript",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "restore:interop": "dotnet restore ../tests/interop/dotnet/Meshline.Interop.csproj --nologo && npm ci --prefix ../tests/interop/typescript",
+    "build:interop": "dotnet build ../tests/interop/dotnet/Meshline.Interop.csproj -c Release --no-restore --nologo",
+    "typecheck": "tsc -p tsconfig.tools.json && tsc -p tests/tsconfig.json && tsc -p tests/expo/tsconfig.json",
+    "typecheck:examples": "tsc -p examples/tsconfig.json && tsc -p examples/tsconfig.expo.json",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:api": "node scripts/check-client-api.mjs",
+    "check:inventory": "node scripts/api-inventory.mjs --check",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "serve:tests": "vite --host 127.0.0.1 --port 4177 --strictPort",
+    "check": "npm run build && npm run typecheck && npm run typecheck:examples && npm run check:docs && npm run check:api && npm run check:inventory && npm run build:interop && npm test && npm run test:interop",
+    "pack:local": "npm run build && node scripts/pack.mjs",
+    "check:packages": "node scripts/check-packages.mjs",
+    "check:expo-bundle": "node scripts/check-expo-bundle.mjs",
+    "check:android-native": "node scripts/check-android-native.mjs",
+    "inventory:api": "node scripts/api-inventory.mjs",
+    "test:interop": "npm run check --prefix ../tests/interop/typescript",
+    "test:conformance": "vitest run tests/protocol tests/conformance"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.3",
+    "@types/tr46": "5.0.1",
+    "abort-controller": "3.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.0.16",
+    "vitest": "4.1.10",
+    "whatwg-url-minimum": "0.1.2"
+  }
+}

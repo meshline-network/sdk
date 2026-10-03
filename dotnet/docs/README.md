@@ -41,6 +41,6 @@ There are three distinct validation levels:
 - **Offline behavioral tests:** exercise protocol vectors, transport, persistence, and component workflows against scripted peers. See the [test guide](../TESTING.md).
 - **Live network validation:** requires your chosen network, eligible relays, wallet integration, and platform-specific storage. Compilation and offline tests do not establish live-relay interoperability or mobile, browser, and NativeAOT support.
 
-The SDK release number does not change the [Protocol 1.0 specification's draft status](https://meshline.org/protocol/v1/en/index.html). Wire formats and interoperability rules belong to the specification; these guides explain the .NET implementation. Content hosting, attachment retrieval, and UI rendering remain application responsibilities. TypeScript is planned and has no API documentation here.
+The SDK release number does not change the [Protocol 1.0 specification's draft status](https://meshline.org/protocol/v1/en/index.html). Wire formats and interoperability rules belong to the specification; these guides explain the .NET implementation. Content hosting, attachment retrieval, and UI rendering remain application responsibilities. For TypeScript applications, see the [TypeScript guide](../../typescript/docs/README.md).
 
 [SDK overview](../README.md) · [API reference](api/README.md) · [Maintenance](../../MAINTENANCE.md)

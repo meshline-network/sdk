@@ -1,0 +1,41 @@
+{
+  "name": "@meshline/transport-node",
+  "version": "0.1.0-alpha.1",
+  "description": "Node.js HTTPS and WebSocket adapters for Meshline",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "peerDependencies": {
+    "@meshline/sdk": "0.1.0-alpha.1"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meshline-network/sdk.git",
+    "directory": "typescript/packages/transport-node"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  }
+}

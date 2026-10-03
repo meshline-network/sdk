@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": { "module": "ESNext", "moduleResolution": "Bundler", "customConditions": ["react-native"], "jsx": "react-jsx", "skipLibCheck": true, "noEmit": true },
+  "include": ["shared.ts", "expo.ts", "workflows.ts"]
+}
