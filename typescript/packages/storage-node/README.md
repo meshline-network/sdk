@@ -8,7 +8,7 @@ application on **Node.js 24 or later**. The package is ESM with TypeScript decla
 Install this adapter and the matching core together:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/storage-node@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/storage-node@alpha
 ```
 
 Import `NodeSqliteStore` from `@meshline/storage-node` and construct it

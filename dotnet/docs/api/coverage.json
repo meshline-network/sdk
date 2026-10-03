@@ -1,6 +1,5 @@
 {
   "assembly": "Meshline.Sdk",
-  "version": "1.0.0.0",
   "generator": "DefaultDocumentation.Console 1.2.5",
   "symbols": {
     "E:Meshline.Components.AccountManager.AccountChanged": "Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.AccountChanged",

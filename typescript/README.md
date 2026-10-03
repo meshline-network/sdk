@@ -5,7 +5,11 @@ messages, public channels, and persistent local conversations. `MeshlineClient`
 coordinates these capabilities for one network, account, and local device.
 Your application supplies account signing, relay registry access, and secret protection.
 
-**SDK 0.1.0-alpha.1** consists of ESM packages with TypeScript declarations.
+The SDK is available on the **alpha** channel as ESM packages with TypeScript declarations.
+
+The optional `RpcRelayRegistry` and `Nep6AccountSigner` adapters provide RPC
+registry access and NEP-6 wallet signing. Applications select them explicitly and continue to
+provide secret protection. See the [integration guide](docs/guides/integrations.md).
 
 ## Choose your packages
 
@@ -27,7 +31,7 @@ Linux and iOS runtime validation remains pending.
 For a Node.js application, install the core and both Node adapters:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/storage-node@0.1.0-alpha.1 @meshline/transport-node@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/storage-node@alpha @meshline/transport-node@alpha
 ```
 
 For browser and Expo installation commands, see the [quick start](docs/guides/quick-start.md).

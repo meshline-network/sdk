@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { compareVersions, packageDirectories, publicationPlan, publishRelease, releaseVersion, validatePackages, validateRelease, verifyPackages } from '../../scripts/release.mjs';
+import { compareVersions, packageDirectories, publicationPlan, publishRelease, releaseVersion, setWorkspaceVersion, validatePackages, validateRelease, verifyPackages } from '../../scripts/release.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const info = releaseVersion('0.1.0-alpha.2');
@@ -63,6 +63,58 @@ test('all package versions, internal peers, lockfile and repository identity mus
     }
     const stale = structuredClone(lock); stale.packages['packages/expo'].version = '9.0.0';
     assert.throws(() => validatePackages(manifests, stale), /package-lock/);
+});
+
+async function versionFixture(t) {
+    const { directory: base } = await fixture(t);
+    const directory = join(base, 'typescript');
+    const files = packageDirectories.map(name => join(directory, 'packages', name, 'package.json'));
+    for (const [i, file] of files.entries()) {
+        await mkdir(dirname(file), { recursive: true });
+        const manifest = JSON.parse(await readFile(join(root, 'packages', packageDirectories[i], 'package.json'), 'utf8'));
+        manifest.version = '0.1.0-alpha.1';
+        if (i) manifest.peerDependencies['@meshline/sdk'] = manifest.version;
+        await writeFile(file, JSON.stringify(manifest, null, 2) + '\n');
+    }
+    return { directory, files, read: () => Promise.all(files.map(file => readFile(file, 'utf8'))) };
+}
+
+test('local version updates synchronize internal dependencies and refresh both locks without Git or publishing', async t => {
+    const { directory, read } = await versionFixture(t);
+    const before = (await read()).map(JSON.parse); const commands = [];
+    const options = { directory, npm: 'npm-cli.js', execute: (...args) => commands.push(args) };
+    await setWorkspaceVersion(info.version, options);
+    const after = (await read()).map(JSON.parse);
+    for (const [i, manifest] of after.entries()) {
+        assert.equal(manifest.version, info.version);
+        if (i) assert.equal(manifest.peerDependencies['@meshline/sdk'], info.version);
+        for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies', 'devDependencies']) {
+            for (const [name, value] of Object.entries(before[i][field] ?? {})) {
+                if (!name.startsWith('@meshline/')) assert.equal(manifest[field][name], value);
+            }
+        }
+        assert.deepEqual(manifest.repository, before[i].repository);
+        assert.deepEqual(manifest.publishConfig, before[i].publishConfig);
+    }
+    assert.deepEqual(commands, [directory, join(directory, '../tests/interop/typescript')].map(prefix =>
+        [process.execPath, ['npm-cli.js', 'install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', '--prefix', prefix]]));
+    const once = await read();
+    await setWorkspaceVersion(info.version, options);
+    assert.deepEqual(await read(), once);
+});
+
+test('invalid version input or unknown internal dependencies cannot partially rewrite manifests', async t => {
+    const { directory, files, read } = await versionFixture(t);
+    const commands = []; const options = { directory, npm: 'npm-cli.js', execute: (...args) => commands.push(args) };
+    const original = await read();
+    await assert.rejects(setWorkspaceVersion('0.1.0+metadata', options), /SemVer/);
+    assert.deepEqual(await read(), original);
+    const last = JSON.parse(original.at(-1)); last.dependencies = { '@meshline/unknown': '1.0.0' };
+    await writeFile(files.at(-1), JSON.stringify(last));
+    const invalid = await read();
+    await assert.rejects(setWorkspaceVersion(info.version, options), /Unknown internal dependency/);
+    assert.deepEqual(await read(), invalid);
+    assert.deepEqual(commands, []);
 });
 
 test('published releases skip later commits; drafts and tags must belong to the source commit', () => {

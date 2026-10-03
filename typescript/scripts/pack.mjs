@@ -17,7 +17,10 @@ for (const entry of await readdir(new URL('../packages/', import.meta.url), { wi
         { cwd: root, encoding: 'utf8', windowsHide: true });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(result.stderr || `npm pack failed with status ${result.status}`);
-    const [packed] = JSON.parse(result.stdout);
+    // npm 11 returns an array; npm 12 keys workspace results by package name.
+    const packedResults = Object.values(JSON.parse(result.stdout));
+    if (packedResults.length !== 1 || packedResults[0].name !== `@meshline/${entry.name}`) throw new Error(`Unexpected npm pack result for ${entry.name}.`);
+    const [packed] = packedResults;
     for (const required of ['dist/index.js', 'dist/index.d.ts', 'README.md', 'LICENSE']) if (!packed.files.some(file => file.path === required)) throw new Error(`${packed.name} is missing ${required}`);
     if (packed.name === '@meshline/expo') for (const required of ['expo-module.config.json', 'android/build.gradle', 'android/src/main/AndroidManifest.xml', 'android/src/main/java/org/meshline/expo/MeshlineRelaySocketModule.kt', 'ios/MeshlineExpo.podspec', 'ios/MeshlineRelaySocketModule.swift']) if (!packed.files.some(file => file.path === required)) throw new Error(`Expo native package is missing ${required}`);
     if (packed.files.some(file => /(^|\/)(tests?|node_modules|\.git)(\/|$)/.test(file.path) || /\.tsbuildinfo$/.test(file.path))) throw new Error(`${packed.name} contains build/test-only content.`);

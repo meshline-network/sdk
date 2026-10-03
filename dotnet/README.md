@@ -1,8 +1,8 @@
 # Meshline .NET SDK
 
-**Version 1.0.0** · **.NET 10** · Assembly: `Meshline.Sdk` · Root namespace: `Meshline`
+**.NET 10** · Assembly: `Meshline.Sdk` · Root namespace: `Meshline`
 
-[NuGet package](https://www.nuget.org/packages/Meshline.Sdk) · [Release notes](https://github.com/meshline-network/sdk/releases/tag/v1.0.0) · [Source](https://github.com/meshline-network/sdk)
+[NuGet package](https://www.nuget.org/packages/Meshline.Sdk) · [Release notes](https://github.com/meshline-network/sdk/releases) · [Source](https://github.com/meshline-network/sdk)
 
 [Developer guide](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/README.md) · [Complete API reference](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/api/README.md) · [Compilable examples](https://github.com/meshline-network/sdk/blob/main/dotnet/examples/README.md)
 
@@ -16,12 +16,14 @@ Meshline is a decentralized messaging and social protocol built around self-sove
 
 Use `MeshlineClient` to coordinate the client components, or compose the components independently. Construction performs no I/O. Applications supply account signing, relay registry access, and platform-specific secret protection.
 
+The optional `RpcRelayRegistry` and `Nep6AccountSigner` adapters provide RPC registry access and NEP-6 wallet signing. Applications choose and register the adapters explicitly; platform-specific secret protection remains application-provided. See the [integration guide](https://github.com/meshline-network/sdk/blob/main/dotnet/docs/guides/integrations.md).
+
 ## Requirements and installation
 
 Install the .NET 10 SDK and target `net10.0` in the consuming application. Add the NuGet package:
 
 ```sh
-dotnet add package Meshline.Sdk --version 1.0.0
+dotnet add package Meshline.Sdk
 ```
 
 For source integration, reference the SDK project instead, replacing the paths below with your project and checkout locations:
@@ -32,7 +34,7 @@ dotnet add path/to/MyApp.csproj reference path/to/sdk/dotnet/src/Meshline.Sdk/Me
 
 SQLite and its EF Core provider are included. The application needs a writable directory for each local database and access to its chosen Meshline network. A named HTTP client registered through Microsoft DI additionally requires `Microsoft.Extensions.Http` 10.x; see [HTTP configuration](#http-configuration).
 
-Version 1.0.0 is validated by the [offline test suite](#validation-scope). Live-relay interoperability and cross-platform release validation, including mobile, browser, and NativeAOT environments, remain pending. Relay-server/DHT behavior and application content rendering are outside the SDK test suite.
+The SDK is validated by the [offline test suite](#validation-scope). Live-relay interoperability and cross-platform release validation, including mobile, browser, and NativeAOT environments, remain pending. Relay-server/DHT behavior and application content rendering are outside the SDK test suite.
 
 ## Application integrations
 
@@ -277,7 +279,7 @@ The package includes XML API documentation for IntelliSense, covering parameters
 
 ## Validation scope
 
-Version 1.0.0 passed 542 offline tests covering protocol and cryptographic vectors, transport, SQLite persistence, account and device workflows, contacts, messaging, channels, groups, and lifecycle behavior. These tests use in-memory relay peers and isolated local databases.
+The offline suite covers protocol and cryptographic vectors, transport, SQLite persistence, account and device workflows, contacts, messaging, channels, groups, lifecycle behavior, RPC registry queries, and NEP-6 wallet signing. These tests use in-memory relay peers, simulated RPC responses, public test wallets, and isolated local databases.
 
 This does not establish live-relay interoperability or support for mobile, browser, or NativeAOT environments. Applications remain responsible for account signing, network registry access, secret protection, content retrieval, and rendering.
 

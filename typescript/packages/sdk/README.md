@@ -9,7 +9,7 @@ coordinates six managers. The core has no Node.js, React, or Expo runtime depend
 This ESM alpha includes TypeScript declarations. Install the core:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1
+npm install @meshline/sdk@alpha
 ```
 
 Also install the matching adapters for your application:

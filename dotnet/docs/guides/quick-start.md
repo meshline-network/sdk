@@ -7,7 +7,7 @@
 Target `net10.0` and install the .NET 10 SDK. From your application directory:
 
 ```sh
-dotnet add package Meshline.Sdk --version 1.0.0
+dotnet add package Meshline.Sdk
 ```
 
 For source development, use a project reference to the SDK instead of also referencing the NuGet package. The [SDK README](../../README.md#requirements-and-installation) shows that command.

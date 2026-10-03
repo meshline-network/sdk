@@ -1,7 +1,7 @@
 # Quick start
 
 Choose the packages for your runtime in the [SDK overview](../../README.md).
-These commands install SDK 0.1.0-alpha.1 from npm.
+These commands install the current alpha packages from npm.
 
 ## Install in your application
 
@@ -10,19 +10,19 @@ Install the core and the adapters for your runtime together.
 Node.js:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/storage-node@0.1.0-alpha.1 @meshline/transport-node@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/storage-node@alpha @meshline/transport-node@alpha
 ```
 
 Browser:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/storage-browser@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/storage-browser@alpha
 ```
 
 Native Expo:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/expo@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/expo@alpha
 ```
 
 Expo also needs matching native dependencies, the Android compatibility command,

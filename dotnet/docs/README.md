@@ -1,6 +1,6 @@
 # Meshline .NET SDK developer guide
 
-**SDK 1.0.0 · .NET 10 · NuGet package `Meshline.Sdk` · Namespace `Meshline`**
+**.NET 10 · NuGet package `Meshline.Sdk` · Namespace `Meshline`**
 
 Build applications with self-sovereign accounts, encrypted direct and group messages, public channels, and local SQLite persistence. Start with `MeshlineClient`, which coordinates the SDK components for one network, account, and device. The application supplies account signing, relay registry access, and local secret protection.
 

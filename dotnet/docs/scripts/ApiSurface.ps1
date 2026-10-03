@@ -176,7 +176,7 @@ function Initialize-ApiDocumentation([string]$AssemblyPath, [string]$DocsRoot, [
         [Array]::Sort($ids, [StringComparer]::Ordinal)
         $typeCount = @($ids | Where-Object { $_.StartsWith('T:', [StringComparison]::Ordinal) }).Count
         Write-Host "Prepared $($ids.Count) documented API symbols in $typeCount public types."
-        return @{ Ids = $ids; Assembly = $assembly.GetName().Name; Version = $assembly.GetName().Version.ToString() }
+        return @{ Ids = $ids; Assembly = $assembly.GetName().Name }
     }
     finally { $context.Dispose() }
 }

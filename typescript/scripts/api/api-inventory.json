@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "e32cb966e08cba07af2afadde4e09b5e92aeba40f2172aad2144b6df50c2a012",
+  "sourceSha256": "8104e06a7256b87432bce2d3408d19dfcc43aeba76b7dd4a5a7d90c333576530",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [

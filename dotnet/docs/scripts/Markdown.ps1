@@ -130,7 +130,7 @@ function Complete-Documentation([string]$Mode, [string]$DocsRoot, [string]$Repos
     }
     $symbols = [ordered]@{}
     foreach ($id in $Surface.Ids) { $symbols.Add($id, $links[$id].Url) }
-    $coverage = [ordered]@{ assembly = $Surface.Assembly; version = $Surface.Version; generator = 'DefaultDocumentation.Console 1.2.5'; symbols = $symbols }
+    $coverage = [ordered]@{ assembly = $Surface.Assembly; generator = 'DefaultDocumentation.Console 1.2.5'; symbols = $symbols }
     # Match the existing JSON escaping and indentation across PowerShell platforms.
     $json = [Text.Json.Nodes.JsonNode]::Parse(($coverage | ConvertTo-Json -Depth 10))
     $options = [Text.Json.JsonSerializerOptions]::new()

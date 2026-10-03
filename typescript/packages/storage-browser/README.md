@@ -9,7 +9,7 @@ The package is ESM with TypeScript declarations.
 Install this adapter and the matching core together:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/storage-browser@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/storage-browser@alpha
 ```
 
 Import `IndexedDbStore` from `@meshline/storage-browser` and construct it

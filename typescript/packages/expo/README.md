@@ -9,7 +9,7 @@ Use `@meshline/storage-browser` and browser transport for an Expo web build.
 Install the matching core and adapter together:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/expo@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/expo@alpha
 ```
 
 Use Expo **57.0.25**, Expo Modules Core **57.0.19**, and React Native

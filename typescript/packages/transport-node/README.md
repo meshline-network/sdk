@@ -8,7 +8,7 @@ This ESM package includes TypeScript declarations.
 Install this adapter and the matching core together:
 
 ```sh
-npm install @meshline/sdk@0.1.0-alpha.1 @meshline/transport-node@0.1.0-alpha.1
+npm install @meshline/sdk@alpha @meshline/transport-node@alpha
 ```
 
 ```ts

@@ -107,6 +107,33 @@ function run(command, args) {
     return result.stdout.trim();
 }
 
+export async function setWorkspaceVersion(version, { directory = root, npm = process.env.npm_execpath, execute = run } = {}) {
+    releaseVersion(version);
+    if (!npm) throw new Error('Run with npm run release -- version <version>.');
+    const files = packageDirectories.map(name => join(directory, 'packages', name, 'package.json'));
+    const contents = await Promise.all(files.map(file => readFile(file, 'utf8')));
+    const manifests = contents.map(JSON.parse);
+    // Validate every manifest before writing, and leave unrelated dependencies alone.
+    for (const [i, manifest] of manifests.entries()) {
+        if (manifest.name !== `@meshline/${packageDirectories[i]}` || manifest.private) throw new Error(`Unexpected release package: ${manifest.name}`);
+        manifest.version = version;
+        for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies', 'devDependencies']) {
+            for (const dependency of Object.keys(manifest[field] ?? {})) {
+                if (!dependency.startsWith('@meshline/')) continue;
+                if (!packageDirectories.some(name => dependency === `@meshline/${name}`)) throw new Error(`Unknown internal dependency: ${dependency}`);
+                manifest[field][dependency] = version;
+            }
+        }
+    }
+    for (const [i, manifest] of manifests.entries()) {
+        const text = JSON.stringify(manifest, null, 2) + '\n';
+        if (text !== contents[i]) await writeFile(files[i], text);
+    }
+    for (const prefix of [directory, resolve(directory, '../tests/interop/typescript')]) {
+        execute(process.execPath, [npm, 'install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', '--prefix', prefix]);
+    }
+}
+
 async function json(url, authenticated = false) {
     const headers = authenticated ? { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json' } : {};
     const response = await fetch(url, { headers, signal: AbortSignal.timeout(30_000), redirect: 'error' });
@@ -161,7 +188,12 @@ export async function publishRelease({ info, sha, release, packages, lookup, exe
 
 async function main() {
     const mode = process.argv[2];
-    if (!['check', 'publish'].includes(mode) || process.argv.length !== 3) throw new Error('Usage: npm run release -- check|publish');
+    if (mode === 'version' && process.argv.length === 4) {
+        await setWorkspaceVersion(process.argv[3]);
+        console.log(`Updated five packages and both lockfiles to ${process.argv[3]}. Review the local diff before committing.`);
+        return;
+    }
+    if (!['check', 'publish'].includes(mode) || process.argv.length !== 3) throw new Error('Usage: npm run release -- check|publish or npm run release -- version <version>');
     const sha = process.env.GITHUB_SHA;
     if (process.env.GITHUB_REPOSITORY !== repository || process.env.GITHUB_REF !== 'refs/heads/main' || !/^[a-f0-9]{40}$/.test(sha ?? '') || !process.env.GH_TOKEN) throw new Error('Run this workflow on meshline-network/sdk main with a GitHub token.');
     if (run('git', ['rev-parse', 'HEAD']) !== sha) throw new Error('The checkout does not match GITHUB_SHA.');

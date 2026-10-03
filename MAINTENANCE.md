@@ -82,7 +82,7 @@ The test project's design-time factory uses an in-memory SQLite database. Verify
 - The workflow restores, builds, tests, and packs before publishing. NuGet publication precedes GitHub Release publication.
 - If NuGet succeeded but the GitHub step failed, rerun the same workflow run after NuGet indexing completes. Existing package metadata and tags must identify the same source commit. A version already owned by another commit requires a version bump.
 
-Update `Version` and the user-facing installation examples and release notes together for a new SDK release. Documentation-only changes can retain the current version. Keep the protocol specification's status separate from the SDK's release number.
+For a .NET version bump, change only `Version` in the SDK project. Installation examples select the current stable package; the workflow generates GitHub Release notes. API coverage records symbols rather than the assembly version, so a version-only change does not require regenerating documentation or TypeScript API inventories. Documentation-only changes can retain the current version. Keep the protocol specification's status separate from the SDK's release number.
 
 ## NuGet Trusted Publishing
 
@@ -99,10 +99,19 @@ The release job has `id-token: write` for authentication and `contents: write` f
 
 [release-typescript.yml](.github/workflows/release-typescript.yml) runs on pushes
 to `main` and can be rerun manually on `main`. All five `@meshline/*` packages
-share one version. Update their `version` fields and internal peer dependencies
-together, then run `npm install --package-lock-only` from `typescript/` and commit
-the resulting lockfile with the release changes. Keep installation examples in
-the package READMEs and guides aligned with the version being released.
+share one version. From `typescript/`, run the following command with the desired
+version:
+
+```sh
+npm run release -- version <version>
+```
+
+This local command updates the five package manifests, their internal dependency
+versions, and both the workspace and interoperability lockfiles. It does not
+stage files, commit, tag, push, or publish. Commit the resulting seven files
+together when the release is ready. Android and iOS read the Expo version from
+its package manifest. Installation examples use `@alpha`, so they do not change
+for each alpha release; update that channel when moving to beta or stable.
 
 The workflow validates the workspace and lockfile, skips an existing published
 `typescript-v<version>` Release, and otherwise builds and checks the SDK on

@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'org.meshline.expo'
-version = '0.1.0-alpha.1'
+version = new groovy.json.JsonSlurper().parse(file('../package.json')).version
 
 android {
   namespace 'org.meshline.expo'
