@@ -57,7 +57,8 @@ sealed partial class MessageManager
     /// <param name="note">An optional note accompanying the contact request.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The locally stored outgoing contact request and its associated outbox information.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. Required account routes, current device states, local keys, or the secret protector are unavailable. The account is already a contact or the prospective contact has no currently authorized devices.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -80,7 +81,8 @@ sealed partial class MessageManager
     /// <param name="note">An optional note accompanying the contact request.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The locally stored outgoing contact request and its associated outbox information.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. Required account routes, current device states, local keys, or the secret protector are unavailable. The account is already a contact or the prospective contact has no currently authorized devices.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -165,7 +167,8 @@ sealed partial class MessageManager
     /// <param name="accountId">The account's CAIP-10 identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The newly active contact with its updated grant states.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. Required account routes, current device states, local keys, or the secret protector are unavailable. There is no incoming request, its device state is unavailable, or the request changed while being accepted.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

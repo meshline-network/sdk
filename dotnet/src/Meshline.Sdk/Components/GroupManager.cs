@@ -56,7 +56,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="options">The new group name, capacity, description, and invitation policy.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The created group's state and the local account's ownership information.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -123,7 +124,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <remarks>
     /// The group-reference overload synchronizes group state. The invitation overload retrieves a preview using the invitation ID, whose applicability is checked by the hosting relay; it does not apply for membership automatically.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -150,7 +152,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <remarks>
     /// Validates the supplied invitation's fields and recipient, then retrieves a preview using its ID. The hosting relay checks the invitation it previously accepted. This does not independently verify the supplied document's signature or apply for membership automatically.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -218,7 +221,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="update">The field assignments and deletions to apply; unspecified fields remain unchanged.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The updated locally synchronized group information.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -248,7 +252,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <remarks>
     /// Closure changes group lifecycle state. Previously decrypted messages can remain in local storage; callers must not assume closed-group history remains retrievable from the relay.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -271,7 +276,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="draft">The plaintext message body, attachment references, and optional reply information to send.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The accepted group message as verified and materialized in local storage.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -327,7 +333,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="nickname">The current member's group nickname, or <see langword="null"/> to clear it.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -353,7 +360,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="maxUses">An optional positive limit on uses of a shareable invitation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The signed group invitation with its hosting relay reference.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -379,7 +387,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="expiresAt">The future expiration time of the invitation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The signed group invitation with its hosting relay reference.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -403,7 +412,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="invite">The group, relay, and invitation identifiers to resolve or revoke.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The verified invitation with its hosting relay and observed use count.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -423,7 +433,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="page">The requested page size and previous continuation cursor, or <see langword="null"/> for the first default-sized page.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A page of verified invitations and an optional relay continuation cursor.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -442,7 +453,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="invite">The group, relay, and invitation identifiers to resolve or revoke.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -468,7 +480,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// Admission remains pending until an authorized group administrator approves it. The operation retains the local member key needed to receive the group's encrypted secrets.
     /// The hosting relay checks its accepted invitation by ID. Local validation checks the supplied document's fields and recipient, not its signature independently.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -490,7 +503,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="page">The requested page size and previous continuation cursor, or <see langword="null"/> for the first default-sized page.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A page of verified admission applications and an optional relay continuation cursor.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -511,7 +525,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accounts">The account identifiers affected by the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable. A selected request is missing, changed during paging, or expired, or the current client secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -535,7 +550,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accounts">The account identifiers affected by the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -614,7 +630,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="group">The group identifier and hosting relay.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -637,7 +654,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accounts">The account identifiers affected by the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -660,7 +678,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accounts">The account identifiers affected by the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -683,7 +702,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accounts">The account identifiers affected by the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -707,7 +727,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="role">The group role to assign or select.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -730,7 +751,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accountId">The account's CAIP-10 identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -752,7 +774,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="group">The group identifier and hosting relay.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The accepted recovery request and its relay-assigned expiration time.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -775,7 +798,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="page">The requested page size and previous continuation cursor, or <see langword="null"/> for the first default-sized page.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A page of verified recovery requests and an optional relay continuation cursor.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -795,7 +819,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="group">The group identifier and hosting relay.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -817,7 +842,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accounts">The account identifiers affected by the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable. A selected request is missing, changed during paging, or expired, or the current client secret is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -841,7 +867,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="accounts">The account identifiers affected by the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -867,7 +894,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <remarks>
     /// The operation prepares encrypted secret boxes and then commits a signed management update. Persisted preparation supports recovery from interrupted publication.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. A pending rotation must be retried with its original owner-key rotation choice.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

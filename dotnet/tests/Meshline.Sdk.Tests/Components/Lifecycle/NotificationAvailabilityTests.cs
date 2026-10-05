@@ -61,7 +61,7 @@ public sealed class NotificationAvailabilityTests
             fixture.Relay.Requests.Count(request => request.Method == syncMethod) > beforeRecovery);
         Assert.Equal(ComponentState.Running, manager.LifecycleState);
         Assert.Equal(ComponentState.Running, other.LifecycleState);
-        Assert.Contains(errors, error => invalidResult ? error.Error is InvalidDataException : error.Error is OperationCanceledException);
+        Assert.Contains(errors, error => invalidResult ? error.Error is InvalidDataException : error.Error is TimeoutException);
         Assert.All(errors, error => Assert.Equal(BackgroundOperation.Connect, error.Operation));
 
         await manager.StopAsync(Token).WaitAsync(TimeSpan.FromSeconds(10), Token);

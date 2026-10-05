@@ -205,7 +205,8 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     /// <param name="deviceId">The canonical device identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. Published device state is unavailable, removal would invalidate a contact grant without accepted replacement signatures, or the relay only stages the removal.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -300,7 +301,8 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     /// <param name="accountId">The target account identifier, or <see langword="null"/> for the current account.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The verified device state, or <see langword="null"/> when unavailable.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The home route, local device, or account signer needed to authenticate the query is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -326,7 +328,8 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     /// <param name="grant">A contact grant authorizing this account to access the grantor's device state.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The verified device state, or <see langword="null"/> when unavailable.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The home route, local device, or account signer needed to authenticate the query is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -354,7 +357,8 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     /// <param name="invite">The signed invitation authorizing the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The verified device state, or <see langword="null"/> when unavailable.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The home route, local device, or account signer needed to authenticate the query is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -380,7 +384,8 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     /// <param name="relayId">The relay's canonical lowercase Neo script-hash identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The current account's verified device state, or <see langword="null"/> when unavailable at that relay.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The home route, local device, or account signer needed to authenticate the query is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -407,7 +412,8 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     /// <remarks>
     /// A supplied list is the complete authorized device set, not a delta. With no list, known devices are preserved and the local certificate is refreshed; unavailable prior state or missing local authorization requires explicit recovery. Staged publication is not yet authoritative.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account signer or complete prior device state is unavailable, the local device is unauthorized outside recovery, or a pending publication conflicts with the requested update.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -625,7 +631,8 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     }
 
     /// <inheritdoc/>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">The local device, home route, or published authorization required by startup is unavailable or invalid.</exception>
     /// <exception cref="ObjectDisposedException">A dependency or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

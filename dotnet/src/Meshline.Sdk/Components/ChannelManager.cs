@@ -65,7 +65,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="moderators">Optional account identifiers permitted to moderate the channel.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The created channel's descriptor, reference, and local following state.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">Initialization or the local signing device is unavailable, the relay is inactive, or the new channel has a pending operation or conflicting descriptor revision.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -117,7 +118,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="channel">The channel identifier and hosting relay.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The resolved channel information and local following state.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -145,7 +147,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="update">The field assignments and deletions to apply; unspecified fields remain unchanged.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The channel information after publishing the descriptor update.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -192,7 +195,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="channel">The channel identifier and hosting relay.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -232,7 +236,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="draft">The public post body and attachment references to publish.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The accepted post's locally materialized content and original sequence.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -271,7 +276,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="edit">The body and attachment changes to apply to the referenced post.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The post's locally materialized content after the edit.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -300,7 +306,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="post">The channel and original timeline sequence identifying the post.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -328,7 +335,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="reason">The reason for reporting the post.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -360,7 +368,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <remarks>
     /// Pass the returned <c>NextCursor</c> in the next request to continue toward older events. Deleted posts and non-post events are omitted, so a page can contain fewer posts than requested or no posts while still exposing a next cursor.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -431,7 +440,8 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <remarks>
     /// Following is local to this database. Background subscriptions and synchronization run while the component is started.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

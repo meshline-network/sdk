@@ -21,7 +21,8 @@ sealed partial class MeshlineClient
     /// <remarks>
     /// Requires a known route, complete device state, and a local device. Progress is persisted for retry or startup resumption at the same target relay. This transfers authorization and profile state; it does not copy relay message history.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. A verified active relay, account signer, complete device state, or local-device authorization required by the operation is unavailable. The route changed concurrently, a pending migration targets another relay, the device is not yet valid, or staging leaves too little time to publish the route.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

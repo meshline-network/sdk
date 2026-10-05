@@ -99,7 +99,7 @@ export class RpcConnection {
         throwIfAborted(this.#lifetime.signal);
         if (this.#opening) return awaitWithSignal(this.#opening, signal);
         this.#requestPrefix = encodeBase64Url(this.#random.bytes(16));
-        const scope = abortScope([this.#lifetime.signal], this.#timeout);
+        const scope = abortScope([this.#lifetime.signal], this.#timeout, "relay.websocket.connect");
         this.#opening = new Promise<void>((resolve, reject) => {
             this.#rejectOpening = reject;
             let socket: RelaySocket;
@@ -131,7 +131,7 @@ export class RpcConnection {
     async request(method: string, parameters?: JsonObject, signal?: AbortSignal): Promise<JsonValue> {
         throwIfAborted(signal);
         throwIfAborted(this.#lifetime.signal);
-        const scope = abortScope([signal, this.#lifetime.signal], this.#timeout);
+        const scope = abortScope([signal, this.#lifetime.signal], this.#timeout, `relay.websocket.${method}`);
         let id: string | undefined;
         let sent = false;
         const authentication = method === 'auth.account.verify' || method === 'auth.device.verify';

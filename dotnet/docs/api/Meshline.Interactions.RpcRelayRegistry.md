@@ -102,6 +102,9 @@ The matching registry entry, or [null](https://docs.microsoft.com/en-us/dotnet/c
 
 #### Exceptions
 
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An RPC request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
+
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The operation observes cancellation of [cancellationToken](Meshline.Interactions.RpcRelayRegistry.md#Meshline.Interactions.RpcRelayRegistry.GetRelayAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Interactions\.RpcRelayRegistry\.GetRelayAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken')\.
 
@@ -129,6 +132,9 @@ Implements [GetRelaysAsync\(CancellationToken\)](Meshline.Interactions.IRelayReg
 An asynchronous sequence of registry entries; entries may have inactive statuses\.
 
 #### Exceptions
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An RPC request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The operation observes cancellation of [cancellationToken](Meshline.Interactions.RpcRelayRegistry.md#Meshline.Interactions.RpcRelayRegistry.GetRelaysAsync(System.Threading.CancellationToken).cancellationToken 'Meshline\.Interactions\.RpcRelayRegistry\.GetRelaysAsync\(System\.Threading\.CancellationToken\)\.cancellationToken')\.

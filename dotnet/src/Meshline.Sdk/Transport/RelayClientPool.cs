@@ -109,7 +109,8 @@ public sealed class RelayClientPool : IAsyncDisposable
     /// <param name="signer">The account signer for an account session.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A pool-owned shared client; callers must leave its lifetime management to the pool.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">The pool has been disposed or the selected client is retired while it is being acquired.</exception>
     /// <exception cref="ArgumentException">The relay identifier is invalid. The signer belongs to a different account than this pool.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -135,7 +136,8 @@ public sealed class RelayClientPool : IAsyncDisposable
     /// <param name="signer">The device signer for a device session; the pool binds to its device identity.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A pool-owned shared client; callers must leave its lifetime management to the pool.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">The pool has been disposed or the selected client is retired while it is being acquired.</exception>
     /// <exception cref="ArgumentException">The relay identifier is invalid. The signer belongs to a different account than this pool.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

@@ -123,7 +123,8 @@ public sealed partial class RelayClient
     /// </summary>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The relay's verified, unexpired descriptor.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">This relay client, its pool, or its supplied HTTP client has been disposed.</exception>
     /// <exception cref="InvalidOperationException">The registry does not identify an active relay with the requested identity.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -172,7 +173,8 @@ public sealed partial class RelayClient
     /// </summary>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The relay's validated public information, including limits required by its capabilities.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">This relay client, its pool, or its supplied HTTP client has been disposed.</exception>
     /// <exception cref="InvalidOperationException">The registry does not identify an active relay with the requested identity.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -210,7 +212,8 @@ public sealed partial class RelayClient
     /// <exception cref="RelayException">The relay rejects the operation with a structured HTTP or JSON-RPC protocol error.</exception>
     /// <exception cref="InvalidDataException">The response is missing, violates transport or model rules, or contains inconsistent relay evidence.</exception>
     /// <exception cref="JsonException">The request or response cannot be represented as protocol JSON.</exception>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">This relay client, its pool, or its supplied HTTP client has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="DecoderFallbackException">A relay response contains bytes that are not valid UTF-8.</exception>
@@ -239,7 +242,8 @@ public sealed partial class RelayClient
     /// <exception cref="InvalidOperationException">The relay is not registered as active, or the authentication identity required by the request is unavailable or has changed.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured HTTP or JSON-RPC protocol error.</exception>
     /// <exception cref="InvalidDataException">The response is missing, violates transport or model rules, or contains inconsistent relay evidence.</exception>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">This relay client, its pool, or its supplied HTTP client has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="JsonException">The request or response cannot be represented as protocol JSON.</exception>
@@ -420,38 +424,40 @@ public sealed partial class RelayClient
             request.Headers.Add("X-Meshline-Session", token);
         if (body is not null)
             request.Content = new StringContent(body, Utf8, "application/json");
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60), Clock);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
-        UpdateState(RelayConnectionState.Connected);
-        if (response.StatusCode == HttpStatusCode.NoContent)
-            return null;
-        if ((int)response.StatusCode is >= 300 and < 400)
-            throw new HttpRequestException("Relay redirects are not permitted.", null, response.StatusCode);
-        var contentType = response.Content.Headers.ContentType;
-        if (contentType is null || !string.Equals(contentType.MediaType, "application/json", StringComparison.OrdinalIgnoreCase)
-            || contentType.Parameters.Any(static parameter => parameter.Name.Equals("charset", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(parameter.Value?.Trim('"'), "utf-8", StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidDataException("Relay responses must use application/json with UTF-8 encoding.");
-        var bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token).ConfigureAwait(false);
-        var json = Utf8.GetString(bytes);
-        if (!response.IsSuccessStatusCode)
+        using var deadline = new RequestDeadline("relay.http." + name, TimeSpan.FromSeconds(60), cancellationToken, Clock);
+        return await deadline.RunAsync(async requestToken =>
         {
-            var error = ReadModel<RelayError>(json);
-            if (error.Code == "rate_limited")
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
+            UpdateState(RelayConnectionState.Connected);
+            if (response.StatusCode == HttpStatusCode.NoContent)
+                return null;
+            if ((int)response.StatusCode is >= 300 and < 400)
+                throw new HttpRequestException("Relay redirects are not permitted.", null, response.StatusCode);
+            var contentType = response.Content.Headers.ContentType;
+            if (contentType is null || !string.Equals(contentType.MediaType, "application/json", StringComparison.OrdinalIgnoreCase)
+                || contentType.Parameters.Any(static parameter => parameter.Name.Equals("charset", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(parameter.Value?.Trim('"'), "utf-8", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidDataException("Relay responses must use application/json with UTF-8 encoding.");
+            var bytes = await response.Content.ReadAsByteArrayAsync(requestToken).ConfigureAwait(false);
+            var json = Utf8.GetString(bytes);
+            if (!response.IsSuccessStatusCode)
             {
-                var retryAfter = error.GetRetryAfter();
-                var hasHeader = response.Headers.TryGetValues("Retry-After", out var values);
-                if (hasHeader && (retryAfter is null || values!.ToArray() is not [var value] || !long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) || seconds != retryAfter)
-                    || response.StatusCode == HttpStatusCode.TooManyRequests && retryAfter is not null && !hasHeader)
-                    throw new InvalidDataException("The Retry-After header must match the relay error retry_after value.");
+                var error = ReadModel<RelayError>(json);
+                if (error.Code == "rate_limited")
+                {
+                    var retryAfter = error.GetRetryAfter();
+                    var hasHeader = response.Headers.TryGetValues("Retry-After", out var values);
+                    if (hasHeader && (retryAfter is null || values!.ToArray() is not [var value] || !long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) || seconds != retryAfter)
+                        || response.StatusCode == HttpStatusCode.TooManyRequests && retryAfter is not null && !hasHeader)
+                        throw new InvalidDataException("The Retry-After header must match the relay error retry_after value.");
+                }
+                ApplyRateLimit(error);
+                throw new RelayException(error);
             }
-            ApplyRateLimit(error);
-            throw new RelayException(error);
-        }
-        if (response.StatusCode != HttpStatusCode.OK)
-            throw new InvalidDataException("A method returning a result must return HTTP 200.");
-        return json;
+            if (response.StatusCode != HttpStatusCode.OK)
+                throw new InvalidDataException("A method returning a result must return HTTP 200.");
+            return json;
+        }).ConfigureAwait(false);
     }
 
     void ApplyRateLimit(RelayError error)
@@ -552,7 +558,7 @@ public sealed partial class RelayClient
 
     void ReportFailure(Exception exception)
     {
-        var disconnected = exception is HttpRequestException { StatusCode: null } or System.Net.WebSockets.WebSocketException or IOException or OperationCanceledException;
+        var disconnected = exception is HttpRequestException { StatusCode: null } or System.Net.WebSockets.WebSocketException or IOException or OperationCanceledException or TimeoutException;
         var authentication = exception is RelayException { Error.Code: "unauthorized" or "device_unknown" or "invalid_signature" }
             ? RelayAuthenticationState.Rejected
             : _authenticationState == RelayAuthenticationState.Authenticating ? HasValidSession ? AuthenticatedState : RelayAuthenticationState.None : AuthenticationState;

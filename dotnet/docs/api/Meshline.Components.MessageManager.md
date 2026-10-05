@@ -144,7 +144,10 @@ The newly active contact with its updated grant states\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.AcceptContactRequestAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.MessageManager\.AcceptContactRequestAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. Required account routes, current device states, local keys, or the secret protector are unavailable\. There is no incoming request, its device state is unavailable, or the request changed while being accepted\.
@@ -221,7 +224,10 @@ The locally stored outgoing contact request and its associated outbox informatio
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.AddContactAsync(Meshline.Models.Protocol.ContactInvite,string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.MessageManager\.AddContactAsync\(Meshline\.Models\.Protocol\.ContactInvite, string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. Required account routes, current device states, local keys, or the secret protector are unavailable\. The account is already a contact or the prospective contact has no currently authorized devices\.
@@ -298,7 +304,10 @@ The locally stored outgoing contact request and its associated outbox informatio
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.AddContactAsync(string,string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.MessageManager\.AddContactAsync\(string, string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. Required account routes, current device states, local keys, or the secret protector are unavailable\. The account is already a contact or the prospective contact has no currently authorized devices\.
@@ -907,7 +916,10 @@ The locally persisted outbox status; delivery proceeds in background processing\
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.SendMessageAsync(string,Meshline.Models.Client.DirectMessageDraft,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.MessageManager\.SendMessageAsync\(string, Meshline\.Models\.Client\.DirectMessageDraft, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. Required account routes, current device states, local keys, or the secret protector are unavailable\.

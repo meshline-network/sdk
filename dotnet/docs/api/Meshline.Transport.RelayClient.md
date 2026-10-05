@@ -131,7 +131,10 @@ The relay's verified, unexpired descriptor\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClient.md#Meshline.Transport.RelayClient.GetDescriptorAsync(System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClient\.GetDescriptorAsync\(System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This relay client, its pool, or its supplied HTTP client has been disposed\.
@@ -181,7 +184,10 @@ The relay's validated public information, including limits required by its capab
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClient.md#Meshline.Transport.RelayClient.GetInfoAsync(System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClient\.GetInfoAsync\(System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This relay client, its pool, or its supplied HTTP client has been disposed\.
@@ -264,7 +270,10 @@ The relay rejects the operation with a structured HTTP or JSON\-RPC protocol err
 The response is missing, violates transport or model rules, or contains inconsistent relay evidence\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClient.md#Meshline.Transport.RelayClient.SendHttpAsync(System.Net.Http.HttpMethod,string,Meshline.Models.Protocol.ProtocolModel,bool,System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClient\.SendHttpAsync\(System\.Net\.Http\.HttpMethod, string, Meshline\.Models\.Protocol\.ProtocolModel, bool, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This relay client, its pool, or its supplied HTTP client has been disposed\.
@@ -358,7 +367,10 @@ The response is missing, violates transport or model rules, or contains inconsis
 The request or response cannot be represented as protocol JSON\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClient.md#Meshline.Transport.RelayClient.SendHttpAsync_T_(System.Net.Http.HttpMethod,string,Meshline.Models.Protocol.ProtocolModel,bool,System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClient\.SendHttpAsync\<T\>\(System\.Net\.Http\.HttpMethod, string, Meshline\.Models\.Protocol\.ProtocolModel, bool, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This relay client, its pool, or its supplied HTTP client has been disposed\.
@@ -426,7 +438,10 @@ The relay rejects the operation with a structured HTTP or JSON\-RPC protocol err
 The response is missing, violates transport or model rules, or contains inconsistent relay evidence\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClient.md#Meshline.Transport.RelayClient.SendWebSocketAsync(string,Meshline.Models.Protocol.ProtocolModel,System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClient\.SendWebSocketAsync\(string, Meshline\.Models\.Protocol\.ProtocolModel, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This relay client, its pool, or its supplied HTTP client has been disposed\.
@@ -514,7 +529,10 @@ The response is missing, violates transport or model rules, or contains inconsis
 The request or response cannot be represented as protocol JSON\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClient.md#Meshline.Transport.RelayClient.SendWebSocketAsync_T_(string,Meshline.Models.Protocol.ProtocolModel,System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClient\.SendWebSocketAsync\<T\>\(string, Meshline\.Models\.Protocol\.ProtocolModel, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This relay client, its pool, or its supplied HTTP client has been disposed\.

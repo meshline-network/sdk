@@ -192,7 +192,7 @@ export class RelayClient {
         if (existing && existing.connection.endpoint === endpoint && !existing.connection.failure && existing.session.remainingSeconds > 0) return existing;
         if (existing) { existing.controller.abort(); existing.connection.dispose(); await existing.renewal; this.#socket = undefined; }
         const connection = new RpcConnection(endpoint, { ...this.#options, clock: this.#clock, random: this.#random, backoff: this.#backoff });
-        const timeout = abortScope([this.#lifetime.signal], this.#options.requestTimeoutMilliseconds ?? 60000);
+        const timeout = abortScope([this.#lifetime.signal], this.#options.requestTimeoutMilliseconds ?? 60000, "relay.websocket.connect");
         this.#connection = 'connecting'; this.#stateChanged();
         try {
             const session = await this.#authenticator!.authenticate(endpoint, (name, params, signal) => connection.request(name, params, signal), timeout.signal);
@@ -223,7 +223,7 @@ export class RelayClient {
                 if (remaining <= 0) throw new ProtocolError('expired_session', 'The WebSocket session expired.');
                 const due = this.#clock.monotonicMilliseconds() + Math.max(remaining * 0.8, remaining - 30) * 1000;
                 while (due > this.#clock.monotonicMilliseconds()) await this.#clock.delay(Math.min(60000, due - this.#clock.monotonicMilliseconds()), scope.signal);
-                const deadline = abortScope([scope.signal], Math.max(1, Math.min(60000, Math.floor(previous.remainingSeconds * 1000))));
+                const deadline = abortScope([scope.signal], Math.max(1, Math.min(60000, Math.floor(previous.remainingSeconds * 1000))), "relay.websocket.renew");
                 try {
                     const renewed = await this.#authenticator!.authenticate(slot.connection.endpoint, (name, params, signal) => slot.connection.request(name, params, signal), deadline.signal);
                     if (previous.remainingSeconds <= 0) throw new ProtocolError('expired_session', 'Previous socket session expired before renewal completed.');
@@ -284,7 +284,7 @@ export class RelayClient {
 
     async requestWebSocket(method: string, parameters?: JsonObject, signal?: AbortSignal): Promise<JsonValue> {
         this.#check(signal);
-        const deadline = abortScope([signal, this.#lifetime.signal], this.#options.requestTimeoutMilliseconds ?? 60000);
+        const deadline = abortScope([signal, this.#lifetime.signal], this.#options.requestTimeoutMilliseconds ?? 60000, `relay.websocket.${method}`);
         try {
             let slot: SocketSlot;
             if (this.sessionMode === 'device') { this.startNotifications(); slot = await awaitWithSignal(this.#ready.promise, deadline.signal); }

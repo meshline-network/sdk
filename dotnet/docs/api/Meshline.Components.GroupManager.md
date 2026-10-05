@@ -159,7 +159,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.ApplyToGroupAsync(Meshline.Models.Client.GroupInvite,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.ApplyToGroupAsync\(Meshline\.Models\.Client\.GroupInvite, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -237,7 +240,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.ApproveApplicationsAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.ApproveApplicationsAsync\(Meshline\.Models\.Client\.GroupRef, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\. A selected request is missing, changed during paging, or expired, or the current client secret is unavailable\.
@@ -317,7 +323,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.ApproveKeyRecoveryAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.ApproveKeyRecoveryAsync\(Meshline\.Models\.Client\.GroupRef, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\. A selected request is missing, changed during paging, or expired, or the current client secret is unavailable\.
@@ -397,7 +406,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.BanAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.BanAsync\(Meshline\.Models\.Client\.GroupRef, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -465,7 +477,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.CloseGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.CloseGroupAsync\(Meshline\.Models\.Client\.GroupRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -542,7 +557,10 @@ The created group's state and the local account's ownership information\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.CreateGroupAsync(string,Meshline.Models.Client.GroupCreateOptions,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.CreateGroupAsync\(string, Meshline\.Models\.Client\.GroupCreateOptions, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -628,7 +646,10 @@ The signed group invitation with its hosting relay reference\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.CreateInviteAsync(Meshline.Models.Client.GroupRef,string,System.DateTimeOffset,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.CreateInviteAsync\(Meshline\.Models\.Client\.GroupRef, string, System\.DateTimeOffset, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -714,7 +735,10 @@ The signed group invitation with its hosting relay reference\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.CreateInviteAsync(Meshline.Models.Client.GroupRef,System.DateTimeOffset,System.Nullable_long_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.CreateInviteAsync\(Meshline\.Models\.Client\.GroupRef, System\.DateTimeOffset, System\.Nullable\<long\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -794,7 +818,10 @@ A page of verified admission applications and an optional relay continuation cur
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetApplicationsAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.GetApplicationsAsync\(Meshline\.Models\.Client\.GroupRef, Meshline\.Models\.Client\.PageRequest, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session\.
@@ -909,7 +936,10 @@ The resolved group state or invitation preview with the locally known membership
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetGroupAsync(Meshline.Models.Client.GroupInvite,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.GetGroupAsync\(Meshline\.Models\.Client\.GroupInvite, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -980,7 +1010,10 @@ The resolved group state or invitation preview with the locally known membership
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.GetGroupAsync\(Meshline\.Models\.Client\.GroupRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -1107,7 +1140,10 @@ The verified invitation with its hosting relay and observed use count\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetInviteAsync(Meshline.Models.Client.GroupInviteRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.GetInviteAsync\(Meshline\.Models\.Client\.GroupInviteRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session\.
@@ -1175,7 +1211,10 @@ A page of verified invitations and an optional relay continuation cursor\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetInvitesAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.GetInvitesAsync\(Meshline\.Models\.Client\.GroupRef, Meshline\.Models\.Client\.PageRequest, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session\.
@@ -1243,7 +1282,10 @@ A page of verified recovery requests and an optional relay continuation cursor\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetKeyRecoveryRequestsAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.GetKeyRecoveryRequestsAsync\(Meshline\.Models\.Client\.GroupRef, Meshline\.Models\.Client\.PageRequest, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or its signing device is uninitialized, the local device or secret protector is unavailable, or the relay cannot establish the required session\.
@@ -1417,7 +1459,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.LeaveGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.LeaveGroupAsync\(Meshline\.Models\.Client\.GroupRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -1491,7 +1536,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.RejectApplicationsAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.RejectApplicationsAsync\(Meshline\.Models\.Client\.GroupRef, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -1565,7 +1613,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.RejectKeyRecoveryAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.RejectKeyRecoveryAsync\(Meshline\.Models\.Client\.GroupRef, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -1639,7 +1690,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.RemoveMembersAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.RemoveMembersAsync\(Meshline\.Models\.Client\.GroupRef, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -1707,7 +1761,10 @@ The accepted recovery request and its relay\-assigned expiration time\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.RequestKeyRecoveryAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.RequestKeyRecoveryAsync\(Meshline\.Models\.Client\.GroupRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -1778,7 +1835,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.RevokeInviteAsync(Meshline.Models.Client.GroupInviteRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.RevokeInviteAsync\(Meshline\.Models\.Client\.GroupInviteRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.
@@ -1852,7 +1912,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.RotateSecretAsync(Meshline.Models.Client.GroupRef,bool,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.RotateSecretAsync\(Meshline\.Models\.Client\.GroupRef, bool, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. A pending rotation must be retried with its original owner\-key rotation choice\.
@@ -1932,7 +1995,10 @@ The accepted group message as verified and materialized in local storage\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.SendMessageAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.GroupMessageDraft,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.SendMessageAsync\(Meshline\.Models\.Client\.GroupRef, Meshline\.Models\.Client\.GroupMessageDraft, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -2006,7 +2072,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.SetNicknameAsync(Meshline.Models.Client.GroupRef,string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.SetNicknameAsync\(Meshline\.Models\.Client\.GroupRef, string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -2086,7 +2155,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.SetRoleAsync(Meshline.Models.Client.GroupRef,string,Meshline.Models.Protocol.GroupRole,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.SetRoleAsync\(Meshline\.Models\.Client\.GroupRef, string, Meshline\.Models\.Protocol\.GroupRole, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -2160,7 +2232,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.TransferOwnershipAsync(Meshline.Models.Client.GroupRef,string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.TransferOwnershipAsync\(Meshline\.Models\.Client\.GroupRef, string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -2234,7 +2309,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.UnbanAsync(Meshline.Models.Client.GroupRef,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.UnbanAsync\(Meshline\.Models\.Client\.GroupRef, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -2308,7 +2386,10 @@ The updated locally synchronized group information\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.UpdateGroupAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.GroupUpdate,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.UpdateGroupAsync\(Meshline\.Models\.Client\.GroupRef, Meshline\.Models\.Client\.GroupUpdate, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
@@ -2376,7 +2457,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.WithdrawKeyRecoveryAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.WithdrawKeyRecoveryAsync\(Meshline\.Models\.Client\.GroupRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\.

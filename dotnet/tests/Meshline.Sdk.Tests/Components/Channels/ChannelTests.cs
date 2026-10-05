@@ -60,8 +60,8 @@ public sealed class ChannelTests
 
         Assert.Equal(2, Volatile.Read(ref subscriptions));
         Assert.Equal(2, fixture.Relay.Sockets.Count);
-        Assert.Contains(errors, error => error is OperationCanceledException);
-        Assert.All(errors, error => Assert.True(error is OperationCanceledException or IOException));
+        Assert.Contains(errors, error => error is TimeoutException);
+        Assert.All(errors, error => Assert.True(error is TimeoutException or IOException));
     }
 
     [Fact]

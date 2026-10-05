@@ -148,7 +148,8 @@ public sealed class HttpClientTests
         if (cause == "dispose")
             await pool.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10), Token);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        if (cause == "timeout") await Assert.ThrowsAsync<TimeoutException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        else await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10), Token));
 
         await exited.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
 

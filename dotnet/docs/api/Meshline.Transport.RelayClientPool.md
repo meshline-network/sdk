@@ -207,7 +207,10 @@ A pool\-owned shared client; callers must leave its lifetime management to the p
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClientPool.md#Meshline.Transport.RelayClientPool.GetAsync(string,Meshline.Interactions.IAccountSigner,System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClientPool\.GetAsync\(string, Meshline\.Interactions\.IAccountSigner, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 The pool has been disposed or the selected client is retired while it is being acquired\.
@@ -272,7 +275,10 @@ A pool\-owned shared client; callers must leave its lifetime management to the p
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Transport.RelayClientPool.md#Meshline.Transport.RelayClientPool.GetAsync(string,Meshline.Interactions.IDeviceSigner,System.Threading.CancellationToken).cancellationToken 'Meshline\.Transport\.RelayClientPool\.GetAsync\(string, Meshline\.Interactions\.IDeviceSigner, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 The pool has been disposed or the selected client is retired while it is being acquired\.

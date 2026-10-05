@@ -44,7 +44,7 @@ export function awaitWithSignal<T>(promise: Promise<T>, signal?: AbortSignal): P
 }
 
 /** Explicit cleanup avoids accumulating listeners or request deadline timers. */
-export function abortScope(signals: readonly (AbortSignal | undefined)[], timeoutMilliseconds?: number): { signal: AbortSignal; dispose(): void } {
+export function abortScope(signals: readonly (AbortSignal | undefined)[], timeoutMilliseconds?: number, operation = 'request'): { signal: AbortSignal; normalizeError(error: unknown): unknown; dispose(): void } {
     const controller = createAbortController();
     const listeners = new Map<AbortSignal, () => void>();
     for (const signal of signals) {
@@ -53,11 +53,21 @@ export function abortScope(signals: readonly (AbortSignal | undefined)[], timeou
         if (signal.aborted) onAbort();
         else { signal.addEventListener('abort', onAbort, { once: true }); listeners.set(signal, onAbort); }
     }
+    let timeoutReason: Error | undefined;
     const timer = timeoutMilliseconds === undefined ? undefined : setTimeout(() => {
-        controller.abort(new DOMException('The relay request timed out.', 'TimeoutError'));
+        if (controller.signal.aborted) return;
+        timeoutReason = Object.assign(new DOMException(`Request '${operation}' timed out after ${timeoutMilliseconds} milliseconds.`, 'TimeoutError'), { operation, timeoutMilliseconds });
+        controller.abort(timeoutReason);
     }, timeoutMilliseconds);
     return {
         signal: controller.signal,
+        normalizeError(error: unknown): unknown {
+            if (!controller.signal.aborted || !(error instanceof Error) || !['AbortError', 'TimeoutError'].includes(error.name)) return error;
+            const reason: unknown = abortReason(controller.signal);
+            if (reason instanceof Error && reason === timeoutReason && reason !== error && !('cause' in reason))
+                Object.defineProperty(reason, 'cause', { value: error, configurable: true });
+            return reason;
+        },
         dispose() { clearTimeout(timer); for (const [signal, listener] of listeners) signal.removeEventListener('abort', listener); listeners.clear(); },
     };
 }

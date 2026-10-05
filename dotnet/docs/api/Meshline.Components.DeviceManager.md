@@ -358,7 +358,10 @@ The verified device state, or [null](https://docs.microsoft.com/en-us/dotnet/csh
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.GetDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.GetDeviceStateAsync\(Meshline\.Models\.Protocol\.ContactGrant, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The home route, local device, or account signer needed to authenticate the query is unavailable\.
@@ -426,7 +429,10 @@ The verified device state, or [null](https://docs.microsoft.com/en-us/dotnet/csh
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.GetDeviceStateAsync(Meshline.Models.Protocol.ContactInvite,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.GetDeviceStateAsync\(Meshline\.Models\.Protocol\.ContactInvite, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The home route, local device, or account signer needed to authenticate the query is unavailable\.
@@ -494,7 +500,10 @@ The verified device state, or [null](https://docs.microsoft.com/en-us/dotnet/csh
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.GetDeviceStateAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.GetDeviceStateAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The home route, local device, or account signer needed to authenticate the query is unavailable\.
@@ -562,7 +571,10 @@ The current account's verified device state, or [null](https://docs.microsoft.co
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.GetOwnDeviceStateAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.GetOwnDeviceStateAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The home route, local device, or account signer needed to authenticate the query is unavailable\.
@@ -642,7 +654,10 @@ The submitted state and the relay's authoritative\-acceptance or temporary\-stag
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.PublishDeviceStateAsync(string,System.Collections.Generic.IReadOnlyList_Meshline.Models.Protocol.DeviceCertificate_,Meshline.Models.Client.DeviceStatePublishOptions,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.PublishDeviceStateAsync\(string, System\.Collections\.Generic\.IReadOnlyList\<Meshline\.Models\.Protocol\.DeviceCertificate\>, Meshline\.Models\.Client\.DeviceStatePublishOptions, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The account signer or complete prior device state is unavailable, the local device is unauthorized outside recovery, or a pending publication conflicts with the requested update\.
@@ -713,7 +728,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RemoveDeviceAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.RemoveDeviceAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. Published device state is unavailable, removal would invalidate a contact grant without accepted replacement signatures, or the relay only stages the removal\.

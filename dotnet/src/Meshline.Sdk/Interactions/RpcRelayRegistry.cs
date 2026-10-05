@@ -35,6 +35,7 @@ public sealed class RpcRelayRegistry : IRelayRegistry
     public NetworkContext Context => options.Context;
 
     /// <inheritdoc cref="IRelayRegistry.GetRelayAsync"/>
+    /// <exception cref="TimeoutException">An RPC request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     public async Task<RelayEntry?> GetRelayAsync(string relayId, CancellationToken cancellationToken = default)
     {
         if (RelayIdentity.ValidateRelayId(relayId) is not null)
@@ -51,6 +52,7 @@ public sealed class RpcRelayRegistry : IRelayRegistry
     }
 
     /// <inheritdoc cref="IRelayRegistry.GetRelaysAsync"/>
+    /// <exception cref="TimeoutException">An RPC request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     public async IAsyncEnumerable<RelayEntry> GetRelaysAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await VerifyNetworkAsync(cancellationToken);
@@ -97,14 +99,13 @@ public sealed class RpcRelayRegistry : IRelayRegistry
             if (session is not null)
             {
                 // Cancellation or early enumeration must still release the server session.
-                using var cleanup = new CancellationTokenSource(options.RequestTimeout);
                 try
                 {
-                    var released = await CallAsync("terminatesession", [session], cleanup.Token);
+                    var released = await CallAsync("terminatesession", [session], CancellationToken.None);
                     if (released.ValueKind != JsonValueKind.True)
                         Trace.TraceWarning("Neo RPC did not confirm Registry iterator session termination.");
                 }
-                catch (Exception exception) when (exception is HttpRequestException or IOException or JsonException or OperationCanceledException)
+                catch (Exception exception) when (exception is HttpRequestException or IOException or JsonException or OperationCanceledException or TimeoutException)
                 {
                     Trace.TraceWarning("Could not release Neo Registry iterator session: {0}", exception);
                 }
@@ -123,26 +124,28 @@ public sealed class RpcRelayRegistry : IRelayRegistry
     async Task<JsonElement> CallAsync(string method, object[] parameters, CancellationToken cancellationToken)
     {
         var id = Interlocked.Increment(ref requestId);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(options.RequestTimeout);
-        using var request = new HttpRequestMessage(HttpMethod.Post, options.RpcUrl)
+        using var deadline = new RequestDeadline("registry." + method, options.RequestTimeout, cancellationToken, Clock.Provider);
+        return await deadline.RunAsync(async requestToken =>
         {
-            Content = JsonContent.Create(new { jsonrpc = "2.0", id, method, @params = parameters })
-        };
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-        response.EnsureSuccessStatusCode();
-        await response.Content.LoadIntoBufferAsync(1024 * 1024, timeout.Token);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync(timeout.Token), new JsonDocumentOptions { MaxDepth = 32 });
-        var root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("jsonrpc", out var version)
-            || version.ValueKind != JsonValueKind.String || version.GetString() != "2.0"
-            || !root.TryGetProperty("id", out var responseId) || responseId.ValueKind != JsonValueKind.Number
-            || !responseId.TryGetInt64(out var actualId) || actualId != id
-            || root.TryGetProperty("result", out _) == root.TryGetProperty("error", out _))
-            throw new InvalidDataException("Neo RPC returned a mismatched JSON-RPC response.");
-        if (root.TryGetProperty("error", out var error))
-            throw new InvalidDataException($"Neo RPC {method} failed: {error.GetRawText()}");
-        return root.GetProperty("result").Clone();
+            using var request = new HttpRequestMessage(HttpMethod.Post, options.RpcUrl)
+            {
+                Content = JsonContent.Create(new { jsonrpc = "2.0", id, method, @params = parameters })
+            };
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken);
+            response.EnsureSuccessStatusCode();
+            await response.Content.LoadIntoBufferAsync(1024 * 1024, requestToken);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync(requestToken), new JsonDocumentOptions { MaxDepth = 32 });
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("jsonrpc", out var version)
+                || version.ValueKind != JsonValueKind.String || version.GetString() != "2.0"
+                || !root.TryGetProperty("id", out var responseId) || responseId.ValueKind != JsonValueKind.Number
+                || !responseId.TryGetInt64(out var actualId) || actualId != id
+                || root.TryGetProperty("result", out _) == root.TryGetProperty("error", out _))
+                throw new InvalidDataException("Neo RPC returned a mismatched JSON-RPC response.");
+            if (root.TryGetProperty("error", out var error))
+                throw new InvalidDataException($"Neo RPC {method} failed: {error.GetRawText()}");
+            return root.GetProperty("result").Clone();
+        }).ConfigureAwait(false);
     }
 
     static JsonElement GetSingleStackItem(JsonElement result)

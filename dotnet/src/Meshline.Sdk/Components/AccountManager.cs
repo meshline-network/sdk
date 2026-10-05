@@ -116,7 +116,8 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
     /// <param name="isRecovery">Whether to select a recovery revision when no revision is supplied.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The published route with the relay's verified signature.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. An account signer is unavailable, the relay is not active, or an unresolved publication would be replaced by different input.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -236,7 +237,7 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
             {
                 continue;
             }
-            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && (exception is HttpRequestException or InvalidDataException or JsonException or CryptographicException or OperationCanceledException
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && (exception is HttpRequestException or InvalidDataException or JsonException or CryptographicException or OperationCanceledException or TimeoutException
                 || exception is RelayException { Error.Code: "temporarily_unavailable" or "bad_gateway" or "rate_limited" }))
             {
                 failures.Add(exception);

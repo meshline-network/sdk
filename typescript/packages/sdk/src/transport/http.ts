@@ -100,7 +100,7 @@ export class HttpRelayTransport {
         let deadline: ReturnType<typeof abortScope> | undefined;
         try {
             await this.backoff.wait(lifetime.signal);
-            deadline = abortScope([lifetime.signal], this.#timeout);
+            deadline = abortScope([lifetime.signal], this.#timeout, `relay.http.${name}`);
             throwIfAborted(deadline.signal);
             const response = await this.#fetch(address, { method, headers, ...(body === undefined ? {} : { body }), signal: deadline.signal,
                 redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' });
@@ -121,7 +121,8 @@ export class HttpRelayTransport {
             }
             if (response.status !== 200) throw new ProtocolError('invalid_http_status', 'A method returning a result must return HTTP 200.');
             return value;
-        } finally { deadline?.dispose(); lifetime.dispose(); }
+        } catch (error) { throw deadline?.normalizeError(error) ?? error; }
+        finally { deadline?.dispose(); lifetime.dispose(); }
     }
 
     /** Cancels active requests and makes later requests fail. */

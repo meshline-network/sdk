@@ -60,7 +60,7 @@ sealed partial class RelayClient
                 catch (Exception exception)
                 {
                     reportError(exception);
-                    if (exception is HttpRequestException or WebSocketException or IOException or OperationCanceledException
+                    if (exception is HttpRequestException or WebSocketException or IOException or OperationCanceledException or TimeoutException
                         || exception is RelayException { Error.Code: "unauthorized" or "temporarily_unavailable" or "bad_gateway" or "rate_limited" })
                     {
                         // Retry empty sets too: after removing the last resource,

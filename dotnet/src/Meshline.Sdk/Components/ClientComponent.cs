@@ -159,7 +159,8 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <remarks>
     /// The caller token controls startup. Once startup completes, background work uses the component runtime token and ends through stop or disposal. A client device must already have published authorization before its device component can start.
     /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">The component has been disposed, or disposal has begun while registering an operation.</exception>
     /// <exception cref="InvalidOperationException">Initialization is incomplete, or a component startup hook lacks the required local device, route, or published authorization.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

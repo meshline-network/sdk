@@ -127,7 +127,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.CloseChannelAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.CloseChannelAsync\(Meshline\.Models\.Client\.ChannelRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available\.
@@ -219,7 +222,10 @@ The created channel's descriptor, reference, and local following state\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.CreateChannelAsync(string,string,string,System.Collections.Generic.IReadOnlyList_string_,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.CreateChannelAsync\(string, string, string, System\.Collections\.Generic\.IReadOnlyList\<string\>, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 Initialization or the local signing device is unavailable, the relay is inactive, or the new channel has a pending operation or conflicting descriptor revision\.
@@ -287,7 +293,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.DeletePostAsync(Meshline.Models.Client.ChannelPostRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.DeletePostAsync\(Meshline\.Models\.Client\.ChannelPostRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available\.
@@ -364,7 +373,10 @@ The post's locally materialized content after the edit\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.EditPostAsync(Meshline.Models.Client.ChannelPostRef,Meshline.Models.Client.ChannelPostUpdate,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.EditPostAsync\(Meshline\.Models\.Client\.ChannelPostRef, Meshline\.Models\.Client\.ChannelPostUpdate, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available\.
@@ -435,7 +447,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.FollowAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.FollowAsync\(Meshline\.Models\.Client\.ChannelRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\.
@@ -503,7 +518,10 @@ The resolved channel information and local following state\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.GetChannelAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.GetChannelAsync\(Meshline\.Models\.Client\.ChannelRef, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\.
@@ -668,7 +686,10 @@ The available posts from the event page and a cursor for earlier events when mor
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.LoadChannelHistoryAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.LoadChannelHistoryAsync\(Meshline\.Models\.Client\.ChannelRef, Meshline\.Models\.Client\.PageRequest, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\.
@@ -745,7 +766,10 @@ The accepted post's locally materialized content and original sequence\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.PublishPostAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.ChannelPostDraft,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.PublishPostAsync\(Meshline\.Models\.Client\.ChannelRef, Meshline\.Models\.Client\.ChannelPostDraft, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available\.
@@ -822,7 +846,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.ReportPostAsync(Meshline.Models.Client.ChannelPostRef,string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.ReportPostAsync\(Meshline\.Models\.Client\.ChannelPostRef, string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\.
@@ -940,7 +967,10 @@ The channel information after publishing the descriptor update\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.UpdateChannelAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.ChannelUpdate,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.UpdateChannelAsync\(Meshline\.Models\.Client\.ChannelRef, Meshline\.Models\.Client\.ChannelUpdate, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available\.

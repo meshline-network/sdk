@@ -93,7 +93,7 @@ sealed partial class RelayClient
                     lock (_notificationGate)
                         if (_socketReady.Task.IsCompleted)
                             _socketReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                    var retry = exception is HttpRequestException or WebSocketException or OperationCanceledException
+                    var retry = exception is HttpRequestException or WebSocketException or OperationCanceledException or TimeoutException
                         || exception is IOException
                         || exception is RelayException { Error.Code: "unauthorized" or "temporarily_unavailable" or "bad_gateway" or "rate_limited" };
                     ErrorOccurred?.Invoke(this, exception);
@@ -137,7 +137,8 @@ sealed partial class RelayClient
     /// <exception cref="RelayException">The relay rejects the operation with a structured HTTP or JSON-RPC protocol error.</exception>
     /// <exception cref="InvalidDataException">The response is missing, violates transport or model rules, or contains inconsistent relay evidence.</exception>
     /// <exception cref="JsonException">The request or response cannot be represented as protocol JSON.</exception>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">This relay client, its pool, or its supplied HTTP client has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="DecoderFallbackException">A relay response contains bytes that are not valid UTF-8.</exception>
@@ -147,13 +148,7 @@ sealed partial class RelayClient
     /// <exception cref="CryptographicException">The cryptographic provider or configured signer fails while verifying relay evidence or authenticating the request.</exception>
     public async Task<T> SendWebSocketAsync<T>(string method, ProtocolModel? parameters = null, CancellationToken cancellationToken = default) where T : ProtocolModel
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60), Clock);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token, deadline.Token);
-        cancellationToken = timeout.Token;
-        var socket = SessionMode == Models.Protocol.SessionMode.Device
-            ? await WaitForSocketAsync(cancellationToken).ConfigureAwait(false)
-            : await GetSocketAsync(cancellationToken).ConfigureAwait(false);
-        var model = ReadModel<T>(await SendSocketRequestAsync(socket, method, parameters, cancellationToken).ConfigureAwait(false));
+        var model = ReadModel<T>(await SendWebSocketCoreAsync(method, parameters, cancellationToken).ConfigureAwait(false));
         if (model.Validate(_registry.Context) is { } violation)
             throw new InvalidDataException(violation.Message);
         return model;
@@ -171,7 +166,8 @@ sealed partial class RelayClient
     /// <exception cref="NotSupportedException">The relay has no WebSocket endpoint, or a protocol value has no supported serializer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured HTTP or JSON-RPC protocol error.</exception>
     /// <exception cref="InvalidDataException">The response is missing, violates transport or model rules, or contains inconsistent relay evidence.</exception>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">This relay client, its pool, or its supplied HTTP client has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="JsonException">The request or response cannot be represented as protocol JSON.</exception>
@@ -182,14 +178,21 @@ sealed partial class RelayClient
     /// <exception cref="CryptographicException">The cryptographic provider or configured signer fails while verifying relay evidence or authenticating the request.</exception>
     public async Task SendWebSocketAsync(string method, ProtocolModel? parameters = null, CancellationToken cancellationToken = default)
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60), Clock);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token, deadline.Token);
-        cancellationToken = timeout.Token;
-        var socket = SessionMode == Models.Protocol.SessionMode.Device
-            ? await WaitForSocketAsync(cancellationToken).ConfigureAwait(false)
-            : await GetSocketAsync(cancellationToken).ConfigureAwait(false);
-        if (await SendSocketRequestAsync(socket, method, parameters, cancellationToken).ConfigureAwait(false) is { } result && result != "null")
+        if (await SendWebSocketCoreAsync(method, parameters, cancellationToken).ConfigureAwait(false) is { } result && result != "null")
             throw new InvalidDataException("A method without a result must return JSON null.");
+    }
+
+    async Task<string?> SendWebSocketCoreAsync(string method, ProtocolModel? parameters, CancellationToken cancellationToken)
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        using var deadline = new RequestDeadline("relay.websocket." + method, TimeSpan.FromSeconds(60), linked.Token, Clock);
+        return await deadline.RunAsync(async requestToken =>
+        {
+            var socket = SessionMode == Models.Protocol.SessionMode.Device
+                ? await WaitForSocketAsync(requestToken).ConfigureAwait(false)
+                : await GetSocketAsync(requestToken).ConfigureAwait(false);
+            return await SendSocketRequestAsync(socket, method, parameters, requestToken).ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 
     Task<SocketSession> GetSocketAsync(CancellationToken cancellationToken)
@@ -220,11 +223,13 @@ sealed partial class RelayClient
             UpdateState(RelayConnectionState.Connecting);
             try
             {
-                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60), Clock);
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(linked.Token, deadline.Token);
-                await socket.Connection.ConnectAsync(socket.Endpoint, _http, timeout.Token).ConfigureAwait(false);
-                socket.ReceiveTask = ReceiveSocketAsync(socket);
-                socket.Authentication = await AuthenticateAsync(socket.Endpoint, (name, parameters, token) => SendSocketRequestAsync(socket, name, parameters, token), identity, timeout.Token).ConfigureAwait(false);
+                using var deadline = new RequestDeadline("relay.websocket.connect", TimeSpan.FromSeconds(60), linked.Token, Clock);
+                socket.Authentication = await deadline.RunAsync(async requestToken =>
+                {
+                    await socket.Connection.ConnectAsync(socket.Endpoint, _http, requestToken).ConfigureAwait(false);
+                    socket.ReceiveTask = ReceiveSocketAsync(socket);
+                    return await AuthenticateAsync(socket.Endpoint, (name, parameters, token) => SendSocketRequestAsync(socket, name, parameters, token), identity, requestToken).ConfigureAwait(false);
+                }).ConfigureAwait(false);
                 if (SessionMode is not null)
                     UpdateState(RelayConnectionState.Connected, AuthenticatedState);
                 socket.RenewalTask = RenewSocketAsync(socket, identity);
@@ -249,9 +254,14 @@ sealed partial class RelayClient
     async Task<string?> SendSocketRequestAsync(SocketSession socket, string method, ProtocolModel? parameters, CancellationToken cancellationToken)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, socket.Lifetime.Token);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60), Clock);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(linked.Token, deadline.Token);
-        await WaitForRateLimitAsync(timeout.Token).ConfigureAwait(false);
+        using var deadline = new RequestDeadline("relay.websocket." + method, TimeSpan.FromSeconds(60), linked.Token, Clock);
+        return await deadline.RunAsync(_ => SendSocketRequestCoreAsync(socket, method, parameters, deadline, cancellationToken)).ConfigureAwait(false);
+    }
+
+    async Task<string?> SendSocketRequestCoreAsync(SocketSession socket, string method, ProtocolModel? parameters, RequestDeadline deadline, CancellationToken callerCancellationToken)
+    {
+        var cancellationToken = deadline.Token;
+        await WaitForRateLimitAsync(cancellationToken).ConfigureAwait(false);
         ImmutableDictionary<string, JsonElement>? values = null;
         if (parameters is not null)
         {
@@ -272,25 +282,25 @@ sealed partial class RelayClient
         socket.Pending.TryAdd(id, pending);
         try
         {
-            await socket.SendGate.WaitAsync(timeout.Token).ConfigureAwait(false);
+            await socket.SendGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (socket.Failure is { } failure)
                     throw new WebSocketException("The relay connection has failed.", failure);
-                using var sendDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(60), Clock);
-                using var sendTimeout = CancellationTokenSource.CreateLinkedTokenSource(socket.Lifetime.Token, sendDeadline.Token, timeout.Token);
-                await socket.Connection.SendAsync(bytes.AsMemory(), WebSocketMessageType.Text, true, sendTimeout.Token).ConfigureAwait(false);
+                await socket.Connection.SendAsync(bytes.AsMemory(), WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
-                socket.Stop(exception);
-                throw;
+                var failure = deadline.Classify(exception);
+                socket.Stop(failure);
+                if (ReferenceEquals(failure, exception)) throw;
+                throw failure;
             }
             finally
             {
                 socket.SendGate.Release();
             }
-            var response = await pending.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+            var response = await pending.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             if (response is RpcFailure error)
             {
                 var code = error.Error.GetRelayErrorCode()
@@ -304,7 +314,7 @@ sealed partial class RelayClient
             UpdateState(RelayConnectionState.Connected);
             return ((RpcSuccess)response).Result?.GetRawText();
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (callerCancellationToken.IsCancellationRequested)
         {
             throw;
         }

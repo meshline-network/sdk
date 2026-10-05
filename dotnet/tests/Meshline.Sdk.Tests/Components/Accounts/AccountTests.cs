@@ -88,6 +88,34 @@ public sealed class AccountTests
     }
 
     [Fact]
+    public async Task Route_discovery_continues_to_another_relay_after_request_timeout()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        using var other = new OfflineRelay("other.test");
+        fixture.Relay.LinkTo(other);
+        other.Routes[fixture.Account.AccountId] = fixture.Client.Route!;
+        var entered = AsyncTest.Signal();
+        fixture.Relay.Handler = async (request, token) =>
+        {
+            if (request.Method == "account.route.resolve")
+            {
+                entered.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            return fixture.Relay.Respond(request);
+        };
+        var pending = fixture.Client.AccountManager.GetRouteAsync(cancellationToken: Token);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(60));
+        var route = await pending.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        Assert.NotNull(route);
+        Assert.Equal(fixture.Client.Route!.Revision, route.Revision);
+        Assert.Contains(other.Requests, request => request.Method == "account.route.resolve");
+    }
+
+    [Fact]
     public async Task Account_recovery_authorizes_local_device_with_newer_revision()
     {
         using var time = Clock.Use(new ManualClock());

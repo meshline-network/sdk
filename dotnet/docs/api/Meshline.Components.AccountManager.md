@@ -240,7 +240,10 @@ The published route with the relay's verified signature\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.PublishRouteAsync(string,System.TimeSpan,System.Nullable_long_,bool,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.AccountManager\.PublishRouteAsync\(string, System\.TimeSpan, System\.Nullable\<long\>, bool, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. An account signer is unavailable, the relay is not active, or an unresolved publication would be replaced by different input\.

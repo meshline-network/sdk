@@ -94,7 +94,7 @@ export class RpcRelayRegistry implements RelayRegistry {
     }
 
     async #call(method: string, parameters: unknown[], signal?: AbortSignal): Promise<unknown> {
-        const deadline = abortScope([signal], this.#timeout);
+        const deadline = abortScope([signal], this.#timeout, `registry.${method}`);
         try {
             throwIfAborted(deadline.signal);
             const id = ++this.#requestId;
@@ -118,7 +118,8 @@ export class RpcRelayRegistry implements RelayRegistry {
                 throw new ProtocolError('invalid_rpc_response', 'Mismatched JSON-RPC response.');
             if (Object.hasOwn(root, 'error')) throw new ProtocolError('rpc_error', `Neo RPC ${method} failed: ${JSON.stringify(root['error'])}`);
             return root['result'];
-        } finally { deadline.dispose(); }
+        } catch (error) { throw deadline.normalizeError(error); }
+        finally { deadline.dispose(); }
     }
 }
 

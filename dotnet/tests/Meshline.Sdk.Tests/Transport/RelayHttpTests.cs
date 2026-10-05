@@ -48,7 +48,10 @@ public sealed class RelayHttpTests
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken: TestContext.Current.CancellationToken);
         relay.Clock.Advance(TimeSpan.FromSeconds(60));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken: TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => request.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("relay.http.probe", error.Data["operation"]);
+        Assert.Equal(60d, error.Data["timeoutSeconds"]);
+        Assert.IsAssignableFrom<OperationCanceledException>(error.InnerException);
 
         using var cancellation = new CancellationTokenSource();
         var second = client.SendHttpAsync(HttpMethod.Get, "probe", authenticated: false, cancellationToken: cancellation.Token);

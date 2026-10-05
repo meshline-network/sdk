@@ -45,7 +45,7 @@ public sealed class RelayWebSocketTests
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
 
             relay.Clock.Advance(TimeSpan.FromSeconds(60));
-            Assert.IsAssignableFrom<OperationCanceledException>(await failed.Task.WaitAsync(TimeSpan.FromSeconds(10), Token));
+            Assert.IsType<TimeoutException>(await failed.Task.WaitAsync(TimeSpan.FromSeconds(10), Token));
             Volatile.Write(ref respond, 1);
             var pending = client.SendWebSocketAsync("after-retirement", cancellationToken: Token);
             Assert.False(pending.IsCompleted);
@@ -194,7 +194,14 @@ public sealed class RelayWebSocketTests
             if (cancellation == "cancel") await caller.CancelAsync();
             else relay.Clock.Advance(TimeSpan.FromSeconds(60));
         }
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        if (cancellation == "timeout")
+        {
+            var error = await Assert.ThrowsAsync<TimeoutException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10), Token));
+            Assert.Equal("relay.websocket." + method, error.Data["operation"]);
+            Assert.Equal(60d, error.Data["timeoutSeconds"]);
+            Assert.IsAssignableFrom<OperationCanceledException>(error.InnerException);
+        }
+        else await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(TimeSpan.FromSeconds(10), Token));
 
         relay.SocketHandler = (request, socket) =>
         {
@@ -239,7 +246,12 @@ public sealed class RelayWebSocketTests
         if (cancel) await caller.CancelAsync();
         else relay.Clock.Advance(TimeSpan.FromSeconds(60));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        if (cancel) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        else
+        {
+            var error = await Assert.ThrowsAsync<TimeoutException>(() => request.WaitAsync(TimeSpan.FromSeconds(10), Token));
+            Assert.Equal("relay.websocket.probe", error.Data["operation"]);
+        }
         Assert.Empty(relay.Sockets);
     }
 

@@ -111,7 +111,7 @@ test('cancellation and request timeout abort transport work without retry', asyn
         init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
     }); };
     const http = new HttpRelayTransport({ fetch: pending, requestTimeoutMilliseconds: 20 });
-    await expect(http.request(endpoint, 'GET', 'relay.info')).rejects.toMatchObject({ name: 'TimeoutError' });
+    await expect(http.request(endpoint, 'GET', 'relay.info')).rejects.toMatchObject({ name: 'TimeoutError', operation: 'relay.http.relay.info', timeoutMilliseconds: 20 });
     const controller = new AbortController();
     const request = http.request(endpoint, 'GET', 'relay.info', undefined, undefined, controller.signal);
     const assertion = expect(request).rejects.toThrow('canceled');

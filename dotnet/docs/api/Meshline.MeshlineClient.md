@@ -257,7 +257,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.MeshlineClient.md#Meshline.MeshlineClient.ChangeHomeRelayAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.MeshlineClient\.ChangeHomeRelayAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. A verified active relay, account signer, complete device state, or local\-device authorization required by the operation is unavailable\. The route changed concurrently, a pending migration targets another relay, the device is not yet valid, or staging leaves too little time to publish the route\.
@@ -328,7 +331,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.MeshlineClient.md#Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken).cancellationToken 'Meshline\.MeshlineClient\.EstablishAccountAsync\(Meshline\.Models\.Client\.AccountEstablishmentOptions, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. A verified active relay, account signer, complete device state, or local\-device authorization required by the operation is unavailable\. A route is already known without valid local\-device authorization, or an interrupted establishment targets another relay\.
@@ -546,7 +552,10 @@ A task that completes when the operation finishes\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.MeshlineClient.md#Meshline.MeshlineClient.RecoverAccountAsync(Meshline.Models.Client.AccountRecoveryOptions,System.Threading.CancellationToken).cancellationToken 'Meshline\.MeshlineClient\.RecoverAccountAsync\(Meshline\.Models\.Client\.AccountRecoveryOptions, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. A verified active relay, account signer, complete device state, or local\-device authorization required by the operation is unavailable\.

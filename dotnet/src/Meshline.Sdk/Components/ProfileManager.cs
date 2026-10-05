@@ -63,7 +63,8 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
     /// <param name="accountId">The target account identifier, or <see langword="null"/> for the current account.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The resolved profile, or <see langword="null"/> when no profile is available.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account has no resolvable home route or a usable device-authenticated session cannot be established.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -113,7 +114,8 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
     /// <param name="update">The field assignments and deletions to apply; unspecified fields remain unchanged.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The signed profile published after applying the updates.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account has no resolvable home route or a usable device-authenticated session cannot be established. A pending profile publication conflicts with the requested content.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
@@ -134,7 +136,8 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
     /// <param name="profile">An optional profile snapshot for this account to consider alongside cached state.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The republished profile, or <see langword="null"/> if no profile was available to publish.</returns>
-    /// <exception cref="OperationCanceledException">The operation is canceled through <paramref name="cancellationToken"/>, a component or relay lifetime ends, or a relay request times out.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
+    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account has no resolvable home route or a usable device-authenticated session cannot be established. A pending profile publication conflicts with the requested content.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>

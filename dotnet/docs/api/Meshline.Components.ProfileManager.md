@@ -150,7 +150,10 @@ The resolved profile, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/l
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.GetProfileAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ProfileManager\.GetProfileAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\.
@@ -218,7 +221,10 @@ The republished profile, or [null](https://docs.microsoft.com/en-us/dotnet/cshar
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ProfileManager\.PublishProfileAsync\(Meshline\.Models\.Protocol\.AccountProfile, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\. A pending profile publication conflicts with the requested content\.
@@ -283,7 +289,10 @@ The signed profile published after applying the updates\.
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation is canceled through [cancellationToken](Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.UpdateProfileAsync(Meshline.Models.Client.ProfileUpdate,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ProfileManager\.UpdateProfileAsync\(Meshline\.Models\.Client\.ProfileUpdate, System\.Threading\.CancellationToken\)\.cancellationToken'), a component or relay lifetime ends, or a relay request times out\.
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\. A pending profile publication conflicts with the requested content\.

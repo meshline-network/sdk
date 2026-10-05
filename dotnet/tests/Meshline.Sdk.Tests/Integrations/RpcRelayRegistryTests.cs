@@ -221,7 +221,14 @@ public sealed class RpcRelayRegistryTests
             RequestTimeout = TimeSpan.FromMilliseconds(30)
         });
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => registry.GetRelayAsync(RelayId, TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => registry.GetRelayAsync(RelayId, TestContext.Current.CancellationToken));
+        Assert.Equal("registry.getversion", error.Data["operation"]);
+        Assert.Equal(0.03d, error.Data["timeoutSeconds"]);
+        Assert.IsAssignableFrom<OperationCanceledException>(error.InnerException);
+
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => registry.GetRelayAsync(RelayId, canceled.Token));
     }
 
     sealed class FailureHandler(string failure) : HttpMessageHandler
