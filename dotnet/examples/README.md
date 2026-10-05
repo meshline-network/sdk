@@ -5,6 +5,7 @@ These examples support the [developer guide](../docs/README.md). They compile ag
 | Source | Examples |
 | --- | --- |
 | [Sessions.cs](Meshline.Sdk.Examples/Sessions.cs) | New accounts, existing-device startup, recovery, migration, and device renewal. |
+| [Synchronization.cs](Meshline.Sdk.Examples/Synchronization.cs) | Foreground account and group refresh with a caller deadline. |
 | [Messaging.cs](Meshline.Sdk.Examples/Messaging.cs) | Profiles, contacts, direct messages, outbox, conversations, and local history. |
 | [Spaces.cs](Meshline.Sdk.Examples/Spaces.cs) | Channels, history cursors, groups, admission, and key recovery. |
 | [Integration.cs](Meshline.Sdk.Examples/Integration.cs) | Account/network binding, event handlers, HTTP configuration, and DI. |

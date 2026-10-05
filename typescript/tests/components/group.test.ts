@@ -75,6 +75,7 @@ test('each committed history page publishes its snapshot even if the following p
     const invite = await owner.groups.createInvite(ref, { invitee: peer.accountId, expiresAt: network.network.clock.wall + 3600 });
     await peer.groups.applyToGroup(invite); await owner.groups.approveApplications(ref, [peer.accountId]); await peer.groups.getGroup(ref);
     await owner.groups.updateGroup(ref, { name: 'first page' }); await owner.groups.updateGroup(ref, { name: 'second page' });
+    const completedAt = (await peer.groups.getSyncStatus(ref.groupId)).lastSynchronizedAt; network.network.clock.wall += 1;
     const changes: GroupEvents['groupChanged'][] = []; peer.groups.on('groupChanged', value => { changes.push(value); });
     const handle = network.network.handleRequest!; let pages = 0;
     network.network.handleRequest = async (method, ...args) => {
@@ -85,6 +86,8 @@ test('each committed history page publishes its snapshot even if the following p
     };
     try { await expect(peer.groups.getGroup(ref)).rejects.toThrow('next page unavailable'); }
     finally { network.network.handleRequest = handle; }
+    expect((await peer.groups.getSyncStatus(ref.groupId)).state).toBe('blocked');
+    expect((await peer.groups.getSyncStatus(ref.groupId)).lastSynchronizedAt).toBe(completedAt);
     expect(changes).toMatchObject([{ kinds: ['properties'], group: { name: 'first page' } }]);
     await peer.groups.getGroup(ref); expect(changes.map(value => value.group.name)).toEqual(['first page', 'second page']);
 });

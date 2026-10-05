@@ -30,6 +30,7 @@
     "check:android-native": "node scripts/check-android-native.mjs",
     "inventory:api": "node scripts/api-inventory.mjs",
     "test:interop": "npm run check --prefix ../tests/interop/typescript",
+    "pretest:conformance": "npm run build",
     "test:conformance": "vitest run tests/protocol tests/conformance"
   },
   "devDependencies": {

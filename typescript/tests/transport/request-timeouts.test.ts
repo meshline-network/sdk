@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { HttpRelayTransport, RpcRelayRegistry, NetworkContext, type RelayFetch } from '../../packages/sdk/src/index.js';
+import { HttpRelayTransport, RpcRelayRegistry, NetworkContext, type RelayFetch } from '@meshline/sdk';
 
 test.each([
     ['relay', 'headers'], ['relay', 'body'], ['registry', 'headers'], ['registry', 'body'],

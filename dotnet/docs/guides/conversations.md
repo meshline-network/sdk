@@ -24,14 +24,38 @@ public static async Task PrintUnreadConversationsAsync(
     }
 }
 
-// Call only when the application considers the conversation read.
+// Pass the last message position the application has actually read.
 public static Task MarkConversationReadAsync(
-    MeshlineClient client, string conversationId, CancellationToken cancellationToken = default) =>
-    client.MarkReadAsync(conversationId, cancellationToken);
+    MeshlineClient client, string conversationId, long localSequence, CancellationToken cancellationToken = default) =>
+    client.MarkReadAsync(conversationId, localSequence, cancellationToken);
 ```
 <!-- /snippet -->
 
-Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs). The list method only displays unread counts. Call the separate read-position method after the user has actually viewed the conversation according to your application's UX. `MarkReadAsync` updates a local read position; it does not send a recipient read receipt to another account.
+Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs). The list method only displays unread counts. After the application has actually viewed messages, pass the last acknowledged message's `LocalSequence` to `MarkReadAsync(conversationId, localSequence)`. It updates a local read position; it does not send a recipient read receipt to another account.
+
+## Track read positions
+
+`MarkReadAsync(conversationId, cancellationToken)` accepts an optional cancellation token. It marks through the latest locally stored readable message when the operation executes, so it can include arrivals since an earlier query. Use it for a "mark all as read" action. Empty conversations are no-ops, and the read position never moves backward. Use the explicit `localSequence` overload when confirming a batch the application has viewed.
+
+The boundary is inclusive and cumulative. Acknowledging position 100 leaves messages beyond 100 unread, including messages that arrive between querying and marking or during a write retry. Repeated or older positions are no-ops, and concurrent acknowledgments cannot move the position backward. Positions must be positive. Advancing to a position that is not a locally stored direct message, decrypted group message, or known original channel publication is rejected. A deleted channel post can still be acknowledged while its original publication metadata is retained.
+
+Use positions from the messages actually viewed in one conversation. Reading one batch does not acknowledge later batches, and an empty batch supplies no new boundary. A sender filter or incomplete history does not establish that all earlier messages were viewed. For groups and channels, history backfilled or decrypted later at or below the acknowledged position is part of the already acknowledged prefix.
+
+## Choose the correct position
+
+Message models expose a common `LocalSequence` property for the position used by the conversation's local read state:
+
+| Message model | `LocalSequence` |
+| --- | --- |
+| `MessageInfo` | The sequence assigned in this database's account-message stream. |
+| `GroupMessageInfo` | A read-only alias of `Sequence`, assigned by the hosting relay within that group. |
+| `ChannelPostInfo` | A read-only alias of `Ref.Sequence`, the original publication position within that channel. Edits retain this position. |
+
+Keep the conversation identifier with the position. Values may have gaps, and group/channel aliases retain their original timeline scope rather than allocating another local counter.
+
+Direct messages share an account-wide `LocalSequence`, but each peer's conversation stores its own read position. Both `MarkReadAsync` overloads update only the supplied conversation. For example, if messages arrive as A:10, B:20, A:30, B:40, acknowledging A through 30 leaves both B messages unread. Unread counts compare messages against their own conversation's read position; they do not use one global read position.
+
+A read marker acknowledges a local prefix, not an exact application-processing ACK.
 
 ## Refresh after changes
 

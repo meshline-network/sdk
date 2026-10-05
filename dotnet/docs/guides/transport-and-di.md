@@ -91,6 +91,28 @@ public static async Task RunWithDependencyInjectionAsync(
 
 The example uses a singleton named client and one scoped pool, and disposes the application client before its scope. Multi-account applications must provide the correct options and registry per account scope rather than reusing this example's singleton account binding. A scoped keyed HTTP client also works when it shares the pool's scope. Dispose scopes asynchronously so relay sessions drain before the HTTP client is released.
 
+## Notification shutdown and recovery
+
+Stopping a component clears its subscriptions while leaving pooled relay clients
+available to other components. Each component allows up to five seconds in total
+for pending subscription requests and the final clear. If a sent request has an
+unknown outcome or clearing fails, the SDK closes that WebSocket connection.
+Components still running reconnect, restore subscriptions, and catch up over HTTP.
+The same reset applies to subscription timeouts during normal operation.
+
+## Request timeouts and cancellation
+
+Relay requests use a 60-second SDK deadline. Registry RPC requests use
+`RpcRelayRegistryOptions.RequestTimeout`, which defaults to 15 seconds. HTTP
+deadlines include response body reads; WebSocket request deadlines include
+connection readiness. A caller-supplied HTTP client can impose a shorter budget.
+
+SDK deadlines produce `TimeoutException`; caller cancellation remains cancellation.
+See [events and errors](events-and-errors.md#cancellation-and-error-types) for diagnostic
+fields and dependency failures. A timeout does not prove a write failed remotely;
+reconcile persisted state before retrying. Notification reconnection continues
+after a request timeout; transport recovery does not replay business requests.
+
 ## API reference
 
 [RelayClientPool](../api/Meshline.Transport.RelayClientPool.md) · [RelayClient](../api/Meshline.Transport.RelayClient.md) · [RelayConnectionState](../api/Meshline.Transport.RelayConnectionState.md) · [RelayAuthenticationState](../api/Meshline.Transport.RelayAuthenticationState.md)

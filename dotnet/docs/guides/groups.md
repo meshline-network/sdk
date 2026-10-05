@@ -1,6 +1,6 @@
 # Encrypted groups
 
-[Guide index](../README.md) · [Events and troubleshooting](events-and-troubleshooting.md)
+[Guide index](../README.md) · [Events and errors](events-and-errors.md)
 
 ## Create a group and send content
 
@@ -26,7 +26,7 @@ public static async Task<GroupInfo> CreateGroupAsync(
 ```
 <!-- /snippet -->
 
-Source: [Spaces.cs](../../examples/Meshline.Sdk.Examples/Spaces.cs). Group sending returns a `GroupMessageInfo`; it does not use the direct-message outbox's `MessageSendStatus` contract. Membership, available group secrets, and relay authorization govern whether a send can complete. Use `GetMessagesAsync` for locally stored group messages and `TimelineChanged` to refresh the view.
+Source: [Spaces.cs](../../examples/Meshline.Sdk.Examples/Spaces.cs). Group sending returns a `GroupMessageInfo`; it does not use the direct-message outbox's `MessageSendStatus` contract. Membership, available group secrets, and relay authorization govern whether a send can complete. Use `GetMessagesAsync` for locally stored group messages and `TimelineChanged` to refresh the view. Messages are ordered by group ID, then ascending timeline sequence within each group. Sequence values belong to their group; `CreatedAt` remains available for display.
 
 ## Invite and admit members
 
@@ -82,6 +82,8 @@ public static Task ApproveGroupKeyRecoveryAsync(
 An administrator inspects `GetKeyRecoveryRequestsAsync` and approves or rejects particular accounts. `KeyRecoveryChanged` reports recovery changes. `RotateSecretAsync` rotates group secret material and can optionally rotate the owner's member key. Rotation and recovery require the documented role and state; they do not guarantee restoration of every historical message after secrets or relay payloads are lost.
 
 Group synchronization consumes the locally stored account-message stream with a durable cursor and commits group changes with that cursor. Keep `MessageManager` running alongside `GroupManager`; `MeshlineClient` coordinates both. Interrupted group operations retain confirmation state. If an operation reports that an earlier request is awaiting confirmation, let the running component recover it before submitting another operation of that kind.
+
+For foreground refreshes and completion status, see [synchronization](synchronization.md).
 
 ## API reference
 

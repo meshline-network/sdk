@@ -41,7 +41,7 @@ conflict. Resolve that state instead of deleting pending records or repeatedly
 switching targets.
 
 Storage or protection failures leave uncommitted state available for retry.
-Observe [background failures](events-and-troubleshooting.md) to distinguish
+Observe [background failures](events-and-errors.md) to distinguish
 temporary transport trouble from authorization or state conflicts.
 
 [All guides](../README.md)

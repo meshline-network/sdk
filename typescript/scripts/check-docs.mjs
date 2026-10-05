@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const files = [join(root, 'README.md'), join(root, '../README.md'), join(root, '../MAINTENANCE.md'),
+const files = [join(root, 'README.md'), join(root, 'TESTING.md'), join(root, '../README.md'), join(root, '../MAINTENANCE.md'),
     join(root, 'examples/README.md'), join(root, '../dotnet/docs/README.md')];
 files.push(...['../tests/README.md', '../tests/scenarios/README.md', '../tests/interop/README.md'].map(path => join(root, path)));
 async function collectMarkdown(directory) {

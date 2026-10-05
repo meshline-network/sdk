@@ -42,10 +42,12 @@ preserves cleanup failures in an `AggregateError`.
 
 `lifecycleState` is `uninitialized`, `stopped`, `running`, `stopping`, or `disposed`.
 Use `onLifecycle('stateChanged', listener)` for transitions and subscribe to
-background errors on each emitting component. See [events](events-and-troubleshooting.md).
+background errors on each emitting component. See [events](events-and-errors.md).
 
 Mobile suspension can stop JavaScript or terminate the process without allowing
 cleanup. Durable state supports later recovery; it does not guarantee execution
 while suspended. See [platform limits](../platforms.md).
+
+For a foreground refresh or background progress, see [synchronization](synchronization.md). Starting the client does not wait for resources to catch up.
 
 [All guides](../README.md)

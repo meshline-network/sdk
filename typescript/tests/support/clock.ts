@@ -1,4 +1,4 @@
-import { throwIfAborted, type RuntimeClock } from '../../packages/sdk/src/runtime/clock.js';
+import { throwIfAborted, type RuntimeClock } from '../../packages/sdk/dist/runtime/clock.js';
 
 export class AdvancingClock implements RuntimeClock {
     wall = 1730000000;

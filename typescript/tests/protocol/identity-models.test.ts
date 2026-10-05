@@ -4,7 +4,7 @@ import {
     certificateDeviceInput, certificateId, compareRoutes, decodeBase64Url, deviceCertificateCodec,
     deviceStateInput, parseJson, requireObject, routeAccountInput, signAccount, signDevice,
     validateCertificate, validateDeviceState, validateRoute, type AccountDeviceState, type AccountRoute, type JsonObject,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 import { vector } from '../support/vectors.js';
 
 interface Fixture {

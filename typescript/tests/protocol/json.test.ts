@@ -5,7 +5,7 @@ import {
     NetworkContext, ProtocolError, canonicalBytes, canonicalJson, decodeBase64Url,
     decodeUtf8, encodeBase64Url, encodeUtf8, parseJson, requireObject,
     signingInput, validateIdentifier, type IdentifierKind, type JsonValue,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 import { hex, unhex, vector, vectorDirectory } from '../support/vectors.js';
 
 interface CommonVectors {

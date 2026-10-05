@@ -48,6 +48,13 @@ smaller of five seconds and 20% of the original lifetime. Concurrent callers sha
 the refresh. A refresh failure is returned rather than falling back to the
 nearly expired token.
 
+## Request timeouts and cancellation
+
+SDK-owned Registry RPC, Relay HTTP, WebSocket readiness, and RPC waits have request
+deadlines. HTTP budgets include response body reads. Caller aborts and SDK
+deadlines remain distinguishable; see [events and errors](events-and-errors.md#cancellation-and-error-types)
+for `TimeoutError` diagnostics, abort reasons, and adapter behavior.
+
 ## Requests, subscriptions, and errors
 
 Failed business requests return to the caller without automatic transport replay.

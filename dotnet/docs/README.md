@@ -4,43 +4,56 @@
 
 Build applications with self-sovereign accounts, encrypted direct and group messages, public channels, and local SQLite persistence. Start with `MeshlineClient`, which coordinates the SDK components for one network, account, and device. The application supplies account signing, relay registry access, and local secret protection.
 
-## Start here
+These guides describe the **current source checkout**. For an installed package,
+use the documentation at its matching release tag; an API described on `main` may
+not yet be available in that package.
 
-1. [Install the SDK and open your first session](guides/quick-start.md).
-2. [Implement the application integrations](guides/integrations.md).
-3. [Understand initialization, startup, shutdown, and ownership](guides/lifecycle.md).
-4. [Establish contacts and send a direct message](guides/direct-messages.md).
+## First integration
 
-The [API reference](api/README.md) documents public types and members, including protected extension points on inheritable types. It is generated from the SDK assembly and XML comments. Inherited members are documented on their declaring base type; follow each type's inheritance links. Compiler-generated implementation details are excluded. EF Core migration types are included as infrastructure, not as application entry points.
-
-## Guides
-
-| Guide | What you will build or learn |
+| Guide | Task |
 | --- | --- |
 | [Quick start](guides/quick-start.md) | Install the package, migrate storage, establish an account, and run a session. |
 | [Application integrations](guides/integrations.md) | Bind the network and account; implement signing, registry access, and secret protection. |
 | [Lifecycle and ownership](guides/lifecycle.md) | Initialize, start, stop, and dispose clients and independently composed components. |
 | [Accounts and devices](guides/accounts-and-devices.md) | Resolve routes, authorize devices, renew certificates, and publish device state. |
-| [Recovery and home-relay migration](guides/recovery-and-migration.md) | Restore account access deliberately and move authorization to another relay. |
+
+## Everyday application work
+
+| Guide | Task |
+| --- | --- |
 | [Profiles and contacts](guides/profiles-and-contacts.md) | Update profile fields, exchange contact requests, and manage contact authorization. |
 | [Direct messages and the outbox](guides/direct-messages.md) | Send encrypted content, observe progress, and understand retries and cancellation. |
 | [Conversations and unread state](guides/conversations.md) | Build a unified conversation list and track local read positions. |
+| [Synchronization](guides/synchronization.md) | Await a fresh pass, observe progress, and interpret retention gaps. |
+| [Storage and pagination](guides/storage-and-pagination.md) | Preserve local state and distinguish snapshot readers from relay cursors. |
 | [Channels](guides/channels.md) | Publish public posts, follow channels, and load retained history. |
 | [Groups](guides/groups.md) | Create encrypted groups, admit members, manage roles, and recover group keys. |
-| [Storage and pagination](guides/storage-and-pagination.md) | Preserve local state and distinguish snapshot readers from relay cursors. |
+
+## Advanced integration and diagnosis
+
+| Guide | Task |
+| --- | --- |
+| [Recovery and home-relay migration](guides/recovery-and-migration.md) | Restore account access deliberately and move authorization to another relay. |
 | [Transport and dependency injection](guides/transport-and-di.md) | Configure HTTP, use relay sessions, and integrate with Microsoft DI. |
-| [Events and troubleshooting](guides/events-and-troubleshooting.md) | React to updates, diagnose background failures, and recover without losing state. |
+| [Events and errors](guides/events-and-errors.md) | Subscribe to changes and distinguish deadlines, cancellation, and operation failures. |
+| [Troubleshooting](guides/troubleshooting.md) | Diagnose symptoms and resume safely from retained state. |
 
-## Working with the examples
+## Reference, examples, and contributions
 
-Code blocks marked as snippets are synchronized from the [compilable examples](../examples/README.md). They are methods to incorporate into an application, with dependencies supplied as arguments. Use the linked source files for their namespace imports. They are not a ready-to-run wallet, registry client, or Relay server.
+The [API reference](api/README.md) is generated from the assembly and XML comments.
+Inherited members are documented on their declaring base type; follow inheritance
+links. Protected extension points are included, and EF migration types are
+infrastructure rather than application entry points.
 
-There are three distinct validation levels:
+Guide snippets are synchronized from [compilable examples](../examples/README.md).
+They are integration methods with application-supplied dependencies, not a wallet
+or relay service. Compilation verifies API usage; [offline tests](../TESTING.md)
+verify behavior against scripted peers. Neither establishes live-network or full
+platform support. See [validation limits](guides/troubleshooting.md#validation-and-recovery-limits).
 
-- **Example compilation:** verifies that the documented calls match this checkout's public API.
-- **Offline behavioral tests:** exercise protocol vectors, transport, persistence, and component workflows against scripted peers. See the [test guide](../TESTING.md).
-- **Live network validation:** requires your chosen network, eligible relays, wallet integration, and platform-specific storage. Compilation and offline tests do not establish live-relay interoperability or mobile, browser, and NativeAOT support.
+For source builds, documentation updates, and publishing, use [Maintenance](../../MAINTENANCE.md).
+The [Protocol 1.0 draft](https://meshline.org/protocol/v1/en/index.html) defines wire
+formats and interoperability rules; these guides describe the .NET implementation.
+Content hosting, retrieval, and UI rendering remain application responsibilities.
 
-The SDK release number does not change the [Protocol 1.0 specification's draft status](https://meshline.org/protocol/v1/en/index.html). Wire formats and interoperability rules belong to the specification; these guides explain the .NET implementation. Content hosting, attachment retrieval, and UI rendering remain application responsibilities. For TypeScript applications, see the [TypeScript guide](../../typescript/docs/README.md).
-
-[SDK overview](../README.md) · [API reference](api/README.md) · [Maintenance](../../MAINTENANCE.md)
+[SDK overview](../README.md) · [TypeScript guide](../../typescript/docs/README.md)

@@ -1,4 +1,4 @@
-# Events and troubleshooting
+# Events and errors
 
 Use `on(name, listener)` for domain events and
 `onLifecycle(name, listener)` for component state and background failures.
@@ -32,6 +32,7 @@ track any work that must finish separately.
 | Channel manager | `channelChanged`, `timelineChanged`, `followChanged` | Channel snapshot, channel/post changes, or follow status |
 | Group manager | `groupChanged`, `timelineChanged` | Group snapshot with change kinds, or group/sequence with optional decrypted message |
 | Group manager | `applicationsChanged`, `keyRecoveryChanged` | Group reference |
+| Message/group/channel managers | `syncStatusChanged` | Local resource progress; see [synchronization](synchronization.md#observe-local-progress). |
 | Any client component | `stateChanged`, `backgroundError` via `onLifecycle` | Previous/current state, or operation/resource/error |
 
 A group timeline event may have no `message`; check it before appending chat
@@ -62,23 +63,24 @@ global controller. SDK-owned scopes preserve their cancellation reasons.
 | `TypeError` / `RangeError` | Correct argument shape or range. |
 | `StateConflictError` | Refresh/reconcile state before choosing the next operation. |
 | `RelayError` | Inspect retained relay error metadata; distinguish permissions from authentication. |
-| Transport/deadline/cancellation failure | Preserve pending state; interruption is not proof of remote rejection. |
+| `TimeoutError` | Inspect `operation`, `timeoutMilliseconds`, and the original `cause`; reconcile writes before retrying. |
+| Caller abort / `AbortError` | Cancellation does not establish remote rejection or an SDK deadline. |
+| Other transport failure | Preserve the original error and pending state. |
 | Local storage/protection failure | Restore access to the original store/protector and retry without discarding state. |
 
-## Troubleshooting
+SDK-owned deadlines cover Registry RPC, Relay HTTP, WebSocket connection/readiness,
+and RPC waits. HTTP deadlines include response body reads. If an HTTP adapter
+returns a generic `AbortError` after the SDK deadline, the SDK restores the
+`TimeoutError` reason and retains the adapter error as `cause`.
 
-| Symptom | Likely cause | What to do |
-| --- | --- | --- |
-| Client cannot open its database | Missing migration, incorrect binding, inaccessible storage, or lost protector | Migrate explicitly; check the network/account/database and restore access to the original protection keys. Surface corruption instead of opening a new empty store. |
-| Existing account fails initial establishment | This database has no authorized device for the existing route | Use the application's explicit account recovery flow with an account signer. |
-| Send returns but the peer has no message yet | The return is an outbox status, or background work is stopped | Start the client, inspect `getSendStatus`, and observe `sendStatusChanged`. |
-| Page does not show a new arrival | The reader holds a fixed snapshot | Dispose it and open a new reader. |
-| Profile edit or migration reports a conflict | An earlier request is uncertain or authoritative state changed | Let the original operation reconcile; inspect the current state before choosing another edit or target. |
-| New device cannot decrypt old group messages | Historical secrets are unavailable on that device | Keep another authorized device running for key synchronization; recovery alone cannot recreate missing historical keys. |
-| Group approval does not complete a pending request | Approval does not verify the original candidate, or history/key processing failed | Keep the original store/protector, inspect background errors, and verify the correct application's approval. |
-| Expo cannot find `MeshlineRelaySocket` | Expo Go or an old native binary lacks the module | Rebuild the native app after installing the adapter. |
-| Android reports a released SQLite object or incomplete HTTP body | Pinned Expo native dependencies may be missing compatibility fixes | Apply and check the [Android fixes](../platforms.md#android-compatibility), then rebuild. If already applied, retain the error for diagnosis. |
-| Browser relay traffic carries cookies | Ambient WebSocket policy or the known Windows WebKit fetch issue | Use a cookie-free relay origin and review [browser limits](../platforms.md#browser). |
-| Authentication stays rejected after a public request succeeds | A public request does not reauthorize the device | Check route/device authorization and establish a newly authenticated session. |
+Caller aborts preserve the signal's reason where the runtime supports it; SDK
+disposal uses `AbortError`. An unrelated dependency abort is not converted to a
+timeout. Application adapters can impose their own deadlines. A lost response,
+timeout, or abort does not prove that a mutation failed remotely: reconcile the
+persisted operation before retrying. [Aborting a send wait](direct-messages.md#wait-for-an-acceptance-milestone)
+leaves the outgoing message active.
+
+See [transport configuration](transport.md#request-timeouts-and-cancellation) and
+[symptom-based troubleshooting](troubleshooting.md).
 
 [All guides](../README.md)

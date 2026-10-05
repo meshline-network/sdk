@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { HttpRelayTransport, RpcConnection } from '../../packages/sdk/src/index.js';
+import { HttpRelayTransport, RpcConnection } from '@meshline/sdk';
 import { createNodeRelayFetch, createNodeSocketFactory } from '../../packages/transport-node/src/index.js';
 import { startTlsPeer, tlsMaterial, type TlsMaterial } from '../support/tls-peer.js';
 

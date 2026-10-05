@@ -59,4 +59,6 @@ the original signed request and reconciles verified history; known acceptance is
 not reposted. Inconsistent acceptance evidence remains a visible failure rather
 than causing a new publication. Keep pending state across restarts.
 
+For foreground refreshes and completion status, see [synchronization](synchronization.md).
+
 [All guides](../README.md)

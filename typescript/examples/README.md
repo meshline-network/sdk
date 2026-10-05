@@ -10,7 +10,7 @@ your network, account signer, relay registry, and secret protector; see
 | [node.ts](node.ts) | Open SQLite and configure Node HTTPS/WSS transport. |
 | [browser.ts](browser.ts) | Open IndexedDB and configure browser transport. |
 | [expo.ts](expo.ts) | Open native SQLite and configure native randomness, HTTP, and WebSocket. |
-| [workflows.ts](workflows.ts) | Establish or resume a client; use profiles, contacts, messages, conversations, channels, groups, and events. |
+| [workflows.ts](workflows.ts) | Establish or resume a client; use profiles, contacts, messages, conversations, synchronization, channels, groups, and events. |
 
 The platform helpers migrate storage and initialize the client. Establish or
 recover account authorization only when needed, then start it. Dispose the

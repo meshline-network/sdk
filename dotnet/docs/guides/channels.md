@@ -57,6 +57,8 @@ An interactive UI can request one page at a time instead of exhausting history i
 
 `CloseChannelAsync` closes the channel and is distinct from unfollowing. Public channel content has different privacy properties from encrypted direct messages and groups. Applications must account for relay retention and deletion semantics when displaying historical posts; a local cache is not proof that a post is still retrievable from the network.
 
+For foreground refreshes and completion status, see [synchronization](synchronization.md).
+
 ## API reference
 
 [ChannelManager](../api/Meshline.Components.ChannelManager.md) · [ChannelRef](../api/Meshline.Models.Client.ChannelRef.md) · [ChannelPostRef](../api/Meshline.Models.Client.ChannelPostRef.md) · [ChannelUpdate](../api/Meshline.Models.Client.ChannelUpdate.md) · [ChannelPostUpdate](../api/Meshline.Models.Client.ChannelPostUpdate.md)

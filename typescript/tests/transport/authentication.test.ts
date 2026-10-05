@@ -4,7 +4,7 @@ import {
     decodeBase64Url, decodeUtf8, deviceAuthenticationCodec, deviceAuthenticationInput, relayOrigin,
     signAccount, signDevice, validateChallenge, validateSession, verifyAccount, verifyDevice, webEndpoint,
     type AccountSigner, type JsonObject, type JsonValue, type AuthenticationIdentity,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 import { AdvancingClock } from '../support/clock.js';
 import { hex, vector } from '../support/vectors.js';
 

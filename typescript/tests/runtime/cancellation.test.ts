@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { AbortController as LegacyAbortController } from 'abort-controller';
-import { abortScope, awaitWithSignal, systemClock, throwIfAborted } from '../../packages/sdk/src/runtime/clock.js';
-import { AsyncPulse } from '../../packages/sdk/src/runtime/async-pulse.js';
+import { abortScope, awaitWithSignal, systemClock, throwIfAborted } from '../../packages/sdk/dist/runtime/clock.js';
+import { AsyncPulse } from '../../packages/sdk/dist/runtime/async-pulse.js';
 
 const NativeAbortController = globalThis.AbortController;
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });

@@ -46,7 +46,9 @@ for verified recipients.
 
 `sendMessage(group, draft)` sends group content; replies use `replyToSeq`.
 `setNickname(group, nickname)` changes the caller's nickname, with `null` clearing
-it. `getMessages({ groupId, sender })` opens local message history.
+it. `getMessages({ groupId, sender })` opens local message history, ordered by
+group ID and then ascending timeline sequence within each group. Sequence values
+belong to their group; `createdAt` remains available for display.
 `getGroups`, `getMembers`, and `getBans` also return disposable local readers.
 
 Use `updateGroup` for properties, `setRole` for non-owner role changes, and
@@ -88,6 +90,8 @@ synchronization commits keys and its cursor atomically.
 `groupChanged` reports committed metadata/membership changes.
 `timelineChanged` may describe verified history without a decrypted message;
 check its optional `message` before appending a chat item.
-See [events](events-and-troubleshooting.md).
+See [events](events-and-errors.md).
+
+For foreground refreshes and completion status, see [synchronization](synchronization.md).
 
 [All guides](../README.md)

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { HttpRelayTransport, RelayDiscovery, NetworkContext, relayDescriptorCodec } from '../../packages/sdk/src/index.js';
+import { HttpRelayTransport, RelayDiscovery, NetworkContext, relayDescriptorCodec } from '@meshline/sdk';
 import { AdvancingClock } from '../support/clock.js';
 import { TestRegistry, signedDescriptor } from '../support/relay-fixture.js';
 

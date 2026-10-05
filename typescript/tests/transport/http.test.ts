@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import {
     HttpRelayTransport, RelayBackoff, RelayError, validateJsonContentType, validateRetryAfterHeader,
     type RelayFetch, type RelayFetchInit, type JsonObject,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 import { AdvancingClock } from '../support/clock.js';
 
 const endpoint = 'https://RELAY.example:443/a/meshline/v1/';

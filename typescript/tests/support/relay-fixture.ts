@@ -1,6 +1,6 @@
 import { base58btc } from 'multiformats/bases/base58';
 import { create } from 'multiformats/hashes/digest';
-import { NetworkContext, accountPublicKey, getRelayId, relayDescriptorInput, signAccount, type RelayDescriptor, type RelayEntry, type RelayRegistry } from '../../packages/sdk/src/index.js';
+import { NetworkContext, accountPublicKey, getRelayId, relayDescriptorInput, signAccount, type RelayDescriptor, type RelayEntry, type RelayRegistry } from '@meshline/sdk';
 
 export const context = NetworkContext.parse('neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70');
 export const relayPrivateKey = new Uint8Array(32).fill(7);

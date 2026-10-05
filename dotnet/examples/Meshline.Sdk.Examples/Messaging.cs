@@ -46,6 +46,17 @@ public static class Messaging
     }
     #endregion
 
+    #region wait-for-send
+    public static async Task<MessageSendStatus?> WaitForDeliveryAsync(
+        MeshlineClient client, string messageId, CancellationToken cancellationToken = default)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        return await client.MessageManager.WaitForSendStatusAsync(
+            messageId, cancellationToken: deadline.Token);
+    }
+    #endregion
+
     #region outbox
     public static async Task PrintPendingMessagesAsync(
         MeshlineClient client, CancellationToken cancellationToken = default)
@@ -78,10 +89,21 @@ public static class Messaging
         }
     }
 
-    // Call only when the application considers the conversation read.
+    // Pass the last message position the application has actually read.
     public static Task MarkConversationReadAsync(
-        MeshlineClient client, string conversationId, CancellationToken cancellationToken = default) =>
-        client.MarkReadAsync(conversationId, cancellationToken);
+        MeshlineClient client, string conversationId, long localSequence, CancellationToken cancellationToken = default) =>
+        client.MarkReadAsync(conversationId, localSequence, cancellationToken);
+    #endregion
+
+    #region history-before
+    public static async Task<IReadOnlyList<MessageInfo>> ReadPreviousMessagesAsync(
+        MeshlineClient client, string peerAccountId, long before,
+        CancellationToken cancellationToken = default)
+    {
+        await using var reader = await client.MessageManager.GetMessageHistoryAsync(
+            peerAccountId, new HistoryRange { Before = before }, cancellationToken);
+        return await reader.ReadNextAsync(50, cancellationToken);
+    }
     #endregion
 
     #region history

@@ -16,7 +16,10 @@ Paths in the table and code references below are relative to `tests/Meshline.Sdk
 | `Components/Devices/` | Device keys, authorization, renewal and fixed key-agreement vectors through the device API. |
 | `Components/Profiles/` | Profile publication, resolution, caching and restart recovery. |
 | `Components/Contacts/` | Contact requests, grants, aliases, invitations and expiry. |
-| `Components/Messages/` | Sending, synchronization, fixed decryption vectors, conversations and read positions. |
+| `Components/Messages/` | Sending, outbox retention, send-status waiting, message reception/synchronization and fixed decryption vectors. |
+| `Components/History/` | Local message/group/channel query contracts, ordering, exclusive bounds, snapshots, restart continuation and API compatibility. |
+| `Components/Conversations/` | Conversation summaries, unread counts and read positions across direct messages, groups and channels. |
+| `Components/Synchronization/` | Shared foreground/background sync contracts and observable status; `ResourceSyncTrackerTests` isolates the internal state tracker from component workflows. |
 | `Components/Groups/` | Group workflows, membership, admission, invitations, rotation, recovery and persisted-ciphertext vector recovery. |
 | `Components/Channels/` | Channel lifecycle, signed projections, history and recovery. |
 | `Components/Lifecycle/` | Component start/stop, cancellation, draining and background errors. |
@@ -43,7 +46,15 @@ Choose the layer by the behavior under test, not by whether its input happens to
 
 `TestNetwork` defines the network context. `ProtocolVectors` reads local snapshots and decodes their bytes. `AccountSigner`, `DeviceSigner`, `SecretProtector` and `TestDatabase` are separate resources. `ContactSetup`, `EncryptionVectorSetup` and `ProtocolResults` prepare specific test inputs; `RequestQuery` parses queries shared by scripted relays and synchronization tests.
 
+`StoredMessageSetup` seeds local projections shared by history and read-position tests. Callers explicitly choose whether the account participates in the group or follows the channel. History queries use nonparticipating resources; conversation/read-position tests use participating resources. This helper does not simulate synchronization or assert outcomes. Keep the clock scope in the calling test.
+
 `OfflineRelay` and `MemorySocket` exercise actual transport code without network I/O. `GroupRelay` and `ChannelRelay` provide domain scripts. Their state is per test; avoid shared mutable fixtures or a universal scenario framework.
+
+## Regression ownership
+
+Split independent contracts into separately initialized cases, even when they share preparation. History range validation, caller mutation, snapshot behavior, restart continuation and overload compatibility have separate tests. Keep dependent transaction/recovery sequences together so the test still proves atomicity or continuity.
+
+For outgoing messages, `MessageSendingTests` owns submission and retries, `SendHistoryTests` owns bounded retention and restart persistence, and `SendStatusWaitingTests` owns waiting milestones, cancellation, disposal and observer failures. The retention test also checks an active waiter across rollback and immediate terminal eviction; that is an intentional boundary regression, not duplicate happy-path coverage.
 
 ## Running tests
 

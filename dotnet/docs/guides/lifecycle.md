@@ -57,7 +57,7 @@ Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). The dat
 
 Independently composed components follow their constructor dependencies. Initialize and start dependencies before dependents; stop and dispose dependents first. The coordinated client's order is account, device, profile, messages, channels, then groups; shutdown reverses that order. Prefer the coordinated client unless the application needs to manage these relationships explicitly.
 
-HTTP reads perform synchronization. WebSocket notifications trigger earlier reads, and periodic polling continues when notifications or subscriptions are unavailable. A restored subscription triggers an HTTP catch-up read. Connection trouble is observable through `BackgroundError`; do not equate a missing socket with loss of all synchronization.
+Starting activates background work; it does not wait for resources to catch up. See [synchronization](synchronization.md) for foreground refreshes, polling, notifications, and progress snapshots.
 
 ## API reference
 

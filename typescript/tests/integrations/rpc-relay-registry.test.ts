@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RpcRelayRegistry, NetworkContext, type RelayFetch, type RelayEntry } from '../../packages/sdk/src/index.js';
+import { RpcRelayRegistry, NetworkContext, type RelayFetch, type RelayEntry } from '@meshline/sdk';
 
 const context = new NetworkContext(12345, '0x0123456789012345678901234567890123456789');
 const relayId = '0x0102030405060708091011121314151617181920';

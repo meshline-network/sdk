@@ -4,7 +4,7 @@ import {
     devicePublicKey, getAccountId, getRelayId, matchesAccount, nextRevision, requireObject,
     signAccount, signDevice, signingInput, validateAccountId, verifyAccount, verifyDevice, verifyRelay,
     type JsonObject,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 import { hex, vector } from '../support/vectors.js';
 
 interface IdentityVectors {

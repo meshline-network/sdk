@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import {
     NetworkContext, agreeKey, decodeBase64Url, decryptAes, deriveKey, encryptAes,
     encryptionPublicKey, requireObject, signingInput, type JsonObject,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 import { unhex, vector } from '../support/vectors.js';
 
 interface CryptoVectors {

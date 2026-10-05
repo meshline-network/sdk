@@ -10,7 +10,7 @@ Target `net10.0` and install the .NET 10 SDK. From your application directory:
 dotnet add package Meshline.Sdk
 ```
 
-For source development, use a project reference to the SDK instead of also referencing the NuGet package. The [SDK README](../../README.md#requirements-and-installation) shows that command.
+For source development, use a project reference to the SDK instead of also referencing the NuGet package. [Maintenance](../../../MAINTENANCE.md#local-checks) shows that command.
 
 Before connecting, obtain a `NetworkContext` and registered relays from your intended Meshline network. Explicitly select `IAccountSigner` and `IRelayRegistry` implementations: the SDK supplies optional NEP-6 wallet and Neo RPC adapters, or you can provide your own. Supply `ISecretProtector` as described in [Application integrations](integrations.md). Choose a writable database path dedicated to this network/account/device. No public network or integration is selected automatically.
 

@@ -36,23 +36,37 @@ npm install @meshline/sdk@alpha @meshline/storage-node@alpha @meshline/transport
 
 For browser and Expo installation commands, see the [quick start](docs/guides/quick-start.md).
 
-To build packages from source, use Node.js 24 or later and run from this
-repository's `typescript/` directory:
+For source builds and local package tarballs, see [Maintenance](../MAINTENANCE.md#typescript-sdk-checks-and-local-packages).
 
-```sh
-npm ci
-npm run pack:local
-```
-
-The tarballs are written to `artifacts/packages/`. Building local packages does
-not require .NET or running the SDK test suite.
+Guides describe the current checkout. Use the matching release tag for an installed
+package; APIs documented on `main` may not yet be published. Install matching core
+and adapter versions together.
 
 ## Start building
 
 1. [Open a client session](docs/guides/quick-start.md).
 2. [Connect your signer, registry, and secret protector](docs/guides/integrations.md).
 3. [Establish contacts and send a message](docs/guides/direct-messages.md).
-4. Explore the [topic guides](docs/README.md) and [compilable examples](examples/README.md).
+4. [Synchronize data](docs/guides/synchronization.md), [page local history](docs/guides/storage-and-pagination.md), and [track read positions](docs/guides/conversations.md).
+5. Use [events and errors](docs/guides/events-and-errors.md) and [troubleshooting](docs/guides/troubleshooting.md) when diagnosing failures.
+
+The [quick start](docs/guides/quick-start.md) provides platform helpers that open,
+migrate, and initialize a session. For an already authorized device, the application
+lifetime then follows this pattern:
+
+```ts
+try {
+    await session.client.start();
+    await runApplication(session.client);
+} finally {
+    await session.dispose();
+}
+```
+
+Here `session` comes from the platform helper and `runApplication` is your own
+asynchronous application loop. For initial establishment or recovery, follow the
+quick start before starting. Explore all [topic guides](docs/README.md),
+[type-checked examples](examples/README.md), and [testing scope](TESTING.md).
 
 Wire formats and interoperability rules are defined by the
 [Meshline Protocol 1.0 draft](https://meshline.org/protocol/v1/en/index.html).

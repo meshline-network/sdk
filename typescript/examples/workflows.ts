@@ -20,6 +20,12 @@ export async function recover(client: MeshlineClient, options: AccountRecoveryOp
     await client.start();
 }
 
+/** Refresh account recovery messages before processing the group. Requires usable authorization. */
+export async function refreshGroup(client: MeshlineClient, relayId: string, group: GroupRef, signal?: AbortSignal) {
+    await client.messageManager.synchronize(relayId, signal);
+    return client.groupManager.synchronize(group, signal);
+}
+
 export async function moveHomeRelay(client: MeshlineClient, nextRelayId: string) {
     await client.changeHomeRelay(nextRelayId);
 }
@@ -51,8 +57,19 @@ export async function sendText(client: MeshlineClient, peerAccountId: string, te
     return client.messageManager.getSendStatus(queued.messageId);
 }
 
+/** Inspect the returned state: failed/canceled and an absent record are not success. */
+export async function waitForDelivery(client: MeshlineClient, messageId: string, signal?: AbortSignal) {
+    return client.messageManager.waitForSendStatus(messageId, 'targetAccepted', signal);
+}
+
 export async function cancelQueuedMessage(client: MeshlineClient, messageId: string) {
     return client.messageManager.cancelMessage(messageId);
+}
+
+/** Pass the first returned localSequence as before to continue toward older messages. */
+export async function previousMessages(client: MeshlineClient, peerAccountId: string, before: number, signal?: AbortSignal) {
+    const reader = await client.messageManager.getMessageHistory(peerAccountId, { before }, signal);
+    try { return await reader.readNext(50, signal); } finally { await reader.dispose(); }
 }
 
 /** Consumes and disposes a fixed snapshot; the application supplies rendering/export work. */
@@ -81,8 +98,8 @@ export async function unreadConversations(client: MeshlineClient) {
     }
 }
 
-export async function markConversationRead(client: MeshlineClient, conversationId: string) {
-    await client.markRead(conversationId);
+export async function markConversationRead(client: MeshlineClient, conversationId: string, localSequence: number) {
+    await client.markRead(conversationId, localSequence);
 }
 
 export async function publishAnnouncement(client: MeshlineClient, relayId: string) {

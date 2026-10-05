@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { Nep6AccountSigner, NetworkContext, verifyAccount } from '../../packages/sdk/src/index.js';
+import { Nep6AccountSigner, NetworkContext, verifyAccount } from '@meshline/sdk';
 
 interface Wallet { version: string; scrypt: { n: number; r: number; p: number }; accounts: { address: string; isDefault: boolean; key: string | null;
     contract: { script: string; deployed: boolean; parameters: { type: string }[] } }[] }

@@ -5,7 +5,7 @@ import { create } from 'multiformats/hashes/digest';
 import {
     NetworkContext, accountPublicKey, getRelayId, relayDescriptorCodec, relayDescriptorInput, relayInfoCodec,
     signAccount, validateRelayDescriptor, validateRelayEndpoint, validateRelayInfo, type RelayDescriptor,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 
 const context = NetworkContext.parse('neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70');
 const key = new Uint8Array(32).fill(7);

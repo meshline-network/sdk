@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { URL as ExpoUrl } from 'whatwg-url-minimum';
 import { relayOrigin, webEndpoint } from '@meshline/sdk';
-import { parseAbsoluteUrl } from '../../packages/sdk/src/runtime/url.js';
+import { parseAbsoluteUrl } from '../../packages/sdk/dist/runtime/url.js';
 
 const vectors = JSON.parse(readFileSync(new URL('../../../tests/vectors/identity-auth-v1.json', import.meta.url), 'utf8')) as {
     relay_origin: { normalization_cases: { name: string; endpoint: string; expected_origin: string }[];

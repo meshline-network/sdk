@@ -19,6 +19,13 @@ Keep language-neutral vectors and behavior cases in [shared tests](tests/README.
 Each SDK executes them through its own native test adapters. Cross-language
 interoperability has a separate [test project](tests/interop/README.md).
 
+To consume a local .NET checkout, add a project reference using your application
+and checkout paths:
+
+```sh
+dotnet add path/to/MyApp.csproj reference path/to/sdk/dotnet/src/Meshline.Sdk/Meshline.Sdk.csproj
+```
+
 ## Local packages
 
 After a Release build, run from `dotnet/`:
@@ -49,6 +56,8 @@ destinations, and run the offline suite with the actual .NET interoperability
 driver. Package checks install the five tarballs into independent consumers;
 Expo bundle checks compile JavaScript with Metro and Hermes for Android and iOS.
 These commands do not publish packages or establish native runtime acceptance.
+
+See the [TypeScript test guide](typescript/TESTING.md) for test placement, fixture ownership and filtered runs. Public core API tests use the built `@meshline/sdk` package entry point; internal tests consistently import built modules. `npm test` and `npm run test:conformance` build first through npm lifecycle hooks. Direct `npx vitest` commands require an explicit `npm run build` beforehand.
 
 [typescript.yml](.github/workflows/typescript.yml) configures Windows, Linux and
 macOS checks. See [platform requirements and limits](typescript/docs/platforms.md)
@@ -163,7 +172,17 @@ from `typescript/`. These tests also run within `npm run check`.
 
 Keep README files, website copy, and Release notes focused on installation, integration, capabilities, and limits for SDK consumers. Keep build, testing, publishing, and contributor procedures in this guide or the test guide.
 
-The [developer guide](dotnet/docs/README.md) is hand-written English Markdown. The [API reference](dotnet/docs/api/README.md) is generated with the repository-local `DefaultDocumentation.Console` tool, pinned to 1.2.5 in `dotnet/docs/dotnet-tools.json`. The documentation script runs from that directory to resolve its own tool manifest; the EF migration manifest remains at `dotnet/dotnet-tools.json`. Do not edit generated pages. Change the SDK's XML comments to correct API explanations, or the generator configuration to change presentation.
+The [.NET guide](dotnet/docs/README.md) and [TypeScript guide](typescript/docs/README.md)
+are hand-written English Markdown. Language READMEs cover installation and a minimal
+session; guide indexes route readers by task. Keep lifecycle focused on ownership,
+synchronization on progress and fresh passes, direct messages on the outbox,
+conversations on read state, and storage on query ranges and adapters. Event/error
+contracts belong in `events-and-errors.md`; symptom-based diagnosis belongs in
+`troubleshooting.md`. Extend the relevant section instead of appending new features
+after an API reference or navigation footer. Keep runtime differences explicit and
+use matching source-release documentation for package-specific behavior.
+
+The [API reference](dotnet/docs/api/README.md) is generated with the repository-local `DefaultDocumentation.Console` tool, pinned to 1.2.5 in `dotnet/docs/dotnet-tools.json`. The documentation script runs from that directory to resolve its own tool manifest; the EF migration manifest remains at `dotnet/dotnet-tools.json`. Do not edit generated pages. Change the SDK's XML comments to correct API explanations, or the generator configuration to change presentation.
 
 Use PowerShell 7.6 or later and the .NET 10 SDK. PowerShell must run on .NET 10 to load the SDK's metadata inspection library. From the **SDK repository root**, run:
 

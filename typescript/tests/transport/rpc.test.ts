@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { RpcConnection, decodeRpcMessage, encodeRpcRequest, type RelaySocket, type RelaySocketEvents, type RpcNotification } from '../../packages/sdk/src/index.js';
+import { RpcConnection, decodeRpcMessage, encodeRpcRequest, type RelaySocket, type RelaySocketEvents, type RpcNotification } from '@meshline/sdk';
 
 test('responses correlate opaque IDs and preserve business extensions while ignoring wrapper extensions', () => {
     expect(decodeRpcMessage('{"jsonrpc":"2.0","id":1,"result":{"future":null},"method":"extension","params":null}'))

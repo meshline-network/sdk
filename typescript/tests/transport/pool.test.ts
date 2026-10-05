@@ -3,7 +3,7 @@ import {
     NetworkContext, RelayClient, RelayAuthenticator, RelayClientPool, RelayError, accountAuthenticationCodec, accountAuthenticationInput, deviceAuthenticationCodec,
     deviceAuthenticationInput, deviceCertificateCodec, decodeBase64Url, relayDescriptorCodec, signAccount, signDevice,
     verifyAccount, verifyDevice, rpcErrorCodes, type AuthenticationIdentity, type JsonObject, type RelayFetch,
-} from '../../packages/sdk/src/index.js';
+} from '@meshline/sdk';
 import { createNodeRelayFetch, createNodeSocketFactory } from '../../packages/transport-node/src/index.js';
 import { AdvancingClock } from '../support/clock.js';
 import { context, signedDescriptor, TestRegistry } from '../support/relay-fixture.js';
