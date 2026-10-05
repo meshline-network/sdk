@@ -22,7 +22,7 @@ test('MessageManager establishes contacts, exchanges encrypted direct messages a
     const sent = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: '完整 SDK 工作流 😀' } }); expect(sent.state).toBe('queued');
     await network.until(async () => Boolean(await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId })));
     expect((await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId }))!.body!.text).toBe('完整 SDK 工作流 😀');
-    await network.until(async () => await a.messages.getSendStatus(sent.messageId) === undefined);
+    await network.until(async () => (await a.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted');
     expect(await all(a.messages.getMessageHistory(b.accountId))).toHaveLength(1); expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(0);
     expect(await all(a.messages.getContactRequests())).toEqual([]); expect(await all(b.messages.getContactRequests())).toEqual([]);
     expect(a.messages.lastBackgroundError).toBeUndefined(); expect(b.messages.lastBackgroundError).toBeUndefined();
@@ -60,7 +60,7 @@ test('request delivery events retain each committed send state and dismiss only 
     const { a, b, network } = await fixture(); const outgoing: MessageEvents['contactRequestChanged'][] = []; const incoming: MessageEvents['contactRequestChanged'][] = [];
     a.messages.on('contactRequestChanged', value => { outgoing.push(value); }); b.messages.on('contactRequestChanged', value => { incoming.push(value); });
     const request = await a.messages.addContact(b.accountId, 'delivery snapshots'); await a.messages.start();
-    await network.until(async () => await a.messages.getSendStatus(request.messageId) === undefined);
+    await network.until(async () => (await a.messages.getSendStatus(request.messageId))?.state === 'targetAccepted');
     expect(outgoing.map(value => value.request?.sendState)).toEqual(['queued', 'submitting', 'targetAccepted']);
     expect(outgoing).toMatchObject([{ kind: 'added' }, { kind: 'updated' }, { kind: 'updated' }]);
     await b.messages.start(); await network.until(async () => incoming.length > 0); await b.messages.stop();
@@ -144,7 +144,7 @@ test('uncertain encrypted sends recover after MessageManager/database restart wi
     const sent = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'recover me' } });
     await network.until(async () => (await a.messages.getSendStatus(sent.messageId))?.state === 'submissionUnknown'); await a.dispose();
     network.loseResponse = false; const resumed = await network.client(21, a.path); await resumed.messages.start();
-    await network.until(async () => await resumed.messages.getSendStatus(sent.messageId) === undefined);
+    await network.until(async () => (await resumed.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted');
     const attempts = network.submissions.filter(value => value.envelope.messageId === sent.messageId); expect(attempts.length).toBeGreaterThanOrEqual(2);
     expect(attempts.at(-1)).toEqual(attempts[0]); expect((await resumed.messages.getMessage({ sender: a.accountId, messageId: sent.messageId }))!.body!.text).toBe('recover me');
 });

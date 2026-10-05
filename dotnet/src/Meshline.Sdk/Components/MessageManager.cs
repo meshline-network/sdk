@@ -47,10 +47,13 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     {
         await using var database = new MeshlineDbContext(databaseOptions);
         await EnsureDatabaseBindingAsync(database, cancellationToken).ConfigureAwait(false);
+        await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await database.MessageOutbox.Where(value => value.State == MessageSendState.Submitting).ExecuteUpdateAsync(set => set
             .SetProperty(value => value.State, MessageSendState.SubmissionUnknown), cancellationToken).ConfigureAwait(false);
         await database.ContactRequests.Where(value => value.SendState == MessageSendState.Submitting).ExecuteUpdateAsync(set => set
             .SetProperty(value => value.SendState, MessageSendState.SubmissionUnknown), cancellationToken).ConfigureAwait(false);
+        await PruneSendHistoryAsync(database, cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         foreach (var timeline in await database.AccountTimelines.AsNoTracking().Where(value => value.HasRetentionGap).ToListAsync(cancellationToken).ConfigureAwait(false))
             _syncStatus.ObserveGap(timeline.RelayId);
         accountManager.AccountChanged += OnAccountChanged;
@@ -250,6 +253,7 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
     /// <remarks>
     /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
+    /// Results include retained terminal records. The SDK retains the newest 1000 terminal records by creation time and then ordinal message identifier across the account's entire outbox, including internal protocol messages.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
@@ -276,7 +280,11 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     /// </summary>
     /// <param name="messageId">The canonical message identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
-    /// <returns>The outbox status, or <see langword="null"/> when the message has no local outbox entry.</returns>
+    /// <returns>The pending or retained terminal outbox status, or <see langword="null"/> when no local record remains, including after history eviction.</returns>
+    /// <remarks>
+    /// Terminal states remain queryable across restarts within the SDK's retained history of 1000 terminal outbox records.
+    /// A missing record does not prove success, failure, or that the message was never sent.
+    /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
     /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>

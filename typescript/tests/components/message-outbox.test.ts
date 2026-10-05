@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, test, vi } from 'vitest';
-import { encryptMessage, messageSendRequestCodec, RelayError, StateConflictError, type MessageDeliveryStatus, type MeshlineStore, type StoreMutation } from '@meshline/sdk';
+import { createIdentifier, encryptMessage, messageSendRequestCodec, RelayError, StateConflictError, type MessageDeliveryStatus, type MeshlineStore, type StoreMutation } from '@meshline/sdk';
 import { NodeSqliteStore } from '@meshline/storage-node';
 // Load the built internal engine so adapters and errors share the same package instance.
 import { MessageOutbox, encodeOutbox, outboxKey, type OutboxRecord, type OutboxEffects, type OutboxTransport } from '../../packages/sdk/dist/messages/outbox.js';
@@ -28,7 +28,7 @@ async function fixture() {
     return { store, path, clock, request, record, transport, calls, queue, save, moveHome() { home = relayB; }, reply(value: MessageDeliveryStatus) { reply = value; } };
 }
 
-test('submission is durable before I/O; accepted messages only poll the accepting relay and are removed on target acceptance', async () => {
+test('submission is durable before I/O; accepted messages only poll the accepting relay and retain target acceptance', async () => {
     const f = await fixture(); const prepare = f.transport.prepare;
     f.transport.prepare = async (relay, signal) => { const client = await prepare(relay, signal); return { ...client, send: async (request, token) => {
         expect((await f.queue.get(id))!.state).toBe('submitting'); expect(await f.queue.cancel(id)).toBeUndefined(); return client.send(request, token);
@@ -36,7 +36,12 @@ test('submission is durable before I/O; accepted messages only poll the acceptin
     expect((await f.queue.process(id)).changes.map(value => value.current.state)).toEqual(['submitting', 'relayAccepted']);
     expect((await f.queue.get(id))!.acceptedAt).toBe(f.clock.wall);
     f.moveHome(); f.clock.wall += 15; f.reply({ status: 'target_accepted', acceptedAt: f.clock.wall - 15 });
-    const result = await f.queue.process(id); expect(result.changes.at(-1)!.current.state).toBe('targetAccepted'); expect(await f.queue.get(id)).toBeUndefined();
+    const result = await f.queue.process(id); expect(result.changes.at(-1)!.current.state).toBe('targetAccepted'); expect((await f.queue.get(id))!.state).toBe('targetAccepted');
+    expect(await f.queue.due()).toEqual([]); expect(await f.queue.cancel(id)).toBeUndefined();
+    f.clock.wall += 60; expect((await f.queue.process(id)).changes).toEqual([]);
+    await f.store.dispose(); const reopened = new NodeSqliteStore(f.path); stores.push(reopened); await reopened.initialize({ context: context.toString(), accountId: from.certificate.account });
+    const resumed = new MessageOutbox(reopened, f.clock, f.transport); await resumed.recover();
+    expect((await resumed.get(id))!.state).toBe('targetAccepted'); expect((await resumed.get(id))!.acceptedAt).toBe(f.clock.wall - 75);
     expect(f.calls.map(value => [value.relay, value.kind])).toEqual([[relayA, 'send'], [relayA, 'status']]);
 });
 
@@ -108,7 +113,7 @@ test('local persistence failure after target acceptance cannot silently discard 
     } };
     const queue = new MessageOutbox(f.store, f.clock, f.transport, effects); expect((await queue.process(id)).error).toBeInstanceOf(Error);
     expect((await queue.get(id))!.state).toBe('relayAccepted'); expect((await f.store.read([{ collection: 'test_contacts' }])).sets[0]).toEqual([]);
-    fail = false; f.clock.wall += 15; await queue.process(id); expect(await queue.get(id)).toBeUndefined();
+    fail = false; f.clock.wall += 15; await queue.process(id); expect((await queue.get(id))!.state).toBe('targetAccepted');
     expect((await f.store.read([{ collection: 'test_contacts' }])).sets[0]![0]!.value).toEqual({ confirmed: true });
     expect(f.calls.map(value => value.kind)).toEqual(['send', 'status']);
 });
@@ -129,7 +134,7 @@ test('another queue completing the request cannot be overwritten by a late older
     f.transport.prepare = async () => ({ send: async () => { enter!(); await gate; throw new Error('late response lost'); }, status: async () => { throw new Error('unexpected'); } });
     const first = f.queue.process(id); await entered;
     const second = new MessageOutbox(f.store, f.clock, { ...f.transport, prepare: async () => ({ send: async () => ({ status: 'target_accepted', acceptedAt: f.clock.wall }), status: async () => { throw new Error('unexpected'); } }) });
-    await second.recover(); await second.process(id); release!(); await first; expect(await f.queue.get(id)).toBeUndefined();
+    await second.recover(); await second.process(id); release!(); await first; expect((await f.queue.get(id))!.state).toBe('targetAccepted');
 });
 
 test('due work has stable chronological ordering, skips terminal entries and respects retry time', async () => {
@@ -137,4 +142,42 @@ test('due work has stable chronological ordering, skips terminal entries and res
     const snapshot = await f.store.read([]); const mutations: StoreMutation[] = [{ kind: 'put', ...outboxKey(otherId), value: encodeOutbox(other) }]; await f.store.commit(snapshot.version, mutations);
     expect(await f.queue.due()).toEqual([otherId, id]); await f.queue.cancel(id); expect(await f.queue.due()).toEqual([otherId]);
     await f.save({ ...f.record, nextAttemptAt: f.clock.wall + 15 }); expect(await f.queue.due()).toEqual([otherId]);
+});
+
+test('recovery keeps 1000 terminal records with stable tie ordering and preserves all pending states', async () => {
+    const f = await fixture(); const failedId = 'msg_EBESExQVFhcYGRobHB0eHw'; const canceledId = 'msg_ICEiIyQlJicoKSorLC0uLw';
+    const record = (messageId: string, state: OutboxRecord['state'], offset: number): OutboxRecord => ({ ...f.record, state,
+        request: { ...f.request, envelope: { ...f.request.envelope, messageId, createdAt: f.clock.wall + offset } },
+        ...(['relayAccepted', 'targetAccepted'].includes(state) ? { acceptedAt: f.clock.wall } : {}) });
+    const pending = (['queued', 'submitting', 'submissionUnknown', 'relayAccepted'] as const).map(state => record(createIdentifier('message'), state, -100));
+    const records = [record(id, 'targetAccepted', 0), record(failedId, 'failed', 10), record(canceledId, 'canceled', 10), ...pending,
+        ...Array.from({ length: 999 }, (_, index) => ({ ...record(createIdentifier('message'), 'canceled', 100), isDirect: index !== 0 }))];
+    const snapshot = await f.store.read([]); await f.store.commit(snapshot.version, records.map(value => ({ kind: 'put', ...outboxKey(value.request.envelope.messageId), value: encodeOutbox(value) })));
+    await f.queue.recover();
+    expect(await f.queue.get(id)).toBeUndefined(); expect(await f.queue.get(failedId)).toBeUndefined(); expect((await f.queue.get(canceledId))!.state).toBe('canceled');
+    for (const value of pending) expect((await f.queue.get(value.request.envelope.messageId))!.state).toBe(value.state === 'submitting' ? 'submissionUnknown' : value.state);
+    expect(await f.queue.due()).toHaveLength(4); expect((await f.store.read([{ collection: 'message_outbox' }])).sets[0]).toHaveLength(1004);
+    expect(await f.queue.get(createIdentifier('message'))).toBeUndefined();
+});
+
+test('late completion and concurrent terminal writes enforce the shared bound without replaying a send', async () => {
+    const f = await fixture(); const oldest = createIdentifier('message'); const recent = createIdentifier('message'); const concurrent = createIdentifier('message');
+    const record = (messageId: string, state: OutboxRecord['state'], offset: number): OutboxRecord => ({ ...f.record, state,
+        request: { ...f.request, envelope: { ...f.request.envelope, messageId, createdAt: f.clock.wall + offset } },
+        ...(state === 'targetAccepted' ? { acceptedAt: f.clock.wall } : {}) });
+    const snapshot = await f.store.read([]); await f.store.commit(snapshot.version, [record(id, 'queued', -100), record(oldest, 'targetAccepted', -10), record(recent, 'queued', 200),
+        ...Array.from({ length: 999 }, () => record(createIdentifier('message'), 'canceled', 0))]
+        .map(value => ({ kind: 'put', ...outboxKey(value.request.envelope.messageId), value: encodeOutbox(value) })));
+    expect((await f.queue.cancel(id))!.current.state).toBe('canceled'); expect(await f.queue.get(id)).toBeUndefined(); expect(await f.queue.get(oldest)).toBeDefined();
+    const commit = f.store.commit.bind(f.store); let inject = true;
+    vi.spyOn(f.store, 'commit').mockImplementation(async (version, mutations, signal) => {
+        if (inject && mutations.some(value => value.kind === 'put' && value.key === recent && value.value.state === 'targetAccepted')) {
+            inject = false; await commit(version, [{ kind: 'put', ...outboxKey(concurrent), value: encodeOutbox(record(concurrent, 'targetAccepted', 300)) }]);
+        }
+        return commit(version, mutations, signal);
+    });
+    f.reply({ status: 'target_accepted', acceptedAt: f.clock.wall }); await f.queue.process(recent);
+    expect(inject).toBe(false); expect(f.calls).toHaveLength(1); expect(await f.queue.get(oldest)).toBeUndefined();
+    expect((await f.queue.get(recent))!.state).toBe('targetAccepted'); expect((await f.queue.get(concurrent))!.state).toBe('targetAccepted');
+    expect((await f.store.read([{ collection: 'message_outbox' }])).sets[0]).toHaveLength(1000);
 });

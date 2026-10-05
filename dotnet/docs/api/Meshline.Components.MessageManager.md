@@ -31,6 +31,7 @@
 - [`SendMessageAsync(string, DirectMessageDraft, CancellationToken)`](#Meshline.Components.MessageManager.SendMessageAsync%28string%2CMeshline.Models.Client.DirectMessageDraft%2CSystem.Threading.CancellationToken%29)
 - [`SetAliasAsync(string, string, CancellationToken)`](#Meshline.Components.MessageManager.SetAliasAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`SynchronizeAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.SynchronizeAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`WaitForSendStatusAsync(string, MessageSendState, CancellationToken)`](#Meshline.Components.MessageManager.WaitForSendStatusAsync%28string%2CMeshline.Models.Client.MessageSendState%2CSystem.Threading.CancellationToken%29)
 
 </details>
 
@@ -833,7 +834,8 @@ The SQLite database cannot be opened or a database command fails, for example be
 The send\-state filter contains unsupported flags\.
 
 ### Remarks
-This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
+This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.<br>
+Results include retained terminal records\. The SDK retains the newest 1000 terminal records by creation time and then ordinal message identifier across the account's entire outbox, including internal protocol messages\.
 
 <a name='Meshline.Components.MessageManager.GetSendStatusAsync(string,System.Threading.CancellationToken)'></a>
 
@@ -860,7 +862,7 @@ A token that can cancel the operation\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[MessageSendStatus](Meshline.Models.Client.MessageSendStatus.md 'Meshline\.Models\.Client\.MessageSendStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
-The outbox status, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when the message has no local outbox entry\.
+The pending or retained terminal outbox status, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when no local record remains, including after history eviction\.
 
 #### Exceptions
 
@@ -875,6 +877,10 @@ This component or a component used by the operation has been disposed\.
 
 [Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
 The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+### Remarks
+Terminal states remain queryable across restarts within the SDK's retained history of 1000 terminal outbox records\.<br>
+A missing record does not prove success, failure, or that the message was never sent\.
 
 <a name='Meshline.Components.MessageManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)'></a>
 
@@ -1191,6 +1197,63 @@ Requires initialization and usable authorization, but not StartAsync\. Every cal
 serialized with background synchronization\. Reads forward from local progress until the relay reports no more pages;<br>
 this does not freeze a remote sequence at call time or guarantee complete historical data\.<br>
 Transport and storage failures update synchronization status and propagate to the caller\.
+
+<a name='Meshline.Components.MessageManager.WaitForSendStatusAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken)'></a>
+
+## MessageManager\.WaitForSendStatusAsync\(string, MessageSendState, CancellationToken\) Method
+
+Waits for a locally tracked send to reach an acceptance milestone or finish unsuccessfully\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.MessageSendStatus?> WaitForSendStatusAsync(string messageId, Meshline.Models.Client.MessageSendState targetState=Meshline.Models.Client.MessageSendState.TargetAccepted, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.MessageManager.WaitForSendStatusAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken).messageId'></a>
+
+`messageId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The message identifier returned by [SendMessageAsync\(string, DirectMessageDraft, CancellationToken\)](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.SendMessageAsync(string,Meshline.Models.Client.DirectMessageDraft,System.Threading.CancellationToken) 'Meshline\.Components\.MessageManager\.SendMessageAsync\(string, Meshline\.Models\.Client\.DirectMessageDraft, System\.Threading\.CancellationToken\)')\.
+
+<a name='Meshline.Components.MessageManager.WaitForSendStatusAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken).targetState'></a>
+
+`targetState` [MessageSendState](Meshline.Models.Client.MessageSendState.md 'Meshline\.Models\.Client\.MessageSendState')
+
+The milestone to await: queued, relay accepted, or target accepted\. Defaults to target accepted\.
+
+<a name='Meshline.Components.MessageManager.WaitForSendStatusAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that cancels only this wait, without canceling the outgoing message\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[MessageSendStatus](Meshline.Models.Client.MessageSendStatus.md 'Meshline\.Models\.Client\.MessageSendStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The actual status at or beyond the requested milestone, a failed or canceled status, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') if no local record or concurrent completion is available\.
+
+#### Exceptions
+
+[System\.ArgumentOutOfRangeException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentoutofrangeexception 'System\.ArgumentOutOfRangeException')<br>
+The target is not queued, relay accepted, or target accepted, including combined filter flags\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller cancels the wait or the component is disposed while waiting\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+The component has not completed initialization\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The component has been disposed\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+Reading the local send status fails\.
+
+### Remarks
+Checks retained local status and observes subsequent commits by this manager without polling or issuing network requests\.<br>
+Later acceptance satisfies an earlier milestone; failed and canceled always end the wait\. Inspect the returned state\.<br>
+Unknown or evicted records return null immediately\. Target acceptance is not a recipient read receipt\.<br>
+Initialize the component before waiting\. Waiting does not start the sender; it survives stop/start, but component disposal cancels it\.<br>
+There is no built\-in timeout; use a cancellation token to bound the wait\. Changes made by another manager or process are not observed\.
 ### Events
 
 <a name='Meshline.Components.MessageManager.ContactChanged'></a>

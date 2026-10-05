@@ -13,6 +13,7 @@ namespace Meshline.Components;
 
 sealed partial class MessageManager
 {
+    const int SendHistoryLimit = 1000;
     readonly SemaphoreSlim _databaseGate = new(1, 1);
     readonly Channel<bool> _sendRequests = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
     readonly Channel<bool> _syncRequests = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
@@ -41,17 +42,25 @@ sealed partial class MessageManager
             foreach (var entry in database.ChangeTracker.Entries<MessageOutboxRecord>().Where(value => value.State is EntityState.Added or EntityState.Modified).ToArray())
             {
                 await ProcessContactSendChangeAsync(database, entry.Entity, notifications, cancellationToken).ConfigureAwait(false);
-                if (entry.Entity.State == MessageSendState.TargetAccepted)
-                    database.MessageOutbox.Remove(entry.Entity);
             }
             var messagesAdded = database.ChangeTracker.Entries<StoredMessageRecord>().Any(value => value.State == EntityState.Added);
+            var sendStatuses = database.ChangeTracker.Entries<MessageOutboxRecord>()
+                .Where(value => value.State is EntityState.Added or EntityState.Modified).Select(value => ToStatus(value.Entity)).ToArray();
             await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await PruneSendHistoryAsync(database, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            // Complete waits from committed snapshots, even if retention removed the record or an application observer throws.
+            foreach (var status in sendStatuses) SendStatusCommitted?.Invoke(status);
             if (messagesAdded) notifications.Insert(0, OnTimelineChanged);
         }
         finally { _databaseGate.Release(); }
         return notifications;
     }
+
+    Task<int> PruneSendHistoryAsync(MeshlineDbContext database, CancellationToken cancellationToken) =>
+        database.MessageOutbox.Where(value => value.State == MessageSendState.TargetAccepted || value.State == MessageSendState.Failed || value.State == MessageSendState.Canceled)
+            .OrderByDescending(value => value.CreatedAt).ThenByDescending(value => value.MessageId)
+            .Skip(SendHistoryLimit).ExecuteDeleteAsync(cancellationToken);
 
     void PublishNotifications(List<Action> notifications)
     {

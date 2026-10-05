@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "7c5d2668cf47a8969ab63decfc662ba4a262f37c3d042a4a4935a8a68516a01c",
+  "sourceSha256": "485fae388d11000b08def1d3b2a107a717a35cb5e6a4669f1b7f7f64360bba7a",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1743,6 +1743,13 @@
     {
       "symbol": "M:Meshline.Components.MessageManager.SynchronizeAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.SynchronizeAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
+      "symbol": "M:Meshline.Components.MessageManager.WaitForSendStatusAsync(System.String,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.WaitForSendStatusAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/message.ts",
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."

@@ -21,6 +21,8 @@ export interface OutboxRecord {
 export interface OutboxChange { readonly previous: OutboxRecord; readonly current: OutboxRecord }
 const states = new Set<MessageSendState>(['queued', 'submitting', 'submissionUnknown', 'relayAccepted', 'targetAccepted', 'failed', 'canceled']);
 const pending = new Set<MessageSendState>(['queued', 'submissionUnknown', 'relayAccepted']);
+const terminal = new Set<MessageSendState>(['targetAccepted', 'failed', 'canceled']);
+const sendHistoryLimit = 1000;
 export const outboxKey = (messageId: string): RecordKey => ({ collection: 'message_outbox', key: messageId });
 export function encodeOutbox(value: OutboxRecord): JsonObject {
     return { request: messageSendRequestCodec.encode(value.request), relayId: value.relayId, state: value.state, nextAttemptAt: value.nextAttemptAt, isDirect: value.isDirect,
@@ -62,7 +64,8 @@ export interface OutboxEffects {
 /** Internal durable delivery engine. Its owner supplies lifecycle, authorization, events and enqueue transactions. */
 export class MessageOutbox {
     readonly #gate = new AsyncGate();
-    constructor(readonly store: MeshlineStore, readonly clock: RuntimeClock, readonly transport: OutboxTransport, readonly effects?: OutboxEffects) {}
+    constructor(readonly store: MeshlineStore, readonly clock: RuntimeClock, readonly transport: OutboxTransport, readonly effects?: OutboxEffects,
+        readonly changed?: (status: MessageSendStatus) => void) {}
 
     async recover(signal?: AbortSignal): Promise<readonly OutboxChange[]> {
         const snapshot = await this.store.read([{ collection: 'message_outbox' }], signal); const changes: OutboxChange[] = [];
@@ -71,6 +74,7 @@ export class MessageOutbox {
             const change = await this.#update(row.key, current => current.state === 'submitting' ? { ...current, state: 'submissionUnknown', nextAttemptAt: this.clock.nowSeconds() } : undefined, signal);
             if (change) changes.push(change);
         }
+        await updateStore(this.store, [{ collection: 'message_outbox' }], snapshot => ({ mutations: this.#prune(snapshot.sets[0]!.map(decodeOutbox)), result: undefined }), signal);
         return changes;
     }
     async get(messageId: string, signal?: AbortSignal): Promise<OutboxRecord | undefined> {
@@ -131,21 +135,33 @@ export class MessageOutbox {
         }
     }
     #retryAt(): number { const result = this.clock.nowSeconds() + 15; requireSafeInteger(result, 0); return result; }
+    #prune(records: readonly OutboxRecord[]): readonly StoreMutation[] {
+        return records.filter(value => terminal.has(value.state))
+            .sort((a, b) => b.request.envelope.createdAt - a.request.envelope.createdAt || ordinal(b.request.envelope.messageId, a.request.envelope.messageId))
+            .slice(sendHistoryLimit).map(value => ({ kind: 'delete', ...outboxKey(value.request.envelope.messageId) }));
+    }
     #replace(previous: OutboxRecord, current: Omit<OutboxRecord, 'errorMessage'> & { readonly errorMessage?: string | undefined }): Promise<OutboxChange | undefined> {
         const fingerprint = canonicalJson(encodeOutbox(previous));
         return this.#update(previous.request.envelope.messageId, saved => canonicalJson(encodeOutbox(saved)) === fingerprint ? current : undefined);
     }
     async #update(messageId: string, update: (record: OutboxRecord) => (Omit<OutboxRecord, 'errorMessage'> & { readonly errorMessage?: string | undefined }) | undefined, signal?: AbortSignal): Promise<OutboxChange | undefined> {
-        const result = await updateStore(this.store, [outboxKey(messageId), ...(this.effects?.queries ?? [])], snapshot => {
+        const result = await updateStore(this.store, [outboxKey(messageId), ...(this.effects?.queries ?? []), { collection: 'message_outbox' }], snapshot => {
             const row = snapshot.sets[0]![0]; if (!row) return { mutations: [], result: undefined };
             const previous = decodeOutbox(row); const updated = update(previous); if (!updated) return { mutations: [], result: undefined };
             const { errorMessage, ...rest } = updated; const current: OutboxRecord = { ...rest, ...(errorMessage === undefined ? {} : { errorMessage }) };
             const change = { previous, current };
-            const mutation: StoreMutation = current.state === 'targetAccepted' ? { kind: 'delete', ...outboxKey(messageId) } : { kind: 'put', ...outboxKey(messageId), value: encodeOutbox(current) };
-            const effects = this.effects?.plan(snapshot, change) ?? [];
-            return { mutations: [mutation, ...effects], result: { change, snapshot, effects } };
+            const pruned = this.#prune([...snapshot.sets.at(-1)!.filter(value => value.key !== messageId).map(decodeOutbox), current]);
+            const mutations: StoreMutation[] = pruned.some(value => value.key === messageId) ? [] : [{ kind: 'put', ...outboxKey(messageId), value: encodeOutbox(current) }];
+            const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(0, -1) };
+            const effects = this.effects?.plan(effectSnapshot, change) ?? [];
+            return { mutations: [...mutations, ...pruned, ...effects], result: { change, snapshot: effectSnapshot, effects } };
         }, signal);
-        if (result) this.effects?.committed?.(result.snapshot, result.effects); return result?.change;
+        if (result) {
+            // Notify from the committed snapshot even when retention removed this record.
+            this.changed?.(outboxStatus(result.change.current));
+            this.effects?.committed?.(result.snapshot, result.effects);
+        }
+        return result?.change;
     }
 }
 function sameRequest(a: OutboxRecord, b: OutboxRecord): boolean { return messageSendRequestCodec.stringify(a.request) === messageSendRequestCodec.stringify(b.request); }

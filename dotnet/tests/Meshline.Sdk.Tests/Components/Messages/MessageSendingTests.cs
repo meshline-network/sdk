@@ -98,6 +98,15 @@ public sealed class MessageSendingTests
 
         Assert.Equal(2, bodies.Count);
         Assert.Single(bodies.Distinct());
-        Assert.Null(await manager.GetSendStatusAsync(queued.MessageId, Token));
+        var status = await manager.GetSendStatusAsync(queued.MessageId, Token);
+        Assert.Equal(MessageSendState.TargetAccepted, status!.State);
+        Assert.Equal(fixture.Relay.RelayId, status.AcceptedRelayId);
+        Assert.NotNull(status.AcceptedAt);
+        await fixture.ReopenAsync();
+        var persisted = await fixture.Client.MessageManager.GetSendStatusAsync(queued.MessageId, Token);
+        Assert.Equal(status.State, persisted!.State);
+        Assert.Equal(status.AcceptedAt, persisted.AcceptedAt);
+        Assert.Equal(status.AcceptedRelayId, persisted.AcceptedRelayId);
+        Assert.False(await fixture.Client.MessageManager.CancelMessageAsync(queued.MessageId, Token));
     }
 }

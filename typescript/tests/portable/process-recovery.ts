@@ -218,10 +218,10 @@ export async function verifyProcessRecovery(options: InteropOptions, state: Proc
         pass('followed channel and previously accepted local posts survive process termination');
         await messages.start(); await groups.start(); await channels.start();
         for (const member of members) await member.local.client.groupManager.start();
-        await until('outbox, rotation, publication and member request reconciliation', async () => (await messages.getSendStatus(state.messageId)) === undefined
+        await until('outbox, rotation, publication and member request reconciliation', async () => (await messages.getSendStatus(state.messageId))?.state === 'targetAccepted'
             && (await store.read([{ collection: 'group_operations' }, { collection: 'group_rotations' }, { collection: 'channel_operations' }])).sets.every(rows => rows.length === 0)
             && (await Promise.all(members.map(async member => (await member.local.store.read([{ collection: 'group_operations' }])).sets[0]!.length))).every(count => count === 0));
-        pass('runtime recovery clears the confirmed outbox, rotation, publication and both member submissions without application resubmission');
+        pass('runtime recovery retains confirmed send status and clears rotation, publication and both member submissions without application resubmission');
         for (const member of members) {
             const approval = before.offlineApprovals.find(value => value.groupId === member.state.group.groupId)!; const manager = member.local.client.groupManager;
             await until(`${member.state.kind} approved welcome`, async () => (await all(manager.getMessages())).some(value => value.messageId === approval.welcomeMessageId

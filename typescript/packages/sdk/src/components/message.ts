@@ -59,6 +59,7 @@ export class MessageManager extends ClientComponent {
     }
     readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #account: AccountManager; readonly #device: DeviceManager; readonly #random: RandomSource;
     readonly #events = new EventHub<MessageEvents>(); readonly #writes = new AsyncGate();
+    readonly #sendWaiters = new Set<(status: MessageSendStatus) => void>();
     readonly #repository: MessageRepository; readonly #contacts: MessageContacts; readonly #outbox: MessageOutbox; readonly #receiver: MessageReceiver;
     readonly #deliveryGrants = new Map<string, ContactGrant>();
     readonly #observed = new Map<string, { client: RelayClient; detach: (() => void)[] }>();
@@ -82,7 +83,7 @@ export class MessageManager extends ClientComponent {
                 send: async (request, token) => messageDeliveryStatusCodec.decode((await relay.requestHttp('POST', 'message.send', messageSendRequestCodec.encode(request), { ...(token ? { signal: token } : {}) }))!),
                 status: async (messageId, token) => messageDeliveryStatusCodec.decode((await relay.requestHttp('GET', 'message.delivery.status', { message_id: messageId }, { ...(token ? { signal: token } : {}) }))!),
             }; },
-        }, this.#contacts.deliveryEffects(this.#deliveryGrants));
+        }, this.#contacts.deliveryEffects(this.#deliveryGrants), status => { for (const observe of this.#sendWaiters) observe(status); });
         this.#receiver = new MessageReceiver(this.#repository, this.context, this.#device, { prepare: (entry, payload, signal) => this.#contacts.prepareReception(entry, payload, signal),
             isPermanentRejection: (error): error is ContactMessageRejection => error instanceof ContactMessageRejection });
         registerAccountSender(this, async (payload, devices, signal, effects) => {
@@ -166,6 +167,7 @@ export class MessageManager extends ClientComponent {
         return this.runOperation(scope => this.#repository.history(peer, scope, args.range), args.signal);
     }
     readTimeline(after: number, count: number, signal?: AbortSignal): Promise<readonly AccountMessage[]> { return this.runOperation(scope => this.#repository.readTimeline(after, count, scope), signal); }
+    /** Includes retained direct-message terminal records; the account-wide terminal history is limited to the newest 1000 records. */
     getOutbox(query: OutboxQuery = {}, signal?: AbortSignal): Promise<QueryReader<MessageSendStatus>> {
         const recipient = query.recipient; const states = query.states && [...query.states]; if (recipient !== undefined) validateAccountId(recipient);
         if (states?.some(value => !sendStates.has(value))) throw new TypeError('Unknown message send state.');
@@ -173,7 +175,39 @@ export class MessageManager extends ClientComponent {
             return snapshotReader(rows.sets[0]!.map(decodeOutbox).filter(value => value.isDirect && (recipient === undefined || value.request.envelope.to === recipient) && (states === undefined || states.includes(value.state)))
                 .sort((a, b) => a.request.envelope.createdAt - b.request.envelope.createdAt || ordinal(a.request.envelope.messageId, b.request.envelope.messageId)).map(outboxStatus)); }, signal);
     }
+    /** Reads pending or retained terminal status. Undefined means no local record remains, including after history eviction. */
     getSendStatus(messageId: string, signal?: AbortSignal): Promise<MessageSendStatus | undefined> { return this.runOperation(async scope => { const record = await this.#outbox.get(messageId, scope); return record && outboxStatus(record); }, signal); }
+    /**
+     * Wait for queued, relayAccepted, or targetAccepted (the default), returning the actual status.
+     * Later acceptance satisfies an earlier milestone; failed/canceled also finish the wait.
+     * Unknown or evicted records return undefined. Target acceptance is not a read receipt.
+     * Observes this manager's commits without polling or starting the sender; initialize first.
+     * Stop/start preserves waits. Caller abort or disposal ends only the wait, not the send.
+     * Use signal to bound the wait; there is no built-in timeout or observation of other processes.
+     */
+    waitForSendStatus(messageId: string, targetState: MessageSendState = 'targetAccepted', signal?: AbortSignal): Promise<MessageSendStatus | undefined> {
+        return this.runOperation(async scope => {
+            if (!['queued', 'relayAccepted', 'targetAccepted'].includes(targetState)) throw new RangeError('Expected queued, relayAccepted, or targetAccepted.');
+            let result: MessageSendStatus | undefined;
+            let complete!: (status: MessageSendStatus) => void;
+            const completion = new Promise<MessageSendStatus>(resolve => { complete = resolve; });
+            const observe = (status: MessageSendStatus): void => {
+                if (status.messageId === messageId && !result && (['failed', 'canceled', 'targetAccepted'].includes(status.state)
+                    || targetState === 'queued' || targetState === 'relayAccepted' && status.state === 'relayAccepted')) {
+                    result = status; complete(status);
+                }
+            };
+            // Subscribe before reading to cover commits during the initial lookup.
+            this.#sendWaiters.add(observe);
+            try {
+                const record = await this.#outbox.get(messageId, scope);
+                if (record) observe(outboxStatus(record));
+                throwIfAborted(scope);
+                if (result || !record) return result;
+                return await awaitWithSignal(completion, scope);
+            } finally { this.#sendWaiters.delete(observe); }
+        }, signal);
+    }
     async cancelMessage(messageId: string, signal?: AbortSignal): Promise<boolean> { const change = await this.runOperation(scope => this.#outbox.cancel(messageId, scope), signal); if (change) await this.#sendChanges([change]); return Boolean(change); }
     createInvite(expiresAt: number, signal?: AbortSignal): Promise<ContactInvite> { return this.runOperation(scope => this.#contacts.invite(expiresAt, scope), signal); }
     addContact(target: string | ContactInvite, note?: string, signal?: AbortSignal): Promise<ContactRequestInfo> {
