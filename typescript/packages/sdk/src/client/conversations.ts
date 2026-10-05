@@ -83,13 +83,27 @@ export class ClientConversations {
     }
     async get(id: string, signal?: AbortSignal): Promise<Conversation | undefined> { conversationKind(id); return this.#project(await this.store.read(queries, signal)).find(value => value.conversation.conversationId === id)?.conversation; }
     async ids(signal?: AbortSignal): Promise<ReadonlySet<string>> { return new Set(this.#project(await this.store.read(queries, signal)).map(value => value.conversation.conversationId)); }
-    async markRead(id: string, signal?: AbortSignal): Promise<boolean> {
-        conversationKind(id);
-        return updateStore(this.store, queries, snapshot => {
-            const projection = this.#project(snapshot, true).find(value => value.conversation.conversationId === id); const sequence = projection?.head;
-            const before = snapshot.sets[5]!.find(row => row.key === id)?.value.sequence ?? -1; requireSafeInteger(before, -1);
+    async markRead(id: string, localSequence: number | undefined, signal?: AbortSignal): Promise<boolean> {
+        const kind = conversationKind(id);
+        if (localSequence === undefined) return updateStore(this.store, queries, snapshot => {
+            const sequence = this.#project(snapshot, true).find(value => value.conversation.conversationId === id)?.head;
+            const before = snapshot.sets[5]!.find(value => value.key === id)?.value.sequence ?? -1; requireSafeInteger(before, -1);
             if (sequence === undefined || sequence <= before) return { mutations: [], result: false };
             return { mutations: [{ kind: 'put', ...readKey(id), value: { sequence } }], result: true };
+        }, signal);
+        requireSafeInteger(localSequence, 1);
+        const target: RecordQuery = kind === 'direct' ? { collection: 'messages' }
+            : { collection: kind === 'group' ? 'group_events' : 'channel_posts', key: `${id}|${String(localSequence).padStart(16, '0')}` };
+        return updateStore(this.store, [readKey(id), target], snapshot => {
+            const before = snapshot.sets[0]![0]?.value.sequence ?? -1; requireSafeInteger(before, -1);
+            if (localSequence <= before) return { mutations: [], result: false };
+            const known = snapshot.sets[1]!.some(({ value }) => kind === 'direct'
+                ? value.payloadType === 'meshline.message.direct' && value.localSequence === localSequence &&
+                    (value.sender === this.accountId && value.recipient === id || value.sender === id && value.recipient === this.accountId)
+                : kind === 'group' ? value.isMessage === true && value.decryptedPayload !== undefined && groupEventCodec.decode(value.event!).sequence === localSequence
+                    : value.sequence === localSequence && typeof value.messageId === 'string');
+            if (!known) throw new RangeError('The position does not identify a locally known message in this conversation.');
+            return { mutations: [{ kind: 'put', ...readKey(id), value: { sequence: localSequence } }], result: true };
         }, signal);
     }
 }

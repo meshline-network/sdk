@@ -77,7 +77,7 @@ export class MessageReceiver {
         try {
             const result = await this.repository.accept(relayId, entry, message, hasRetentionGap, effects, signal);
             return { ...result, ...(result.inserted && message.payloadType === 'meshline.message.direct' ? { message: {
-                ...directMessageCodec.decode(payload), key: { sender: message.sender, messageId: message.messageId }, senderDeviceId: message.senderDeviceId, recipient: message.recipient, createdAt: message.createdAt,
+                ...directMessageCodec.decode(payload), localSequence: result.localSequence, key: { sender: message.sender, messageId: message.messageId }, senderDeviceId: message.senderDeviceId, recipient: message.recipient, createdAt: message.createdAt,
             } } : {}) };
         }
         catch (error) { return this.#rejectBusiness(relayId, entry, error, hasRetentionGap, signal); }

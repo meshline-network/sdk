@@ -133,12 +133,14 @@ test('actual .NET and TypeScript agree on history pagination, cancellation, fixe
     const client = new MeshlineClient({ context, accountId: ts.accountId, store: ts.store, relayClients: ts.pool, secretProtector: ts.protector, clock: network.clock }); resources.push(client); await client.initialize();
     const sendTs = (text: string) => ts.messages.sendMessage(remote.accountId, { body: { contentType: 'text/plain', text } });
     const sendNet = (text: string) => bridge.invoke<{ messageId: string }>({ operation: 'message-send', id, account: ts.accountId, text });
-    const netHistory = () => bridge.invoke<{ messages: { messageId: string }[] }>({ operation: 'message-read', id });
+    const netHistory = () => bridge.invoke<{ messages: { localSequence: number; messageId: string; sender: string; recipient: string; createdAt: number; text?: string }[] }>({ operation: 'message-read', id });
     const history = () => all(ts.messages.getMessageHistory(remote.accountId));
     const first = await sendTs('first TS'); await sendTs('second TS'); await sendNet('first .NET'); await sendNet('second .NET');
     await until(async () => (await history()).length === 4 && (await netHistory()).messages.length === 4);
     const normalize = (value: MessageInfo) => ({ messageId: value.key.messageId, sender: value.key.sender, recipient: value.recipient, createdAt: value.createdAt, text: value.body?.text });
     const expected = (await history()).map(normalize); expect(expected.some(value => value.messageId === first.messageId)).toBe(true);
+    const netExpected = (await netHistory()).messages.map(({ localSequence: _position, ...message }) => message);
+    expect([...netExpected].sort((a, b) => a.messageId.localeCompare(b.messageId))).toEqual([...expected].sort((a, b) => a.messageId.localeCompare(b.messageId)));
     expect(expected[0]!.createdAt).toBe(expected[1]!.createdAt);
     const reader = await ts.messages.getMessageHistory(remote.accountId); resources.push(reader);
     await bridge.invoke({ operation: 'history-open', id, reader: 'fixed', peer: ts.accountId });
@@ -146,10 +148,10 @@ test('actual .NET and TypeScript agree on history pagination, cancellation, fixe
     const cancellation = new AbortController(); cancellation.abort();
     await expect(reader.readNext(2, cancellation.signal)).rejects.toMatchObject({ name: 'AbortError' }); await expect(nextNet(2, true)).rejects.toThrow('Canceled');
     await expect(reader.readNext(0)).rejects.toThrow(); await expect(nextNet(0)).rejects.toThrow('ArgumentOutOfRangeException');
-    expect((await reader.readNext(1)).map(normalize)).toEqual(expected.slice(0, 1)); expect(await nextNet(1)).toEqual(expected.slice(0, 1));
+    expect((await reader.readNext(1)).map(normalize)).toEqual(expected.slice(0, 1)); expect(await nextNet(1)).toEqual(netExpected.slice(0, 1));
     await sendNet('after snapshots opened'); await until(async () => (await history()).length === 5);
-    expect((await reader.readNext(2)).map(normalize)).toEqual(expected.slice(1, 3)); expect(await nextNet(2)).toEqual(expected.slice(1, 3));
-    expect((await reader.readNext(2)).map(normalize)).toEqual(expected.slice(3)); expect(await nextNet(2)).toEqual(expected.slice(3));
+    expect((await reader.readNext(2)).map(normalize)).toEqual(expected.slice(1, 3)); expect(await nextNet(2)).toEqual(netExpected.slice(1, 3));
+    expect((await reader.readNext(2)).map(normalize)).toEqual(expected.slice(3)); expect(await nextNet(2)).toEqual(netExpected.slice(3));
     expect(await reader.readNext(1)).toEqual([]); expect(await nextNet(1)).toEqual([]);
     await reader.dispose(); await bridge.invoke({ operation: 'history-close', id, reader: 'fixed' });
     await expect(reader.readNext(1)).rejects.toMatchObject({ code: 'disposed' }); await expect(nextNet(1)).rejects.toThrow('ObjectDisposedException');
@@ -162,9 +164,11 @@ test('actual .NET and TypeScript agree on history pagination, cancellation, fixe
     for (const filter of [{ kinds: ['direct'] as const }, { hasMessages: true }, { unreadOnly: true }]) {
         expect(await all(client.getConversations(filter))).toHaveLength(1); expect(await netConversations(filter)).toHaveLength(1);
     }
-    for (let repeat = 0; repeat < 2; repeat++) { await client.markRead(remote.accountId); await bridge.invoke({ operation: 'mark-read', id, conversationId: ts.accountId }); }
+    const tsPosition = (await history()).at(-1)!.localSequence; const netPosition = (await netHistory()).messages.at(-1)!.localSequence;
+    for (let repeat = 0; repeat < 2; repeat++) { await client.markRead(remote.accountId, tsPosition); await bridge.invoke({ operation: 'mark-read', id, conversationId: ts.accountId, localSequence: netPosition }); }
     expect(await all(client.getConversations({ unreadOnly: true }))).toEqual([]); expect(await netConversations({ unreadOnly: true })).toEqual([]);
     await sendTs('new unread for .NET'); await sendNet('new unread for TypeScript'); await until(async () => (await history()).length === 7 && (await netHistory()).messages.length === 7);
+    await client.markRead(remote.accountId, tsPosition); await bridge.invoke({ operation: 'mark-read', id, conversationId: ts.accountId, localSequence: netPosition });
     expect((await client.getConversation(remote.accountId))!.unreadCount).toBe(1); expect((await netConversations())[0]!.unreadCount).toBe(1);
     await bridge.invoke({ operation: 'close', id });
 });

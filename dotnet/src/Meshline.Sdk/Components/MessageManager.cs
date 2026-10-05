@@ -190,13 +190,42 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
     /// <remarks>
+    /// This overload retains the original parameter list for binary compatibility. Optional arguments are provided by the HistoryRange overload.
     /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
     /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
-    public async Task<QueryReader<MessageInfo>> GetMessageHistoryAsync(string? peerAccountId = null, CancellationToken cancellationToken = default)
+    public Task<QueryReader<MessageInfo>> GetMessageHistoryAsync(string? peerAccountId, CancellationToken cancellationToken) =>
+        GetMessageHistoryCoreAsync(peerAccountId, null, null, cancellationToken);
+
+    /// <summary>
+    /// Opens a snapshot reader for locally stored direct messages, optionally restricted to one peer.
+    /// </summary>
+    /// <param name="peerAccountId">An optional peer account filter; <see langword="null"/> includes all direct messages.</param>
+    /// <param name="range">The optional exclusive local sequence bounds, copied when this method is called. Null means unbounded.</param>
+    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
+    /// <remarks>
+    /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
+    /// Each batch is returned in ascending sequence order. With before, successive batches move toward older messages; otherwise they move toward newer messages.
+    /// When reopening, use the first item of a backward batch as before, or the last item of a forward batch as after.
+    /// Sequence bounds must be nonnegative safe integers; when both are supplied, after must be less than before and before determines the direction.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
+    /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
+    /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
+    /// <exception cref="ArgumentException">The history bounds or resource scope are invalid.</exception>
+    public Task<QueryReader<MessageInfo>> GetMessageHistoryAsync(string? peerAccountId = null, HistoryRange? range = null, CancellationToken cancellationToken = default)
+    {
+        long? after = null, before = null;
+        if (range is not null) (after, before) = range;
+        return GetMessageHistoryCoreAsync(peerAccountId, after, before, cancellationToken);
+    }
+
+    async Task<QueryReader<MessageInfo>> GetMessageHistoryCoreAsync(string? peerAccountId, long? after, long? before, CancellationToken cancellationToken)
     {
         EnsureInitialized();
         using var operation = BeginOperation(ref cancellationToken);
@@ -205,9 +234,11 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
             var records = database.Messages.AsNoTracking().Where(value => value.IsDirect);
             if (peerAccountId is not null)
                 records = records.Where(value => value.Sender == Options.AccountId && value.Recipient == peerAccountId || value.Sender == peerAccountId && value.Recipient == Options.AccountId);
-            return records.OrderBy(value => value.CreatedAt).ThenBy(value => value.MessageId).ThenBy(value => value.Sender)
-                .Select(record => ToMessage(record));
-        }, cancellationToken).ConfigureAwait(false);
+            if (after.HasValue) records = records.Where(value => value.LocalSequence > after.Value);
+            if (before.HasValue) records = records.Where(value => value.LocalSequence < before.Value);
+            var ordered = before.HasValue ? records.OrderByDescending(value => value.LocalSequence) : records.OrderBy(value => value.LocalSequence);
+            return ordered.Select(record => ToMessage(record));
+        }, cancellationToken, reverseBatch: before.HasValue).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -14,13 +14,15 @@ function decodeRow(row: Row): StoredRecord {
     return { collection: row.collection, key: row.key, revision: row.revision, value: requireObject(parseJson(row.value)) };
 }
 
-function selection(query: RecordQuery): { where: string; parameters: SQLInputValue[]; order: string } {
+function selection(query: RecordQuery): { where: string; parameters: SQLInputValue[]; order: string; limit: number | undefined } {
     validateRecordQuery(query);
     const parameters: SQLInputValue[] = [query.collection];
     let where = 'collection = ?';
     if (query.key !== undefined) { where += ' AND key = ?'; parameters.push(query.key); }
     else if (query.prefix !== undefined) { where += ' AND key >= ? AND key < ?'; parameters.push(query.prefix, query.prefix + '\uffff'); }
-    return { where, parameters, order: query.reverse ? 'DESC' : 'ASC' };
+    if (query.after !== undefined) { where += ' AND key > ?'; parameters.push(query.after); }
+    if (query.before !== undefined) { where += ' AND key < ?'; parameters.push(query.before); }
+    return { where, parameters, order: query.reverse ? 'DESC' : 'ASC', limit: query.limit };
 }
 
 /** SQLite WAL storage with explicit migration, account binding, and fixed readers. */
@@ -94,8 +96,8 @@ export class NodeSqliteStore implements MeshlineStore {
         database.exec('BEGIN DEFERRED');
         try {
             const version = (database.prepare('SELECT version FROM meshline_meta WHERE id = 1').get() as { version: number }).version;
-            const sets = selections.map(query => (database.prepare(`SELECT * FROM meshline_records WHERE ${query.where} ORDER BY key ${query.order}`)
-                .all(...query.parameters) as unknown as Row[]).map(decodeRow));
+            const sets = selections.map(query => (database.prepare(`SELECT * FROM meshline_records WHERE ${query.where} ORDER BY key ${query.order} LIMIT ?`)
+                .all(...query.parameters, query.limit ?? -1) as unknown as Row[]).map(decodeRow));
             throwIfAborted(signal);
             database.exec('COMMIT');
             return { version, sets };
@@ -172,6 +174,8 @@ class SqliteReader implements QueryReader<StoredRecord> {
         requireBatchCount(count);
         throwIfAborted(signal);
         if (this.completed) return [];
+        count = Math.min(count, this.query.limit === undefined ? count : this.query.limit - this.offset);
+        if (count <= 0) { this.completed = true; return []; }
         const rows = this.database.prepare(`SELECT * FROM meshline_records WHERE ${this.query.where} ORDER BY key ${this.query.order} LIMIT ? OFFSET ?`)
             .all(...this.query.parameters, count, this.offset) as unknown as Row[];
         const values = rows.map(decodeRow);

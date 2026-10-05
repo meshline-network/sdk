@@ -12,6 +12,10 @@ public sealed class ChannelPostInfo
     /// </summary>
     public required ChannelPostRef Ref { get; init; }
     /// <summary>
+    /// The local read position for this channel conversation, equal to the original publication's <see cref="ChannelPostRef.Sequence"/> in <see cref="Ref"/>. Edits retain this position.
+    /// </summary>
+    public long LocalSequence => Ref.Sequence;
+    /// <summary>
     /// The message's canonical <c>msg_</c> identifier.
     /// </summary>
     public required string MessageId { get; init; }

@@ -9,6 +9,7 @@
 - [`Body`](#Meshline.Models.Client.GroupMessageInfo.Body)
 - [`CreatedAt`](#Meshline.Models.Client.GroupMessageInfo.CreatedAt)
 - [`Group`](#Meshline.Models.Client.GroupMessageInfo.Group)
+- [`LocalSequence`](#Meshline.Models.Client.GroupMessageInfo.LocalSequence)
 - [`MessageId`](#Meshline.Models.Client.GroupMessageInfo.MessageId)
 - [`ReplyToSequence`](#Meshline.Models.Client.GroupMessageInfo.ReplyToSequence)
 - [`Sender`](#Meshline.Models.Client.GroupMessageInfo.Sender)
@@ -82,6 +83,19 @@ public Meshline.Models.Client.GroupRef Group { get; init; }
 
 #### Property Value
 [GroupRef](Meshline.Models.Client.GroupRef.md 'Meshline\.Models\.Client\.GroupRef')
+
+<a name='Meshline.Models.Client.GroupMessageInfo.LocalSequence'></a>
+
+## GroupMessageInfo\.LocalSequence Property
+
+The local read position for this group conversation, equal to [Sequence](Meshline.Models.Client.GroupMessageInfo.md#Meshline.Models.Client.GroupMessageInfo.Sequence 'Meshline\.Models\.Client\.GroupMessageInfo\.Sequence')\. This alias uses the hosting relay's group\-scoped timeline sequence\.
+
+```csharp
+public long LocalSequence { get; }
+```
+
+#### Property Value
+[System\.Int64](https://learn.microsoft.com/en-us/dotnet/api/system.int64 'System\.Int64')
 
 <a name='Meshline.Models.Client.GroupMessageInfo.MessageId'></a>
 

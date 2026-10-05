@@ -54,18 +54,25 @@ async function transaction<T>(database: IDBDatabase, stores: string[], mode: IDB
     } finally { signal?.removeEventListener('abort', abort); }
 }
 
-function keyRange(query: RecordQuery): IDBKeyRange {
+function keyRange(query: RecordQuery): IDBKeyRange | undefined {
     validateRecordQuery(query);
-    if (query.key !== undefined) return IDBKeyRange.only([query.collection, query.key]);
+    if (query.key !== undefined) {
+        if (query.after !== undefined && query.key <= query.after || query.before !== undefined && query.key >= query.before) return undefined;
+        return IDBKeyRange.only([query.collection, query.key]);
+    }
     const prefix = query.prefix ?? '';
-    return IDBKeyRange.bound([query.collection, prefix], [query.collection, prefix + '\uffff']);
+    const lower = query.after !== undefined && query.after >= prefix ? query.after : prefix;
+    const upper = query.before !== undefined && query.before < prefix + '\uffff' ? query.before : prefix + '\uffff';
+    if (lower >= upper) return undefined;
+    return IDBKeyRange.bound([query.collection, lower], [query.collection, upper], lower === query.after, true);
 }
 
 function decode(record: DiskRecord): StoredRecord {
     return { collection: record.collection, key: record.key, revision: record.revision, value: requireObject(parseJson(record.value)) };
 }
 
-function scan(store: IDBObjectStore, range: IDBKeyRange, reverse: boolean, visit: (cursor: IDBCursorWithValue) => boolean | void): Promise<void> {
+function scan(store: IDBObjectStore, range: IDBKeyRange | undefined, reverse: boolean, visit: (cursor: IDBCursorWithValue) => boolean | void): Promise<void> {
+    if (range === undefined) return Promise.resolve();
     return new Promise((resolve, reject) => {
         const operation = store.openCursor(range, reverse ? 'prev' : 'next');
         operation.onerror = () => reject(operation.error);
@@ -157,13 +164,13 @@ export class IndexedDbStore implements MeshlineStore {
     }
 
     read(queries: readonly RecordQuery[], signal?: AbortSignal): Promise<StoreSnapshot> {
-        const selections = queries.map(query => ({ range: keyRange(query), reverse: query.reverse ?? false }));
+        const selections = queries.map(query => ({ range: keyRange(query), reverse: query.reverse ?? false, limit: query.limit }));
         return this.gate.run(() => transaction(this.connection(), ['meta', 'records'], 'readonly', async tx => {
             const version = (await request(tx.objectStore('meta').get('version')) as { value: number }).value;
             const sets: StoredRecord[][] = [];
             for (const query of selections) {
                 const values: StoredRecord[] = [];
-                await scan(tx.objectStore('records'), query.range, query.reverse, cursor => { values.push(decode(cursor.value as DiskRecord)); });
+                await scan(tx.objectStore('records'), query.range, query.reverse, cursor => { values.push(decode(cursor.value as DiskRecord)); return query.limit === undefined || values.length < query.limit; });
                 sets.push(values);
             }
             return { version, sets };
@@ -189,6 +196,7 @@ export class IndexedDbStore implements MeshlineStore {
     openQuery(query: RecordQuery, signal?: AbortSignal): Promise<QueryReader<StoredRecord>> {
         const range = keyRange(query);
         const reverse = query.reverse ?? false;
+        const limit = query.limit;
         return this.gate.run(async () => {
             const database = this.connection();
             const owner = this.owner!;
@@ -197,6 +205,7 @@ export class IndexedDbStore implements MeshlineStore {
                 let index = 0;
                 await scan(tx.objectStore('records'), range, reverse, cursor => {
                     tx.objectStore('snapshots').add({ owner, reader: id, index: index++, record: cursor.value as DiskRecord });
+                    return limit === undefined || index < limit;
                 });
             }, signal);
             const reader = new IndexedDbReader(database, owner, id, () => this.readers.delete(reader));

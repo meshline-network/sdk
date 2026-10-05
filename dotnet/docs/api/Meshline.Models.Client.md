@@ -40,6 +40,7 @@ Application\-facing options, drafts, queries, result models, and pagination type
 | [GroupMessageInfo](Meshline.Models.Client.GroupMessageInfo.md 'Meshline\.Models\.Client\.GroupMessageInfo') | Contains a verified and decrypted group message from the locally stored timeline\. |
 | [GroupRef](Meshline.Models.Client.GroupRef.md 'Meshline\.Models\.Client\.GroupRef') | Identifies a group and the relay hosting it\. |
 | [GroupUpdate](Meshline.Models.Client.GroupUpdate.md 'Meshline\.Models\.Client\.GroupUpdate') | Describes metadata field updates for a group\. |
+| [HistoryRange](Meshline.Models.Client.HistoryRange.md 'Meshline\.Models\.Client\.HistoryRange') | Selects adjacent batches of local history using exclusive sequence bounds\. |
 | [MessageInfo](Meshline.Models.Client.MessageInfo.md 'Meshline\.Models\.Client\.MessageInfo') | Contains a verified and decrypted direct message retained in local storage\. |
 | [MessageRef](Meshline.Models.Client.MessageRef.md 'Meshline\.Models\.Client\.MessageRef') | Identifies a direct message by the sender account and message identifier\. |
 | [MessageSendStatus](Meshline.Models.Client.MessageSendStatus.md 'Meshline\.Models\.Client\.MessageSendStatus') | Contains the locally tracked submission and delivery state of an outgoing direct message\. |

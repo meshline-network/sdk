@@ -9,6 +9,7 @@
 - [`Attachments`](#Meshline.Models.Client.ChannelPostInfo.Attachments)
 - [`Author`](#Meshline.Models.Client.ChannelPostInfo.Author)
 - [`Body`](#Meshline.Models.Client.ChannelPostInfo.Body)
+- [`LocalSequence`](#Meshline.Models.Client.ChannelPostInfo.LocalSequence)
 - [`MessageId`](#Meshline.Models.Client.ChannelPostInfo.MessageId)
 - [`Ref`](#Meshline.Models.Client.ChannelPostInfo.Ref)
 
@@ -79,6 +80,19 @@ public Meshline.Models.Protocol.MessageBody? Body { get; init; }
 
 #### Property Value
 [MessageBody](Meshline.Models.Protocol.MessageBody.md 'Meshline\.Models\.Protocol\.MessageBody')
+
+<a name='Meshline.Models.Client.ChannelPostInfo.LocalSequence'></a>
+
+## ChannelPostInfo\.LocalSequence Property
+
+The local read position for this channel conversation, equal to the original publication's [Sequence](Meshline.Models.Client.ChannelPostRef.md#Meshline.Models.Client.ChannelPostRef.Sequence 'Meshline\.Models\.Client\.ChannelPostRef\.Sequence') in [Ref](Meshline.Models.Client.ChannelPostInfo.md#Meshline.Models.Client.ChannelPostInfo.Ref 'Meshline\.Models\.Client\.ChannelPostInfo\.Ref')\. Edits retain this position\.
+
+```csharp
+public long LocalSequence { get; }
+```
+
+#### Property Value
+[System\.Int64](https://learn.microsoft.com/en-us/dotnet/api/system.int64 'System\.Int64')
 
 <a name='Meshline.Models.Client.ChannelPostInfo.MessageId'></a>
 

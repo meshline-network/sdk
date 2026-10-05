@@ -17,6 +17,7 @@
 - [`FollowAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.FollowAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`GetChannelAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.GetChannelAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`GetFollowedAsync(string, CancellationToken)`](#Meshline.Components.ChannelManager.GetFollowedAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`GetPostsAsync(string, string, HistoryRange, CancellationToken)`](#Meshline.Components.ChannelManager.GetPostsAsync%28string%2Cstring%2CMeshline.Models.Client.HistoryRange%2CSystem.Threading.CancellationToken%29)
 - [`GetPostsAsync(string, string, CancellationToken)`](#Meshline.Components.ChannelManager.GetPostsAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.ChannelManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`LoadChannelHistoryAsync(ChannelRef, PageRequest, CancellationToken)`](#Meshline.Components.ChannelManager.LoadChannelHistoryAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
@@ -603,6 +604,69 @@ The SQLite database cannot be opened or a database command fails, for example be
 ### Remarks
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
+<a name='Meshline.Components.ChannelManager.GetPostsAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)'></a>
+
+## ChannelManager\.GetPostsAsync\(string, string, HistoryRange, CancellationToken\) Method
+
+Opens a snapshot reader for locally stored, undeleted channel posts matching the supplied filters\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.ChannelPostInfo>> GetPostsAsync(string? channelId=null, string? author=null, Meshline.Models.Client.HistoryRange? range=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ChannelManager.GetPostsAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).channelId'></a>
+
+`channelId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+An optional channel identifier filter; [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') includes all values\.
+
+<a name='Meshline.Components.ChannelManager.GetPostsAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).author'></a>
+
+`author` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+An optional author account filter; [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') includes all authors\.
+
+<a name='Meshline.Components.ChannelManager.GetPostsAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).range'></a>
+
+`range` [HistoryRange](Meshline.Models.Client.HistoryRange.md 'Meshline\.Models\.Client\.HistoryRange')
+
+The optional exclusive local sequence bounds, copied when this method is called\. Null means unbounded\.
+
+<a name='Meshline.Components.ChannelManager.GetPostsAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[Meshline\.Storage\.QueryReader&lt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[ChannelPostInfo](Meshline.Models.Client.ChannelPostInfo.md 'Meshline\.Models\.Client\.ChannelPostInfo')[&gt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+A snapshot reader for the matching local results\. The caller must dispose the reader after use\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation observes cancellation of [cancellationToken](Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.GetPostsAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.ChannelManager\.GetPostsAsync\(string, string, Meshline\.Models\.Client\.HistoryRange, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component or a component used by the operation has been disposed\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The history bounds or resource scope are invalid\.
+
+### Remarks
+This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.<br>
+Each batch is returned in ascending sequence order\. With before, successive batches move toward older messages; otherwise they move toward newer messages\.<br>
+When reopening, use the first item of a backward batch as before, or the last item of a forward batch as after\.<br>
+Sequence bounds must be nonnegative safe integers; when both are supplied, after must be less than before and before determines the direction\.<br>
+Supply channelId when using sequence bounds\.
+
 <a name='Meshline.Components.ChannelManager.GetPostsAsync(string,string,System.Threading.CancellationToken)'></a>
 
 ## ChannelManager\.GetPostsAsync\(string, string, CancellationToken\) Method
@@ -610,7 +674,7 @@ This query reads local storage without fetching missing relay history\. Its snap
 Opens a snapshot reader for locally stored, undeleted channel posts matching the supplied filters\.
 
 ```csharp
-public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.ChannelPostInfo>> GetPostsAsync(string? channelId=null, string? author=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.ChannelPostInfo>> GetPostsAsync(string? channelId, string? author, System.Threading.CancellationToken cancellationToken);
 ```
 #### Parameters
 
@@ -651,6 +715,7 @@ This component or a component used by the operation has been disposed\.
 The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
 
 ### Remarks
+This overload retains the original parameter list for binary compatibility\. Optional arguments are provided by the HistoryRange overload\.<br>
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
 <a name='Meshline.Components.ChannelManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)'></a>

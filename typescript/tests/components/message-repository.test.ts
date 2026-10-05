@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, test, vi } from 'vitest';
-import { ProtocolError, StateConflictError, certificateId, concatBytes, decryptAes, encryptAes, encodeUtf8, encryptMessage, systemRandom,
+import { ProtocolError, StateConflictError, certificateId, concatBytes, createIdentifier, decryptAes, encryptAes, encodeUtf8, encryptMessage, systemRandom,
     type MeshlineStore, type SecretProtector, type MessageTimelineEntry } from '@meshline/sdk';
 import { NodeSqliteStore } from '@meshline/storage-node';
 import { MessageRepository, messageKey, type MessageEffects } from '../../packages/sdk/dist/messages/repository.js';
@@ -17,6 +17,33 @@ afterEach(async () => { for (const store of stores.splice(0)) await store.dispos
 const from = messageDevice(context, 1, 2); const to = messageDevice(context, 3, 4);
 const relayA = `0x${'1'.repeat(40)}`; const relayB = `0x${'2'.repeat(40)}`; const id = 'msg_AAECAwQFBgcICQoLDA0ODw';
 const direct = { $type: 'meshline.message.direct', body: { content_type: 'text/plain', text: 'durable message 中文😀' } };
+
+test('legacy direct history index backfill resumes after failure and bounds each storage batch', async () => {
+    const f = await fixture();
+    const records = Array.from({ length: 600 }, (_, i) => ({ ...f.prepared, messageId: createIdentifier('message'), localSequence: i + 1 }));
+    const version = (await f.store.read([])).version;
+    await f.store.commit(version, records.map(value => ({ kind: 'put', ...messageKey(value), value: { ...value } })));
+    const commit = f.store.commit.bind(f.store); let batches = 0;
+    const failure = vi.spyOn(f.store, 'commit').mockImplementation(async (version, mutations, signal) => {
+        if (mutations.some(value => value.collection === 'message_meta' && value.key === 'history_index_v1') && ++batches === 2) throw new Error('index disk full');
+        return commit(version, mutations, signal);
+    });
+    await expect(f.repo.history()).rejects.toThrow('index disk full');
+    const checkpoint = (await f.store.read([{ collection: 'message_meta', key: 'history_index_v1' }])).sets[0]![0]!;
+    expect(checkpoint.value.complete).toBe(false); expect(checkpoint.value.after).toBeTypeOf('string');
+    failure.mockRestore(); const reads = vi.spyOn(f.store, 'read');
+    const resumed = new MessageRepository(f.options);
+    const reader = await resumed.history(from.certificate.account, undefined, { before: 601 });
+    let items;
+    try { items = await reader.readNext(3); } finally { await reader.dispose(); }
+    expect(items.map(value => value.localSequence)).toEqual([598, 599, 600]);
+    const scans = reads.mock.calls.flatMap(([queries]) => queries).filter(query => query.collection === 'messages' && query.key === undefined);
+    expect(scans.length).toBeGreaterThan(0); expect(scans.every(query => query.limit === 256 && query.after !== undefined)).toBe(true);
+    reads.mockClear();
+    const next = await resumed.history(from.certificate.account, undefined, { before: items[0]!.localSequence });
+    try { expect((await next.readNext(3)).map(value => value.localSequence)).toEqual([595, 596, 597]); } finally { await next.dispose(); }
+    expect(reads.mock.calls.flatMap(([queries]) => queries).some(query => query.collection === 'messages' && query.key === undefined)).toBe(false);
+});
 class Protector implements SecretProtector {
     readonly key = new Uint8Array(32).fill(11); readonly inputs: Uint8Array[] = []; readonly plaintexts: Uint8Array[] = []; readonly purposes: string[] = [];
     fail = false;
@@ -39,12 +66,13 @@ test('message, business effect and timeline cursor commit together and survive r
     const f = await fixture(); const effects: MessageEffects = { queries: [{ collection: 'test_contacts', key: 'peer' }], plan(snapshot) {
         expect(snapshot.sets).toHaveLength(1); return [{ kind: 'put', collection: 'test_contacts', key: 'peer', value: { updated: true } }];
     } };
-    expect(await f.repo.accept(relayA, f.entry, f.prepared, false, effects)).toEqual({ advanced: true, inserted: true });
+    expect(await f.repo.accept(relayA, f.entry, f.prepared, false, effects)).toEqual({ advanced: true, inserted: true, localSequence: 1 });
     expect(await f.repo.getProgress(relayA)).toMatchObject({ sequence: 7, hasRetentionGap: false });
     expect((await f.store.read([{ collection: 'test_contacts' }])).sets[0]![0]!.value).toEqual({ updated: true });
     await f.store.dispose(); const reopened = new NodeSqliteStore(f.path); stores.push(reopened); await reopened.initialize({ context: context.toString(), accountId: to.certificate.account });
     const repo = new MessageRepository({ ...f.options, store: reopened }); expect((await repo.readTimeline(0, 20))[0]).toMatchObject({ localSequence: 1, payload: direct });
     expect((await repo.get({ sender: from.certificate.account, messageId: id }))!.body!.text).toBe(direct.body.text);
+    expect((await repo.get({ sender: from.certificate.account, messageId: id }))!.localSequence).toBe(1);
     expect((await repo.getProgress(relayA)).sequence).toBe(7);
 });
 
@@ -99,7 +127,7 @@ test('history readers hold a stable snapshot while the local timeline uses monot
     const nextId = 'msg_EBESExQVFhcYGRobHB0eHw'; const envelope = { ...f.entry.envelope, messageId: nextId, createdAt: f.clock.wall - 10 };
     await f.repo.accept(relayA, { ...f.entry, envelope, sequence: 9 }, await f.repo.prepare(envelope, direct), false);
     expect((await reader.readNext(10)).map(value => value.key.messageId)).toEqual([id]); expect(await reader.readNext(10)).toEqual([]); await reader.dispose(); await expect(reader.readNext(1)).rejects.toThrow('disposed');
-    const latest = await f.repo.history(); expect((await latest.readNext(10)).map(value => value.key.messageId)).toEqual([nextId, id]); await latest.dispose();
+    const latest = await f.repo.history(); expect((await latest.readNext(10)).map(value => [value.localSequence, value.key.messageId])).toEqual([[1, id], [2, nextId]]); await latest.dispose();
     expect((await f.repo.readTimeline(1, 10)).map(value => [value.localSequence, value.messageId])).toEqual([[2, nextId]]);
 });
 
@@ -112,15 +140,20 @@ test('outgoing history and outbox insertion are atomic and guarded against chang
     await repo.enqueue(outbox, f.prepared, [{ query: guard, value: { revision: 2 } }]);
     const queue = new MessageOutbox(f.store, f.clock, { getHome: async () => relayA, currentHome: () => relayA, prepare: async () => { throw new Error('unused'); } });
     expect((await queue.get(id))!.state).toBe('queued'); expect((await repo.readTimeline(0, 10))[0]!.localSequence).toBe(1);
+    expect((await repo.get({ sender: from.certificate.account, messageId: id }))!.localSequence).toBe(1);
     await expect(repo.enqueue(outbox, f.prepared, [])).rejects.toThrow('already exists');
 });
 
 test('CAS contention rechecks state guards and cannot create duplicate local sequence numbers', async () => {
     const f = await fixture(); const commit = f.store.commit.bind(f.store); let conflict = true;
+    const competingEnvelope = { ...f.entry.envelope, messageId: 'msg_EBESExQVFhcYGRobHB0eHw' };
+    const competingMessage = await f.repo.prepare(competingEnvelope, direct);
     vi.spyOn(f.store, 'commit').mockImplementation(async (version, mutations, signal) => {
-        if (conflict) { conflict = false; await commit(version, [{ kind: 'put', collection: 'unrelated', key: 'x', value: {} }]); throw new StateConflictError('concurrent transaction'); }
+        if (conflict) { conflict = false; await f.repo.accept(relayB, { ...f.entry, envelope: competingEnvelope }, competingMessage, false); }
         return commit(version, mutations, signal);
     });
-    await f.repo.accept(relayA, f.entry, f.prepared, false); expect((await f.repo.readTimeline(0, 10)).map(value => value.localSequence)).toEqual([1]);
+    expect(await f.repo.accept(relayA, f.entry, f.prepared, false)).toEqual({ advanced: true, inserted: true, localSequence: 2 });
+    expect((await f.repo.get({ sender: from.certificate.account, messageId: id }))!.localSequence).toBe(2);
+    expect((await f.repo.readTimeline(0, 10)).map(value => value.localSequence)).toEqual([1, 2]);
     expect(certificateId(to.certificate, context)).toBe(to.id);
 });

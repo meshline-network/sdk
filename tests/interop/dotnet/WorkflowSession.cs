@@ -103,7 +103,7 @@ static class WorkflowSession
                 var outgoing = await sdk.MessageManager.SendMessageAsync(Text("account"), new() { Body = new() { ContentType = "text/plain", Text = Text("text") } });
                 return new { messageId = outgoing.MessageId };
             case "message-read":
-                await using (var history = await sdk.MessageManager.GetMessageHistoryAsync()) return new { messages = (await history.ReadNextAsync(100)).Select(value => new { messageId = value.Key.MessageId, text = value.Body?.Text }) };
+                await using (var history = await sdk.MessageManager.GetMessageHistoryAsync()) return new { messages = (await history.ReadNextAsync(100)).Select(value => new { localSequence = value.LocalSequence, messageId = value.Key.MessageId, sender = value.Key.Sender, recipient = value.Recipient, createdAt = value.CreatedAt.ToUnixTimeSeconds(), text = value.Body?.Text }) };
             case "history-open":
                 var readerId = Text("reader");
                 if (current.HistoryReaders.ContainsKey(readerId)) throw new InvalidOperationException("History reader already exists.");
@@ -162,7 +162,7 @@ static class WorkflowSession
                 var kinds = request.TryGetProperty("kinds", out var kindValues) ? kindValues.EnumerateArray().Aggregate((ConversationKind)0, (all, kind) => all | Enum.Parse<ConversationKind>(kind.GetString()!, ignoreCase: true)) : ConversationKind.All;
                 var filter = new ConversationQuery { Kind = kinds, UnreadOnly = request.TryGetProperty("unreadOnly", out var unread) && unread.GetBoolean(), HasMessages = request.TryGetProperty("hasMessages", out var hasMessages) ? hasMessages.GetBoolean() : null };
                 await using (var query = await sdk.GetConversationsAsync(filter)) return new { conversations = (await query.ReadNextAsync(100)).Select(value => new { conversationId = value.ConversationId, kind = value.Kind.ToString(), unreadCount = value.UnreadCount, text = value.Latest?.Text, timestamp = value.Latest?.Timestamp.ToUnixTimeSeconds(), hasAttachments = value.Latest?.HasAttachments }) };
-            case "mark-read": await sdk.MarkReadAsync(Text("conversationId")); break;
+            case "mark-read": await sdk.MarkReadAsync(Text("conversationId"), request.GetProperty("localSequence").GetInt64()); break;
             default: throw new ArgumentException("Unsupported workflow operation.");
         }
         return new { route = sdk.Route?.ToJson(), deviceState = sdk.DeviceState?.ToJson(), device = sdk.Device?.ToJson(), profile = sdk.Profile?.ToJson() };

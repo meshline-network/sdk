@@ -28,6 +28,7 @@
 - [`GetInvitesAsync(GroupRef, PageRequest, CancellationToken)`](#Meshline.Components.GroupManager.GetInvitesAsync%28Meshline.Models.Client.GroupRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
 - [`GetKeyRecoveryRequestsAsync(GroupRef, PageRequest, CancellationToken)`](#Meshline.Components.GroupManager.GetKeyRecoveryRequestsAsync%28Meshline.Models.Client.GroupRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
 - [`GetMembersAsync(GroupRef, Nullable<GroupRole>, string, CancellationToken)`](#Meshline.Components.GroupManager.GetMembersAsync%28Meshline.Models.Client.GroupRef%2CSystem.Nullable_Meshline.Models.Protocol.GroupRole_%2Cstring%2CSystem.Threading.CancellationToken%29)
+- [`GetMessagesAsync(string, string, HistoryRange, CancellationToken)`](#Meshline.Components.GroupManager.GetMessagesAsync%28string%2Cstring%2CMeshline.Models.Client.HistoryRange%2CSystem.Threading.CancellationToken%29)
 - [`GetMessagesAsync(string, string, CancellationToken)`](#Meshline.Components.GroupManager.GetMessagesAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.GroupManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`LeaveGroupAsync(GroupRef, CancellationToken)`](#Meshline.Components.GroupManager.LeaveGroupAsync%28Meshline.Models.Client.GroupRef%2CSystem.Threading.CancellationToken%29)
@@ -1382,6 +1383,69 @@ The role filter is not a defined enum value\.
 ### Remarks
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
+<a name='Meshline.Components.GroupManager.GetMessagesAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)'></a>
+
+## GroupManager\.GetMessagesAsync\(string, string, HistoryRange, CancellationToken\) Method
+
+Opens a snapshot reader for locally stored decrypted group messages matching the supplied filters\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.GroupMessageInfo>> GetMessagesAsync(string? groupId=null, string? sender=null, Meshline.Models.Client.HistoryRange? range=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.GroupManager.GetMessagesAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).groupId'></a>
+
+`groupId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+An optional group identifier filter; [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') includes all values\.
+
+<a name='Meshline.Components.GroupManager.GetMessagesAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).sender'></a>
+
+`sender` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+An optional sender account filter; [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') includes all senders\.
+
+<a name='Meshline.Components.GroupManager.GetMessagesAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).range'></a>
+
+`range` [HistoryRange](Meshline.Models.Client.HistoryRange.md 'Meshline\.Models\.Client\.HistoryRange')
+
+The optional exclusive local sequence bounds, copied when this method is called\. Null means unbounded\.
+
+<a name='Meshline.Components.GroupManager.GetMessagesAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[Meshline\.Storage\.QueryReader&lt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[GroupMessageInfo](Meshline.Models.Client.GroupMessageInfo.md 'Meshline\.Models\.Client\.GroupMessageInfo')[&gt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+A snapshot reader for the matching local results\. The caller must dispose the reader after use\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation observes cancellation of [cancellationToken](Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetMessagesAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.GroupManager\.GetMessagesAsync\(string, string, Meshline\.Models\.Client\.HistoryRange, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component or a component used by the operation has been disposed\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The history bounds or resource scope are invalid\.
+
+### Remarks
+This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.<br>
+Each batch is returned in ascending sequence order\. With before, successive batches move toward older messages; otherwise they move toward newer messages\.<br>
+When reopening, use the first item of a backward batch as before, or the last item of a forward batch as after\.<br>
+Sequence bounds must be nonnegative safe integers; when both are supplied, after must be less than before and before determines the direction\.<br>
+Supply groupId when using sequence bounds\.
+
 <a name='Meshline.Components.GroupManager.GetMessagesAsync(string,string,System.Threading.CancellationToken)'></a>
 
 ## GroupManager\.GetMessagesAsync\(string, string, CancellationToken\) Method
@@ -1389,7 +1453,7 @@ This query reads local storage without fetching missing relay history\. Its snap
 Opens a snapshot reader for locally stored decrypted group messages matching the supplied filters\.
 
 ```csharp
-public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.GroupMessageInfo>> GetMessagesAsync(string? groupId=null, string? sender=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.GroupMessageInfo>> GetMessagesAsync(string? groupId, string? sender, System.Threading.CancellationToken cancellationToken);
 ```
 #### Parameters
 
@@ -1430,6 +1494,7 @@ This component or a component used by the operation has been disposed\.
 The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
 
 ### Remarks
+This overload retains the original parameter list for binary compatibility\. Optional arguments are provided by the HistoryRange overload\.<br>
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
 <a name='Meshline.Components.GroupManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)'></a>

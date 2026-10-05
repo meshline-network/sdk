@@ -23,6 +23,7 @@ import { signingInput } from '../protocol/context.js';
 import type { ProtocolCodec } from '../protocol/codec.js';
 import { canonicalJson, requireObject, requireSafeInteger, type JsonObject } from '../protocol/json.js';
 import type { ResourceSyncStatus } from '../models/resource-sync.js';
+import { historyArguments, historySelection, historyQuery, historyReader, type HistoryRange } from '../models/history.js';
 import { ResourceSyncTracker, type SyncBlock } from '../runtime/resource-sync.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { AsyncPulse } from '../runtime/async-pulse.js';
@@ -478,7 +479,7 @@ export class GroupManager extends ClientComponent {
     }
     #messageInfo(group: GroupRef, record: JsonObject): GroupMessageInfo | undefined {
         if (!record.isMessage || !record.decryptedPayload) return undefined; const event = groupEventCodec.decode(record.event!); const envelope = groupMessageEnvelopeCodec.decode(event.payload); const sender = requireObject(record.message!);
-        return { ...groupMessageCodec.decode(record.decryptedPayload), group, sequence: event.sequence, messageId: envelope.messageId, sender: String(sender.sender), senderDeviceId: event.signerDeviceId!, createdAt: envelope.createdAt, acceptedAt: event.acceptedAt };
+        return { ...groupMessageCodec.decode(record.decryptedPayload), group, sequence: event.sequence, get localSequence(): number { return this.sequence; }, messageId: envelope.messageId, sender: String(sender.sender), senderDeviceId: event.signerDeviceId!, createdAt: envelope.createdAt, acceptedAt: event.acceptedAt };
     }
     #sendPayload(group: GroupRef, payload: JsonObject, signal?: AbortSignal): Promise<GroupMessageInfo | undefined> {
         group = { ...group }; validateGroupRef(group); validateGroupPayload(payload);
@@ -509,13 +510,29 @@ export class GroupManager extends ClientComponent {
         return this.runOperation(async scope => snapshotReader((await this.#repository.get(group, scope))?.members.filter(member => (!copy.role || copy.role === member.role) && (!copy.search || member.account.includes(copy.search) || member.nickname?.includes(copy.search))).map(member => ({ accountId: member.account, role: member.role, memberEncryptionPublicKey: member.memberEncryptionPublicKey, ...(member.nickname === undefined ? {} : { nickname: member.nickname }) })).sort((a, b) => ordinal(a.accountId, b.accountId)) ?? []), signal);
     }
     getBans(group: GroupRef, search?: string, signal?: AbortSignal): Promise<QueryReader<string>> { group = { ...group }; validateGroupRef(group); return this.runOperation(async scope => snapshotReader((await this.#repository.get(group, scope))?.bans.filter(account => !search || account.includes(search)).sort() ?? []), signal); }
-    getMessages(filter: { readonly groupId?: string; readonly sender?: string } = {}, signal?: AbortSignal): Promise<QueryReader<GroupMessageInfo>> {
+    /** Opens a fixed local snapshot ordered by group ID and sequence. */
+    getMessages(filter: { readonly groupId?: string; readonly sender?: string } | undefined, signal: AbortSignal | undefined): Promise<QueryReader<GroupMessageInfo>>;
+    /** Omitted/null range is unbounded. Bounds require one group. before reads older batches; each batch is ascending. */
+    getMessages(filter?: { readonly groupId?: string; readonly sender?: string }, range?: HistoryRange | null, signal?: AbortSignal): Promise<QueryReader<GroupMessageInfo>>;
+    getMessages(filter: { readonly groupId?: string; readonly sender?: string } = {}, rangeOrSignal?: HistoryRange | AbortSignal | null, signal?: AbortSignal): Promise<QueryReader<GroupMessageInfo>> {
+        const args = historyArguments(rangeOrSignal, signal);
         const copy = { ...filter }; if (copy.groupId !== undefined) validateIdentifier('group', copy.groupId); if (copy.sender !== undefined) validateAccountId(copy.sender);
+        const selected = historySelection(args.range);
+        if (copy.groupId === undefined && (selected.after !== undefined || selected.before !== undefined)) throw new TypeError('groupId is required for sequence bounds.');
         return this.runOperation(async scope => {
-            const snapshot = await this.#store.read([{ collection: 'groups' }, { collection: 'group_events', ...(copy.groupId ? { prefix: `${copy.groupId}|` } : {}) }], scope); const relays = new Map(snapshot.sets[0]!.map(row => [row.key, String(row.value.relayId)]));
+            if (copy.groupId !== undefined) {
+                const row = (await this.#store.read([{ collection: 'groups', key: copy.groupId }], scope)).sets[0]![0];
+                if (!row) return snapshotReader<GroupMessageInfo>([]);
+                const group = { groupId: copy.groupId, relayId: String(row.value.relayId) };
+                const query = historyQuery('group_events', `${copy.groupId}|`, selected);
+                return historyReader(await this.#store.openQuery(query, scope), query, rows => rows.flatMap(record => {
+                    const value = this.#messageInfo(group, record.value); return value && (copy.sender === undefined || value.sender === copy.sender) ? [value] : [];
+                }));
+            }
+            const snapshot = await this.#store.read([{ collection: 'groups' }, { collection: 'group_events' }], scope); const relays = new Map(snapshot.sets[0]!.map(row => [row.key, String(row.value.relayId)]));
             const messages = snapshot.sets[1]!.flatMap(row => { const groupId = row.key.split('|')[0]!; const relayId = relays.get(groupId); if (!relayId) throw new ProtocolError('invalid_storage', 'Stored group event has no hosting association.'); const message = this.#messageInfo({ groupId, relayId }, row.value); return message && (!copy.sender || copy.sender === message.sender) ? [message] : []; });
-            return snapshotReader(messages.sort((a, b) => a.createdAt - b.createdAt || ordinal(a.group.groupId, b.group.groupId) || a.sequence - b.sequence));
-        }, signal);
+            return snapshotReader(messages.sort((a, b) => ordinal(a.group.groupId, b.group.groupId) || a.sequence - b.sequence));
+        }, args.signal);
     }
     protected override async onStart(signal: AbortSignal): Promise<void> {
         void this.#device.certificate; this.#pulse = new AsyncPulse(); this.#detachMessages = this.#accountMessages.on('timelineChanged', () => this.#pulse?.pulse());

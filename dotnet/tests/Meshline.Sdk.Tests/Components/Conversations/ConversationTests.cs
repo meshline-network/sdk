@@ -3,7 +3,7 @@ using Meshline.Models.Protocol;
 using Meshline.Storage;
 using Meshline.Tests.Support;
 
-namespace Meshline.Tests.Components.Messages;
+namespace Meshline.Tests.Components.Conversations;
 
 public sealed class ConversationTests
 {
@@ -57,7 +57,8 @@ public sealed class ConversationTests
             Assert.All(rows, row => Assert.Equal(1, row.UnreadCount));
         }
 
-        await fixture.Client.MarkReadAsync(second.AccountId, Token);
+        await using (var history = await fixture.Client.MessageManager.GetMessageHistoryAsync(second.AccountId, Token))
+            await fixture.Client.MarkReadAsync(second.AccountId, Assert.Single(await history.ReadNextAsync(10, Token)).LocalSequence, Token);
 
         await fixture.ReopenAsync();
 

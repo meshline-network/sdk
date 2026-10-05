@@ -16,19 +16,21 @@ public sealed class QueryReader<T> : IAsyncDisposable
     readonly MeshlineDbContext _database;
     readonly SqliteTransaction _transaction;
     readonly IQueryable<T> _query;
+    readonly bool _reverseBatch;
     readonly SemaphoreSlim _gate = new(1, 1);
     int _offset;
     bool _completed;
     bool _disposed;
 
-    QueryReader(MeshlineDbContext database, SqliteTransaction transaction, IQueryable<T> query)
+    QueryReader(MeshlineDbContext database, SqliteTransaction transaction, IQueryable<T> query, bool reverseBatch)
     {
         _database = database;
         _transaction = transaction;
         _query = query;
+        _reverseBatch = reverseBatch;
     }
 
-    internal static async Task<QueryReader<T>> OpenAsync(DatabaseOptions options, Func<MeshlineDbContext, IQueryable<T>> query, CancellationToken cancellationToken)
+    internal static async Task<QueryReader<T>> OpenAsync(DatabaseOptions options, Func<MeshlineDbContext, IQueryable<T>> query, CancellationToken cancellationToken, bool reverseBatch = false)
     {
         var database = new MeshlineDbContext(options, SqliteOpenMode.ReadOnly);
         SqliteTransaction? transaction = null;
@@ -39,7 +41,7 @@ public sealed class QueryReader<T> : IAsyncDisposable
             await database.Database.UseTransactionAsync(transaction, cancellationToken).ConfigureAwait(false);
             // The first table read fixes the snapshot before the reader is returned.
             _ = await database.Bindings.AnyAsync(cancellationToken).ConfigureAwait(false);
-            return new(database, transaction, query(database));
+            return new(database, transaction, query(database), reverseBatch);
         }
         catch
         {
@@ -60,7 +62,7 @@ public sealed class QueryReader<T> : IAsyncDisposable
     /// </summary>
     /// <param name="count">The positive maximum number of items to read in this batch.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
-    /// <returns>Up to <paramref name="count"/> items in query order, or an empty list when the snapshot is exhausted.</returns>
+    /// <returns>Up to <paramref name="count"/> items in the order specified by the originating query API, or an empty list when the snapshot is exhausted.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is not positive. A stored sequence or Unix timestamp is outside the range supported by the result model.</exception>
     /// <exception cref="ObjectDisposedException">The reader has been disposed.</exception>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>.</exception>
@@ -81,6 +83,7 @@ public sealed class QueryReader<T> : IAsyncDisposable
             var items = await _query.Skip(_offset).Take(count).ToListAsync(cancellationToken).ConfigureAwait(false);
             _offset = checked(_offset + items.Count);
             _completed = items.Count < count;
+            if (_reverseBatch) items.Reverse();
             return items.AsReadOnly();
         }
         finally

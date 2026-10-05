@@ -15,6 +15,11 @@ export interface RecordQuery {
     readonly key?: string;
     readonly prefix?: string;
     readonly reverse?: boolean;
+    /** Exclusive key bounds, intersected with key/prefix. */
+    readonly after?: string;
+    readonly before?: string;
+    /** Maximum rows in the selection, including when opened as a fixed reader. */
+    readonly limit?: number;
 }
 
 export type StoreMutation = (RecordKey & { readonly kind: 'put'; readonly value: JsonObject })
@@ -60,6 +65,8 @@ export function validateRecordQuery(query: RecordQuery): void {
         throw new ProtocolError('invalid_storage_query', 'Specify either key or prefix.');
     validateRecordKey({ collection: query.collection, key: query.key ?? query.prefix ?? '' });
     if (query.reverse !== undefined && typeof query.reverse !== 'boolean') throw new ProtocolError('invalid_storage_query', 'reverse must be boolean.');
+    for (const key of [query.after, query.before]) if (key !== undefined) validateRecordKey({ collection: query.collection, key });
+    if (query.limit !== undefined) requireBatchCount(query.limit);
 }
 
 /** Copies and validates a commit before an adapter opens its write transaction. */

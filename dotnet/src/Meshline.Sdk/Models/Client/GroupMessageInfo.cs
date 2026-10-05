@@ -16,6 +16,10 @@ public sealed class GroupMessageInfo
     /// </summary>
     public required long Sequence { get; init; }
     /// <summary>
+    /// The local read position for this group conversation, equal to <see cref="Sequence"/>. This alias uses the hosting relay's group-scoped timeline sequence.
+    /// </summary>
+    public long LocalSequence => Sequence;
+    /// <summary>
     /// The message's canonical <c>msg_</c> identifier.
     /// </summary>
     public required string MessageId { get; init; }

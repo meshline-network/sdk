@@ -22,6 +22,7 @@
 - [`GetContactRequestsAsync(string, ContactRequestDirection, CancellationToken)`](#Meshline.Components.MessageManager.GetContactRequestsAsync%28string%2CMeshline.Models.Client.ContactRequestDirection%2CSystem.Threading.CancellationToken%29)
 - [`GetContactsAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetContactsAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetMessageAsync(MessageRef, CancellationToken)`](#Meshline.Components.MessageManager.GetMessageAsync%28Meshline.Models.Client.MessageRef%2CSystem.Threading.CancellationToken%29)
+- [`GetMessageHistoryAsync(string, HistoryRange, CancellationToken)`](#Meshline.Components.MessageManager.GetMessageHistoryAsync%28string%2CMeshline.Models.Client.HistoryRange%2CSystem.Threading.CancellationToken%29)
 - [`GetMessageHistoryAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetMessageHistoryAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetOutboxAsync(string, MessageSendState, CancellationToken)`](#Meshline.Components.MessageManager.GetOutboxAsync%28string%2CMeshline.Models.Client.MessageSendState%2CSystem.Threading.CancellationToken%29)
 - [`GetSendStatusAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetSendStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
@@ -680,6 +681,62 @@ The SQLite database cannot be opened or a database command fails, for example be
 [System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
 A stored or received protocol document cannot be serialized or deserialized\.
 
+<a name='Meshline.Components.MessageManager.GetMessageHistoryAsync(string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)'></a>
+
+## MessageManager\.GetMessageHistoryAsync\(string, HistoryRange, CancellationToken\) Method
+
+Opens a snapshot reader for locally stored direct messages, optionally restricted to one peer\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.MessageInfo>> GetMessageHistoryAsync(string? peerAccountId=null, Meshline.Models.Client.HistoryRange? range=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.MessageManager.GetMessageHistoryAsync(string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).peerAccountId'></a>
+
+`peerAccountId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+An optional peer account filter; [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') includes all direct messages\.
+
+<a name='Meshline.Components.MessageManager.GetMessageHistoryAsync(string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).range'></a>
+
+`range` [HistoryRange](Meshline.Models.Client.HistoryRange.md 'Meshline\.Models\.Client\.HistoryRange')
+
+The optional exclusive local sequence bounds, copied when this method is called\. Null means unbounded\.
+
+<a name='Meshline.Components.MessageManager.GetMessageHistoryAsync(string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[Meshline\.Storage\.QueryReader&lt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[MessageInfo](Meshline.Models.Client.MessageInfo.md 'Meshline\.Models\.Client\.MessageInfo')[&gt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+A snapshot reader for the matching local results\. The caller must dispose the reader after use\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation observes cancellation of [cancellationToken](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetMessageHistoryAsync(string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.MessageManager\.GetMessageHistoryAsync\(string, Meshline\.Models\.Client\.HistoryRange, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component or a component used by the operation has been disposed\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The history bounds or resource scope are invalid\.
+
+### Remarks
+This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.<br>
+Each batch is returned in ascending sequence order\. With before, successive batches move toward older messages; otherwise they move toward newer messages\.<br>
+When reopening, use the first item of a backward batch as before, or the last item of a forward batch as after\.<br>
+Sequence bounds must be nonnegative safe integers; when both are supplied, after must be less than before and before determines the direction\.
+
 <a name='Meshline.Components.MessageManager.GetMessageHistoryAsync(string,System.Threading.CancellationToken)'></a>
 
 ## MessageManager\.GetMessageHistoryAsync\(string, CancellationToken\) Method
@@ -687,7 +744,7 @@ A stored or received protocol document cannot be serialized or deserialized\.
 Opens a snapshot reader for locally stored direct messages, optionally restricted to one peer\.
 
 ```csharp
-public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.MessageInfo>> GetMessageHistoryAsync(string? peerAccountId=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.MessageInfo>> GetMessageHistoryAsync(string? peerAccountId, System.Threading.CancellationToken cancellationToken);
 ```
 #### Parameters
 
@@ -722,6 +779,7 @@ This component or a component used by the operation has been disposed\.
 The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
 
 ### Remarks
+This overload retains the original parameter list for binary compatibility\. Optional arguments are provided by the HistoryRange overload\.<br>
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
 <a name='Meshline.Components.MessageManager.GetOutboxAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken)'></a>

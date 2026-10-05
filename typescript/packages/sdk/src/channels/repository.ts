@@ -11,9 +11,14 @@ import { canonicalJson, requireObject, requireSafeInteger, type JsonObject } fro
 import type { MeshlineStore, QueryReader, RecordKey, RecordQuery, StoredRecord, StoreMutation, StoreSnapshot } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
 import { snapshotReader } from '../messages/repository.js';
+import { historySelection, historyQuery, historyReader, type HistoryRange } from '../models/history.js';
 
 export interface ChannelInfo { readonly ref: ChannelRef; readonly descriptor?: ChannelDescriptor; readonly isFollowed: boolean }
-export interface ChannelPostInfo { readonly ref: ChannelPostRef; readonly messageId: string; readonly author: string; readonly acceptedAt: number; readonly body?: MessageBody; readonly attachments?: readonly ContentReference[] }
+export interface ChannelPostInfo {
+    /** Local read position for this channel conversation; an alias of ref.sequence, the original publication position retained across edits. */
+    readonly localSequence: number;
+    readonly ref: ChannelPostRef; readonly messageId: string; readonly author: string; readonly acceptedAt: number; readonly body?: MessageBody; readonly attachments?: readonly ContentReference[];
+}
 export interface ChannelPostChange { readonly ref: ChannelPostRef; readonly kind: 'added' | 'edited' | 'deleted'; readonly info?: ChannelPostInfo }
 export interface ChannelChanges { readonly channel?: ChannelInfo; readonly posts: readonly ChannelPostChange[] }
 export interface ChannelRecord { readonly channel: ChannelRef; readonly descriptor?: ChannelDescriptor; readonly syncSequence: number; readonly isFollowed: boolean }
@@ -66,7 +71,7 @@ function encodePost(value: PostRecord): JsonObject { return { sequence: value.se
 function postInfo(record: PostRecord, channel: ChannelRef): ChannelPostInfo | undefined {
     if (record.isDeleted || !record.post) return undefined;
     if (!record.messageId || !record.author || record.acceptedAt === undefined) throw new ProtocolError('invalid_storage', 'Visible post lacks its original publication metadata.');
-    return { ref: { channel, sequence: record.sequence }, messageId: record.messageId, author: record.author, acceptedAt: record.acceptedAt,
+    return { ref: { channel, sequence: record.sequence }, get localSequence(): number { return this.ref.sequence; }, messageId: record.messageId, author: record.author, acceptedAt: record.acceptedAt,
         ...(record.post.body ? { body: record.post.body } : {}), ...(record.post.attachments ? { attachments: record.post.attachments } : {}) };
 }
 function target(event: ChannelEvent): number | undefined { return event.payload.kind === 'post' ? event.sequence : event.payload.kind === 'edit' || event.payload.kind === 'delete' ? event.payload.value.targetSequence : undefined; }
@@ -87,8 +92,18 @@ export class ChannelRepository {
         validateChannelPostRef(post); const rows = await this.store.read([channelKey(post.channel), postKey(post.channel, post.sequence)], signal); decodeChannel(rows.sets[0]![0]?.value, post.channel);
         const row = rows.sets[1]![0]; return row && postInfo(decodePost(row.value), post.channel);
     }
-    async posts(channelId?: string, author?: string, signal?: AbortSignal): Promise<QueryReader<ChannelPostInfo>> {
-        const rows = await this.store.read([{ collection: 'channel_posts', ...(channelId ? { prefix: `${channelId}|` } : {}) }, { collection: 'channels' }], signal);
+    async posts(channelId?: string, author?: string, signal?: AbortSignal, bounds: HistoryRange = {}): Promise<QueryReader<ChannelPostInfo>> {
+        const selected = historySelection(bounds);
+        if (channelId !== undefined) {
+            const row = (await this.store.read([{ collection: 'channels', key: channelId }], signal)).sets[0]![0];
+            if (!row) return snapshotReader<ChannelPostInfo>([]);
+            const channel = { channelId, relayId: String(row.value.relayId) };
+            const query = historyQuery('channel_posts', `${channelId}|`, selected);
+            return historyReader(await this.store.openQuery(query, signal), query, rows => rows.flatMap(row => {
+                const value = postInfo(decodePost(row.value), channel); return value && (author === undefined || value.author === author) ? [value] : [];
+            }));
+        }
+        const rows = await this.store.read([{ collection: 'channel_posts' }, { collection: 'channels' }], signal);
         const channels = new Map(rows.sets[1]!.map(row => [row.key, { channelId: row.key, relayId: String(row.value.relayId) }]));
         const values = rows.sets[0]!.map(row => postInfo(decodePost(row.value), channels.get(row.key.split('|')[0]!)!)).filter((value): value is ChannelPostInfo => value !== undefined && (author === undefined || value.author === author));
         return snapshotReader(values);

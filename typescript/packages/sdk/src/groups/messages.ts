@@ -13,6 +13,8 @@ import { decodeGroupProjection, encodeGroupProjection, groupEpochKey, groupEvent
 import type { GroupProjection } from './state.js';
 
 export interface GroupMessageInfo extends GroupMessage {
+    /** Local read position for this group conversation; an alias of the relay-assigned, group-scoped sequence. */
+    readonly localSequence: number;
     readonly group: GroupRef; readonly sequence: number; readonly messageId: string; readonly sender: string; readonly senderDeviceId: string; readonly createdAt: number; readonly acceptedAt: number;
 }
 export interface GroupMessageProcessingResult { readonly state: 'waitingForKey' | 'processed' | 'alreadyProcessed'; readonly requiresKey?: boolean; readonly message?: GroupMessageInfo; readonly nicknameChanged?: boolean; readonly groupRecord?: JsonObject; readonly error?: ProtocolError }
@@ -83,7 +85,7 @@ export class GroupMessageProcessor {
                 const isMessage = content.$type === 'meshline.group.message.content';
                 mutations.push({ kind: 'put', ...groupEventKey(group, sequence), value: { ...current, decryptedPayload: content, isMessage } });
                 return { mutations, result: { state: 'processed', ...(groupRecord ? { nicknameChanged: true, groupRecord } : {}), ...(isMessage ? { message: {
-                    ...groupMessageCodec.decode(content), group: { ...group }, sequence, sender: sender.account, senderDeviceId: event.signerDeviceId!, messageId: envelope.messageId, createdAt: envelope.createdAt, acceptedAt: event.acceptedAt,
+                    ...groupMessageCodec.decode(content), group: { ...group }, sequence, get localSequence(): number { return this.sequence; }, sender: sender.account, senderDeviceId: event.signerDeviceId!, messageId: envelope.messageId, createdAt: envelope.createdAt, acceptedAt: event.acceptedAt,
                 } } : {}) } as GroupMessageProcessingResult };
             }
             return { mutations, result };

@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "89dac696856c54ab5fc11d27b5dbd56ca6de6b86122673280eee5c5b95959097",
+  "sourceSha256": "7c5d2668cf47a8969ab63decfc662ba4a262f37c3d042a4a4935a8a68516a01c",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1125,6 +1125,13 @@
       "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
     },
     {
+      "symbol": "M:Meshline.Components.ChannelManager.GetPostsAsync(System.String,System.String,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.GetPostsAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/channel.ts",
+      "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+    },
+    {
       "symbol": "M:Meshline.Components.ChannelManager.GetPostsAsync(System.String,System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.GetPostsAsync(string,string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1475,6 +1482,13 @@
       "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
     },
     {
+      "symbol": "M:Meshline.Components.GroupManager.GetMessagesAsync(System.String,System.String,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetMessagesAsync(string,string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/group.ts",
+      "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
+    },
+    {
       "symbol": "M:Meshline.Components.GroupManager.GetMessagesAsync(System.String,System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetMessagesAsync(string,string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1666,6 +1680,13 @@
     {
       "symbol": "M:Meshline.Components.MessageManager.GetMessageAsync(Meshline.Models.Client.MessageRef,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetMessageAsync(Meshline.Models.Client.MessageRef,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
+      "symbol": "M:Meshline.Components.MessageManager.GetMessageHistoryAsync(System.String,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetMessageHistoryAsync(string,Meshline.Models.Client.HistoryRange,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/message.ts",
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
@@ -1972,6 +1993,13 @@
       "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
     },
     {
+      "symbol": "M:Meshline.MeshlineClient.MarkReadAsync(System.String,System.Int64,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client.ts",
+      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+    },
+    {
       "symbol": "M:Meshline.MeshlineClient.MarkReadAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.MarkReadAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -2012,6 +2040,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/group.ts",
       "notes": "Invitation client references and usage snapshots; client GroupInvite is named GroupInvitation to distinguish the signed protocol object."
+    },
+    {
+      "symbol": "M:Meshline.Models.Client.HistoryRange.Deconstruct(System.Nullable{System.Int64}@,System.Nullable{System.Int64}@)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.HistoryRange.md#Meshline.Models.Client.HistoryRange.Deconstruct(System.Nullable_long_,System.Nullable_long_)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/history.ts",
+      "notes": "Shared exclusive sequence bounds for local history overloads; before selects earlier batches, with each batch ascending. C# Deconstruct validates the bounds; TypeScript uses object destructuring without validation and validates ranges when opening history queries."
     },
     {
       "symbol": "M:Meshline.Models.FieldUpdate`1.#ctor(`0)",
@@ -3918,6 +3953,13 @@
       "notes": "Verified local channel/post snapshots; stored projections retain original author and acceptance time."
     },
     {
+      "symbol": "P:Meshline.Models.Client.ChannelPostInfo.LocalSequence",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ChannelPostInfo.md#Meshline.Models.Client.ChannelPostInfo.LocalSequence",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/channels/repository.ts",
+      "notes": "Verified local channel/post snapshots; stored projections retain original author and acceptance time."
+    },
+    {
       "symbol": "P:Meshline.Models.Client.ChannelPostInfo.MessageId",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ChannelPostInfo.md#Meshline.Models.Client.ChannelPostInfo.MessageId",
       "status": "mapped-requires-behavior-review",
@@ -4471,6 +4513,13 @@
       "notes": "Authenticated decrypted message snapshot with sender identity and accepted sequence."
     },
     {
+      "symbol": "P:Meshline.Models.Client.GroupMessageInfo.LocalSequence",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.GroupMessageInfo.md#Meshline.Models.Client.GroupMessageInfo.LocalSequence",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/groups/messages.ts",
+      "notes": "Authenticated decrypted message snapshot with sender identity and accepted sequence."
+    },
+    {
       "symbol": "P:Meshline.Models.Client.GroupMessageInfo.MessageId",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.GroupMessageInfo.md#Meshline.Models.Client.GroupMessageInfo.MessageId",
       "status": "mapped-requires-behavior-review",
@@ -4548,6 +4597,20 @@
       "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
     },
     {
+      "symbol": "P:Meshline.Models.Client.HistoryRange.After",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.HistoryRange.md#Meshline.Models.Client.HistoryRange.After",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/history.ts",
+      "notes": "Shared exclusive sequence bounds for local history overloads; before selects earlier batches, with each batch ascending. C# Deconstruct validates the bounds; TypeScript uses object destructuring without validation and validates ranges when opening history queries."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.HistoryRange.Before",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.HistoryRange.md#Meshline.Models.Client.HistoryRange.Before",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/history.ts",
+      "notes": "Shared exclusive sequence bounds for local history overloads; before selects earlier batches, with each batch ascending. C# Deconstruct validates the bounds; TypeScript uses object destructuring without validation and validates ranges when opening history queries."
+    },
+    {
       "symbol": "P:Meshline.Models.Client.MessageInfo.Attachments",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.MessageInfo.md#Meshline.Models.Client.MessageInfo.Attachments",
       "status": "mapped-requires-behavior-review",
@@ -4571,6 +4634,13 @@
     {
       "symbol": "P:Meshline.Models.Client.MessageInfo.Key",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.MessageInfo.md#Meshline.Models.Client.MessageInfo.Key",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/messages/repository.ts",
+      "notes": "Local direct-message snapshot with sender/device/recipient identity and immutable query-reader snapshots."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.MessageInfo.LocalSequence",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.MessageInfo.md#Meshline.Models.Client.MessageInfo.LocalSequence",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/messages/repository.ts",
       "notes": "Local direct-message snapshot with sender/device/recipient identity and immutable query-reader snapshots."
@@ -7927,6 +7997,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/group.ts",
       "notes": "Current group client models; GroupUpdate is named GroupUpdateOptions to distinguish its protocol object."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.HistoryRange",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.HistoryRange.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/history.ts",
+      "notes": "Shared exclusive sequence bounds for local history overloads; before selects earlier batches, with each batch ascending. C# Deconstruct validates the bounds; TypeScript uses object destructuring without validation and validates ranges when opening history queries."
     },
     {
       "symbol": "T:Meshline.Models.Client.MessageInfo",

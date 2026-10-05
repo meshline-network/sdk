@@ -5,6 +5,24 @@ const networks: GroupNetwork[] = []; afterEach(async () => { for (const network 
 async function fixture() { const network = new GroupNetwork(); networks.push(network); const owner = await network.client(51); const peer = await network.client(52); return { network, owner, peer, relayId: network.network.descriptor.relayId }; }
 async function all<T>(query: Promise<QueryReader<T>>): Promise<readonly T[]> { const reader = await query; try { return await reader.readNext(100); } finally { await reader.dispose(); } }
 
+test.each([false, true])('message batches follow group then sequence despite older creation times (filter group: %s)', async filterGroup => {
+    const { network, owner, relayId } = await fixture();
+    const groups = [(await owner.groups.createGroup(relayId, { name: 'one', memberCapacity: 2 })).ref,
+        (await owner.groups.createGroup(relayId, { name: 'two', memberCapacity: 2 })).ref].sort((a, b) => a.groupId < b.groupId ? -1 : 1);
+    const first = groups[0]!; const second = groups[1]!; network.network.clock.wall += 60;
+    await owner.groups.sendMessage(second, { body: { contentType: 'text/plain', text: 'second group first' } });
+    await owner.groups.sendMessage(first, { body: { contentType: 'text/plain', text: 'first group first' } });
+    network.network.clock.wall -= 20;
+    await owner.groups.sendMessage(second, { body: { contentType: 'text/plain', text: 'second group second' } });
+    await owner.groups.sendMessage(first, { body: { contentType: 'text/plain', text: 'first group second' } });
+    const reader = await owner.groups.getMessages(filterGroup ? { groupId: first.groupId } : {});
+    try {
+        for (const text of filterGroup ? ['first group first', 'first group second'] : ['first group first', 'first group second', 'second group first', 'second group second'])
+            expect((await reader.readNext(1))[0]!.body!.text).toBe(text);
+        expect(await reader.readNext(1)).toEqual([]);
+    } finally { await reader.dispose(); }
+});
+
 test('an explicitly empty hosting-relay filter cannot expand a group query to all relays', async () => {
     const { owner, relayId } = await fixture(); const group = await owner.groups.createGroup(relayId, { name: 'scoped query', memberCapacity: 2 });
     expect((await all(owner.groups.getGroups({ relayId }))).map(value => value.ref)).toEqual([group.ref]);

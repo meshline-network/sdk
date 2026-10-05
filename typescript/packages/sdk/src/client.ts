@@ -59,7 +59,15 @@ export class MeshlineClient extends ClientComponent {
     on<K extends keyof MeshlineClientEvents>(event: K, listener: EventListener<MeshlineClientEvents[K]>): () => void { return this.#events.on(event, listener); }
     getConversations(query: ConversationQuery = {}, signal?: AbortSignal) { const copy = { ...query, ...(query.kinds ? { kinds: [...query.kinds] } : {}) }; return this.runOperation(scope => this.#conversations.list(copy, scope), signal); }
     getConversation(conversationId: string, signal?: AbortSignal) { return this.runOperation(scope => this.#conversations.get(conversationId, scope), signal); }
-    async markRead(conversationId: string, signal?: AbortSignal): Promise<void> { if (await this.runOperation(scope => this.#conversations.markRead(conversationId, scope), signal)) this.#queueConversation(conversationId); }
+    /** Marks through the latest locally readable message, including arrivals since an earlier query. */
+    markRead(conversationId: string, signal?: AbortSignal): Promise<void>;
+    /** Marks through the supplied message position inclusively, leaving later positions unread. */
+    markRead(conversationId: string, localSequence: number, signal?: AbortSignal): Promise<void>;
+    async markRead(conversationId: string, localSequenceOrSignal?: number | AbortSignal, signal?: AbortSignal): Promise<void> {
+        const localSequence = typeof localSequenceOrSignal === 'number' ? localSequenceOrSignal : undefined;
+        const cancellation = typeof localSequenceOrSignal === 'number' ? signal : localSequenceOrSignal;
+        if (await this.runOperation(scope => this.#conversations.markRead(conversationId, localSequence, scope), cancellation)) this.#queueConversation(conversationId);
+    }
     #queueConversation(id: string): void { if (this.#conversationLifetime.signal.aborted) return; this.#pendingConversations.add(id); this.#conversationPulse.pulse(); }
     async #observeConversations(): Promise<void> {
         const signal = this.#conversationLifetime.signal;

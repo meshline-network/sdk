@@ -24,7 +24,9 @@ function selection(query: RecordQuery) {
     let where = 'collection = ?'; const parameters: (string | number | null)[] = [query.collection];
     if (query.key !== undefined) { where += ' AND key = ?'; parameters.push(query.key); }
     else if (query.prefix !== undefined) { where += ' AND key >= ? AND key < ?'; parameters.push(query.prefix, query.prefix + '\uffff'); }
-    return { where, parameters, order: query.reverse ? 'DESC' : 'ASC' };
+    if (query.after !== undefined) { where += ' AND key > ?'; parameters.push(query.after); }
+    if (query.before !== undefined) { where += ' AND key < ?'; parameters.push(query.before); }
+    return { where, parameters, order: query.reverse ? 'DESC' : 'ASC', limit: query.limit };
 }
 
 /** Serialized private writer and independent WAL snapshots, with no transaction spanning application callbacks. */
@@ -92,7 +94,7 @@ export class NativeSqliteStore implements MeshlineStore {
             return transaction(database, 'DEFERRED', async () => {
                 const version = (await database.getFirstAsync<{ version: number }>('SELECT version FROM meshline_meta WHERE id = 1'))!.version;
                 const sets: StoredRecord[][] = [];
-                for (const query of selected) sets.push((await database.getAllAsync<Row>(`SELECT * FROM meshline_records WHERE ${query.where} ORDER BY key ${query.order}`, ...query.parameters)).map(decodeRow));
+                for (const query of selected) sets.push((await database.getAllAsync<Row>(`SELECT * FROM meshline_records WHERE ${query.where} ORDER BY key ${query.order} LIMIT ?`, ...query.parameters, query.limit ?? -1)).map(decodeRow));
                 return { version, sets };
             }, signal);
         }, signal);
@@ -171,6 +173,8 @@ class NativeReader implements QueryReader<StoredRecord> {
         return this.#gate.run(async () => {
             if (this.#disposed) throw new Error('Reader is disposed.');
             throwIfAborted(signal); if (this.#completed) return [];
+            count = Math.min(count, this.query.limit === undefined ? count : this.query.limit - this.#offset);
+            if (count <= 0) { this.#completed = true; return []; }
             const rows = await this.database.getAllAsync<Row>(`SELECT * FROM meshline_records WHERE ${this.query.where} ORDER BY key ${this.query.order} LIMIT ? OFFSET ?`, ...this.query.parameters, count, this.#offset);
             const records = rows.map(decodeRow); throwIfAborted(signal);
             this.#offset += records.length; this.#completed = records.length < count;

@@ -15,6 +15,7 @@ import { snapshotReader } from '../messages/repository.js';
 import { nextRevision } from '../protocol/context.js';
 import { canonicalJson, requireObject, requireSafeInteger } from '../protocol/json.js';
 import type { ResourceSyncStatus } from '../models/resource-sync.js';
+import { historyArguments, historySelection, type HistoryRange } from '../models/history.js';
 import { ResourceSyncTracker } from '../runtime/resource-sync.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { AsyncPulse } from '../runtime/async-pulse.js';
@@ -198,8 +199,16 @@ export class ChannelManager extends ClientComponent {
             return { items, ...(result.page.hasMore ? { nextCursor: String(result.page.events[0]!.sequence) } : {}) };
         }, scope), signal);
     }
-    getPosts(query: { readonly channelId?: string; readonly author?: string } = {}, signal?: AbortSignal): Promise<QueryReader<ChannelPostInfo>> {
-        const { channelId, author } = query; if (channelId !== undefined) validateIdentifier('channel', channelId); if (author !== undefined) validateAccountId(author); return this.runOperation(scope => this.#repository.posts(channelId, author, scope), signal);
+    /** Opens a fixed local snapshot of undeleted posts ordered by channel ID and sequence. */
+    getPosts(query: { readonly channelId?: string; readonly author?: string } | undefined, signal: AbortSignal | undefined): Promise<QueryReader<ChannelPostInfo>>;
+    /** Omitted/null range is unbounded. Bounds require one channel and refer to original publication sequences. before reads older batches; each batch is ascending. */
+    getPosts(query?: { readonly channelId?: string; readonly author?: string }, range?: HistoryRange | null, signal?: AbortSignal): Promise<QueryReader<ChannelPostInfo>>;
+    getPosts(query: { readonly channelId?: string; readonly author?: string } = {}, rangeOrSignal?: HistoryRange | AbortSignal | null, signal?: AbortSignal): Promise<QueryReader<ChannelPostInfo>> {
+        const args = historyArguments(rangeOrSignal, signal);
+        const copy = { ...query }; if (copy.channelId !== undefined) validateIdentifier('channel', copy.channelId); if (copy.author !== undefined) validateAccountId(copy.author);
+        const selected = historySelection(args.range);
+        if (copy.channelId === undefined && (selected.after !== undefined || selected.before !== undefined)) throw new TypeError('channelId is required for sequence bounds.');
+        return this.runOperation(scope => this.#repository.posts(copy.channelId, copy.author, scope, args.range), args.signal);
     }
     async follow(channel: ChannelRef, signal?: AbortSignal): Promise<void> {
         channel = { ...channel }; validateChannelRef(channel); await this.getChannel(channel, signal);

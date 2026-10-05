@@ -323,6 +323,7 @@ sealed partial class MessageManager
         var payload = ProtocolModel.FromJson<DirectMessage>(record.PayloadJson!)!;
         return new()
         {
+            LocalSequence = record.LocalSequence,
             Key = new() { Sender = record.Sender, MessageId = record.MessageId },
             SenderDeviceId = record.SenderDeviceId,
             Recipient = record.Recipient,

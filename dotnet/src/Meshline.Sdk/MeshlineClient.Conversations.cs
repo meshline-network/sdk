@@ -61,6 +61,11 @@ sealed partial class MeshlineClient
     /// <param name="conversationId">The peer account identifier for a direct conversation, or the group or channel identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
+    /// <remarks>
+    /// This overload marks all currently stored readable messages as read, including arrivals since an earlier query.
+    /// To acknowledge only messages already viewed, use the overload that accepts their <c>LocalSequence</c>.
+    /// An empty conversation is a no-op, and the read position never moves backward.
+    /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The conversation kind cannot be handled by the local read-position update.</exception>
     /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
@@ -68,14 +73,42 @@ sealed partial class MeshlineClient
     /// <exception cref="DbUpdateException">Persisting local changes fails, including database constraint or optimistic-concurrency failures.</exception>
     /// <exception cref="ArgumentException">The conversation identifier is not a valid peer account, group, or channel identifier.</exception>
     /// <exception cref="NotSupportedException">A direct-conversation identifier uses an unsupported account namespace.</exception>
-    public async Task MarkReadAsync(string conversationId, CancellationToken cancellationToken = default)
+    public Task MarkReadAsync(string conversationId, CancellationToken cancellationToken = default) =>
+        MarkReadCoreAsync(conversationId, null, cancellationToken);
+
+    /// <summary>
+    /// Advances a conversation's local read position through the supplied message position, inclusively.
+    /// </summary>
+    /// <param name="conversationId">The peer account identifier for a direct conversation, or the group or channel identifier.</param>
+    /// <param name="localSequence">The positive <c>LocalSequence</c> of a message the application has read in this conversation.</param>
+    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <returns>A task that completes when the operation finishes.</returns>
+    /// <remarks>
+    /// The position only advances; repeated or older positions are no-ops. New messages beyond this fixed boundary remain unread.
+    /// Advancing requires a locally stored direct message, decrypted group message, or known original channel publication at this position.
+    /// A channel publication remains a valid boundary after deletion while its original metadata is retained.
+    /// This is a cumulative read position, so filtered or incomplete history must not be treated as proof that every earlier message was read.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The conversation kind cannot be handled by the local read-position update.</exception>
+    /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
+    /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
+    /// <exception cref="DbUpdateException">Persisting local changes fails, including database constraint or optimistic-concurrency failures.</exception>
+    /// <exception cref="ArgumentException">The conversation identifier is not a valid peer account, group, or channel identifier.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The position is not positive, or advancing to it would not identify a locally known message in this conversation.</exception>
+    /// <exception cref="NotSupportedException">A direct-conversation identifier uses an unsupported account namespace.</exception>
+    public Task MarkReadAsync(string conversationId, long localSequence, CancellationToken cancellationToken = default) =>
+        MarkReadCoreAsync(conversationId, localSequence, cancellationToken);
+
+    async Task MarkReadCoreAsync(string conversationId, long? localSequence, CancellationToken cancellationToken)
     {
         EnsureInitialized();
         using var operation = BeginOperation(ref cancellationToken);
         var kind = GetConversationKind(conversationId);
+        if (localSequence.HasValue) ArgumentOutOfRangeException.ThrowIfNegativeOrZero(localSequence.Value, nameof(localSequence));
         await using var database = new MeshlineDbContext(_databaseOptions);
         await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-        var sequence = kind switch
+        var sequence = localSequence ?? (kind switch
         {
             ConversationKind.Direct => await database.Messages.Where(value => value.IsDirect &&
                 (value.Sender == Options.AccountId && value.Recipient == conversationId || value.Sender == conversationId && value.Recipient == Options.AccountId))
@@ -85,10 +118,22 @@ sealed partial class MeshlineClient
             ConversationKind.Channel => await database.ChannelPosts.Where(value => value.ChannelId == conversationId && !value.IsDeleted && value.PostJson != null)
                 .MaxAsync(value => (long?)value.Sequence, cancellationToken).ConfigureAwait(false),
             _ => throw new InvalidOperationException("Unsupported conversation kind.")
-        };
+        });
         if (sequence is null) return;
         var record = await database.ConversationReads.FindAsync([conversationId], cancellationToken).ConfigureAwait(false);
         if (record is not null && record.Sequence >= sequence.Value) return;
+        if (localSequence.HasValue)
+        {
+            var known = kind switch
+            {
+                ConversationKind.Direct => await database.Messages.AnyAsync(value => value.IsDirect && value.LocalSequence == localSequence.Value &&
+                    (value.Sender == Options.AccountId && value.Recipient == conversationId || value.Sender == conversationId && value.Recipient == Options.AccountId), cancellationToken).ConfigureAwait(false),
+                ConversationKind.Group => await database.GroupEvents.AnyAsync(value => value.GroupId == conversationId && value.Sequence == localSequence.Value && value.IsMessage && value.DecryptedPayloadJson != null, cancellationToken).ConfigureAwait(false),
+                ConversationKind.Channel => await database.ChannelPosts.AnyAsync(value => value.ChannelId == conversationId && value.Sequence == localSequence.Value && value.MessageId != null, cancellationToken).ConfigureAwait(false),
+                _ => throw new InvalidOperationException("Unsupported conversation kind.")
+            };
+            if (!known) throw new ArgumentOutOfRangeException(nameof(localSequence), "The position does not identify a locally known message in this conversation.");
+        }
         if (record is null)
             database.ConversationReads.Add(new() { ConversationId = conversationId, Sequence = sequence.Value });
         else

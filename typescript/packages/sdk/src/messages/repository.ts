@@ -10,11 +10,16 @@ import { throwIfAborted, type RuntimeClock } from '../runtime/clock.js';
 import { requireBatchCount, type MeshlineStore, type QueryReader, type RecordKey, type RecordQuery, type StoredRecord, type StoreMutation, type StoreSnapshot } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
 import { encodeOutbox, outboxKey, type OutboxRecord } from './outbox.js';
+import { historyIndex, historyQuery, historyReader, historySelection, validateHistoryRows, type HistoryRange } from '../models/history.js';
 
 export interface MessageKey { readonly sender: string; readonly messageId: string }
 export interface MessageInfo extends DirectMessage {
+    /** Monotonically assigned position in this database's account-message stream; gaps are allowed. Not comparable across databases or with relay sequences. */
+    readonly localSequence: number;
     readonly key: MessageKey; readonly senderDeviceId: string; readonly recipient: string; readonly createdAt: number;
 }
+type MessageAcceptance = { readonly advanced: boolean; readonly inserted: false }
+    | { readonly advanced: true; readonly inserted: true; readonly localSequence: number };
 export interface AccountMessage {
     readonly localSequence: number; readonly sender: string; readonly senderDeviceId: string; readonly recipient: string; readonly messageId: string; readonly payload: JsonObject;
 }
@@ -41,6 +46,7 @@ export const messageKey = (value: MessageKey): RecordKey => {
 };
 export const timelineKey = (relayId: string): RecordKey => { validateRelayId(relayId); return { collection: 'message_timelines', key: relayId }; };
 const sequenceKey: RecordKey = { collection: 'message_meta', key: 'local_sequence' };
+const historyMarker: RecordKey = { collection: 'message_meta', key: 'history_index_v1' };
 const secretTypes = new Set(['meshline.account.group.state.sync', 'meshline.account.group.history_secret.sync']);
 const fingerprint = (value: JsonObject | undefined): string => canonicalJson(value ?? null);
 function progress(value: JsonObject | undefined): TimelineProgress {
@@ -129,15 +135,42 @@ export class MessageRepository {
     }
     #info(value: StoredMessage): MessageInfo {
         this.#belongsToAccount(value); const direct = directMessageCodec.decode(value.payload!); validateDirectMessage(direct);
-        return { ...direct, key: { sender: value.sender, messageId: value.messageId }, senderDeviceId: value.senderDeviceId, recipient: value.recipient, createdAt: value.createdAt };
+        return { ...direct, localSequence: value.localSequence, key: { sender: value.sender, messageId: value.messageId }, senderDeviceId: value.senderDeviceId, recipient: value.recipient, createdAt: value.createdAt };
     }
-    async history(peer?: string, signal?: AbortSignal): Promise<QueryReader<MessageInfo>> {
+    async history(peer?: string, signal?: AbortSignal, bounds: HistoryRange = {}): Promise<QueryReader<MessageInfo>> {
         if (peer !== undefined) validateAccountId(peer);
-        const snapshot = await this.options.store.read([{ collection: 'messages' }], signal);
-        const records = snapshot.sets[0]!.map(decodeMessage).filter(value => value.payloadType === 'meshline.message.direct' && (peer === undefined
-            || value.sender === this.options.accountId && value.recipient === peer || value.sender === peer && value.recipient === this.options.accountId))
-            .sort((a, b) => a.createdAt - b.createdAt || compare(a.messageId, b.messageId) || compare(a.sender, b.sender));
-        return snapshotReader(records.map(value => this.#info(value)));
+        const selected = historySelection(bounds);
+        await this.#ensureHistoryIndex(signal);
+        const prefix = `${peer ?? '*'}|`; const query = historyQuery('message_history', prefix, selected);
+        const reader = await this.options.store.openQuery(query, signal);
+        return historyReader(reader, query, async (indexes, readSignal) => {
+            const records = (await this.options.store.read(indexes.map(row => messageKey({ sender: String(row.value.sender), messageId: String(row.value.messageId) })), readSignal)).sets;
+            return records.map((rows, index) => {
+                if (rows.length !== 1) throw new ProtocolError('invalid_storage', 'History index references a missing message.');
+                const value = decodeMessage(rows[0]!);
+                if (value.payloadType !== 'meshline.message.direct' || prefix + historyIndex(value.localSequence) !== indexes[index]!.key
+                    || peer !== undefined && !(value.sender === this.options.accountId && value.recipient === peer || value.sender === peer && value.recipient === this.options.accountId))
+                    throw new ProtocolError('invalid_storage', 'History index differs from its message.');
+                return this.#info(value);
+            });
+        });
+    }
+    async #ensureHistoryIndex(signal?: AbortSignal): Promise<void> {
+        // Backfill older stores in bounded atomic batches. New writes maintain both indexes in their message transaction.
+        for (;;) {
+            throwIfAborted(signal);
+            const marker = (await this.options.store.read([historyMarker], signal)).sets[0]![0]?.value;
+            if (marker?.complete === true) return;
+            if (marker?.after !== undefined && typeof marker.after !== 'string') throw new ProtocolError('invalid_storage', 'Invalid history index checkpoint.');
+            const query = { collection: 'messages', ...(marker?.after === undefined ? {} : { after: marker.after as string }), limit: 256 };
+            await updateStore(this.options.store, [historyMarker, query], snapshot => {
+                if (fingerprint(snapshot.sets[0]![0]?.value) !== fingerprint(marker)) return { mutations: [], result: undefined };
+                const rows = snapshot.sets[1]!; validateHistoryRows(rows, query);
+                const mutations = rows.flatMap(row => { const value = decodeMessage(row); this.#belongsToAccount(value); return historyMutations(value, this.options.accountId); });
+                mutations.push({ kind: 'put', ...historyMarker, value: { complete: rows.length < 256, ...(rows.length ? { after: rows.at(-1)!.key } : {}) } });
+                return { mutations, result: undefined };
+            }, signal);
+        }
     }
     async readTimeline(after: number, count: number, signal?: AbortSignal): Promise<readonly AccountMessage[]> {
         requireSafeInteger(after, 0); requireBatchCount(count);
@@ -167,30 +200,30 @@ export class MessageRepository {
             if (snapshot.sets[0]!.length || snapshot.sets[1]!.length) throw new StateConflictError('Outgoing message ID already exists.');
             guards.forEach((guard, index) => { if (fingerprint(snapshot.sets[index + 3]![0]?.value) !== fingerprint(guard.value)) throw new StateConflictError('Message authorization changed while preparing the encrypted request.'); });
             const mutations: StoreMutation[] = [{ kind: 'put', ...key, value: document }];
-            if (message) mutations.push(...insertMessage(message, snapshot.sets[2]![0]?.value));
+            if (message) mutations.push(...insertMessage(message, snapshot.sets[2]![0]?.value, this.options.accountId).mutations);
             const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(3 + guards.length) }; const effectMutations = effects?.plan(effectSnapshot) ?? [];
             mutations.push(...effectMutations);
             return { mutations, result: { snapshot: effectSnapshot, mutations: effectMutations } };
         }, signal);
         effects?.committed?.(committed.snapshot, committed.mutations);
     }
-    async accept(relayId: string, entry: MessageTimelineEntry, message: PreparedMessage, hasRetentionGap: boolean, effects?: MessageEffects, signal?: AbortSignal): Promise<{ readonly advanced: boolean; readonly inserted: boolean }> {
+    async accept(relayId: string, entry: MessageTimelineEntry, message: PreparedMessage, hasRetentionGap: boolean, effects?: MessageEffects, signal?: AbortSignal): Promise<MessageAcceptance> {
         if (!matchesEnvelope(message, entry.envelope)) throw new ProtocolError('invalid_message', 'Prepared message identity differs from the timeline envelope.');
         this.#belongsToAccount(message); requireSafeInteger(entry.sequence, 0); requireSafeInteger(entry.acceptedAt, 0);
         const key = timelineKey(relayId); const now = this.options.clock.nowSeconds(); requireSafeInteger(now, 0);
-        const result = await updateStore<{ advanced: boolean; inserted: boolean; snapshot?: StoreSnapshot; mutations?: readonly StoreMutation[] }>(this.options.store, [key, messageKey(message), sequenceKey, ...effects?.queries ?? []], snapshot => {
+        const result = await updateStore<MessageAcceptance & { snapshot?: StoreSnapshot; mutations?: readonly StoreMutation[] }>(this.options.store, [key, messageKey(message), sequenceKey, ...effects?.queries ?? []], snapshot => {
             const current = progress(snapshot.sets[0]![0]?.value);
             if (current.sequence >= entry.sequence) return { mutations: [], result: { advanced: false, inserted: false } };
             const inserted = !snapshot.sets[1]!.length;
             const mutations: StoreMutation[] = [{ kind: 'put', ...key, value: { sequence: entry.sequence, hasRetentionGap: hasRetentionGap || current.hasRetentionGap, lastSynchronizedAt: now } }];
-            const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(3) }; const effectMutations = inserted ? effects?.plan(effectSnapshot) ?? [] : [];
-            if (inserted) {
-                mutations.push(...effectMutations);
-                mutations.push(...insertMessage(message, snapshot.sets[2]![0]?.value));
-            }
-            return { mutations, result: { advanced: true, inserted, snapshot: effectSnapshot, mutations: effectMutations } };
+            if (!inserted) return { mutations, result: { advanced: true, inserted: false } };
+            const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(3) }; const effectMutations = effects?.plan(effectSnapshot) ?? [];
+            const insertion = insertMessage(message, snapshot.sets[2]![0]?.value, this.options.accountId);
+            mutations.push(...effectMutations, ...insertion.mutations);
+            return { mutations, result: { advanced: true, inserted: true, localSequence: insertion.localSequence, snapshot: effectSnapshot, mutations: effectMutations } };
         }, signal);
-        if (result.inserted) effects?.committed?.(result.snapshot!, result.mutations!); return { advanced: result.advanced, inserted: result.inserted };
+        if (!result.inserted) return { advanced: result.advanced, inserted: false };
+        effects?.committed?.(result.snapshot!, result.mutations!); return { advanced: true, inserted: true, localSequence: result.localSequence };
     }
     /** Rejected authenticated entries advance only when the receiver classifies the error as permanent protocol rejection. */
     async reject(relayId: string, sequence: number, error: ProtocolError, hasRetentionGap: boolean, signal?: AbortSignal): Promise<boolean> {
@@ -211,14 +244,20 @@ export class MessageRepository {
         }, signal);
     }
 }
-function insertMessage(value: PreparedMessage, meta: JsonObject | undefined): StoreMutation[] {
+function historyMutations(value: StoredMessage, accountId: string): StoreMutation[] {
+    if (value.payloadType !== 'meshline.message.direct') return [];
+    const peer = value.sender === accountId ? value.recipient : value.sender;
+    return ['*', peer].map(prefix => ({ kind: 'put', collection: 'message_history', key: `${prefix}|${historyIndex(value.localSequence)}`,
+        value: { sender: value.sender, messageId: value.messageId, localSequence: value.localSequence } }));
+}
+function insertMessage(value: PreparedMessage, meta: JsonObject | undefined, accountId: string): { localSequence: number; mutations: StoreMutation[] } {
     const previous = meta?.sequence ?? 0; requireSafeInteger(previous, 0); const sequence = previous + 1; requireSafeInteger(sequence, 1);
-    return [{ kind: 'put', ...messageKey(value), value: encodeMessage({ ...value, localSequence: sequence }) }, { kind: 'put', ...sequenceKey, value: { sequence } }];
+    const stored = { ...value, localSequence: sequence };
+    return { localSequence: sequence, mutations: [{ kind: 'put', ...messageKey(value), value: encodeMessage(stored) }, { kind: 'put', ...sequenceKey, value: { sequence } }, ...historyMutations(stored, accountId)] };
 }
 function matchesEnvelope(value: PreparedMessage, envelope: MessageEnvelope): boolean {
     return value.sender === envelope.from && value.messageId === envelope.messageId && value.senderDeviceId === envelope.fromDeviceId && value.recipient === envelope.to && value.createdAt === envelope.createdAt;
 }
-function compare(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }
 /** Materialized immutable query results; caller mutation of a returned page cannot affect later pages. */
 export function snapshotReader<T>(source: readonly T[]): QueryReader<T> {
     let values: readonly T[] | undefined = source; let offset = 0;

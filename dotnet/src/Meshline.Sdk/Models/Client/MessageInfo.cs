@@ -8,6 +8,10 @@ namespace Meshline.Models.Client;
 public sealed class MessageInfo
 {
     /// <summary>
+    /// The monotonically assigned sequence in this local database's account-message stream. Values may have gaps and are not comparable across databases or with relay timeline sequences.
+    /// </summary>
+    public required long LocalSequence { get; init; }
+    /// <summary>
     /// The message reference consisting of the sender account and message identifier.
     /// </summary>
     public required MessageRef Key { get; init; }

@@ -9,6 +9,22 @@ async function ready(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }) => { await ready(page); });
 
+test('bounded reverse ranges intersect prefixes and cap durable readers', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+        const h = window.meshlineHarness; await h.open('range-pages'); const store = h.stores.main!;
+        await store.commit(0, ['a1', 'a2', 'a3', 'a4', 'b1'].map((key, i) => ({ kind: 'put', collection: 'messages', key, value: { i } })));
+        const query = { collection: 'messages', prefix: 'a', after: 'a1', before: 'b1', reverse: true, limit: 2 };
+        const first = (await store.read([query])).sets[0]!.map(row => row.key);
+        const reader = await store.openQuery(query);
+        await store.commit(1, [{ kind: 'put', collection: 'messages', key: 'a5', value: { i: 5 } }]);
+        const pages = [(await reader.readNext(1)).map(row => row.key), (await reader.readNext(9)).map(row => row.key), await reader.readNext(1)];
+        await reader.dispose();
+        const empty = (await store.read([{ ...query, before: 'a1' }, { ...query, after: 'z' }, { collection: 'messages', key: 'a2', after: 'a2' }])).sets;
+        await store.dispose(); return { first, pages, empty };
+    });
+    expect(result).toEqual({ first: ['a4', 'a3'], pages: [['a4'], ['a3'], []], empty: [[], [], []] });
+});
+
 test('real IndexedDB commits records with cursors and reopens persistent state', async ({ page }) => {
     const result = await page.evaluate(async () => {
         const harness = window.meshlineHarness;

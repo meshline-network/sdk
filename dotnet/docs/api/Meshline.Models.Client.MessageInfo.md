@@ -9,6 +9,7 @@
 - [`Body`](#Meshline.Models.Client.MessageInfo.Body)
 - [`CreatedAt`](#Meshline.Models.Client.MessageInfo.CreatedAt)
 - [`Key`](#Meshline.Models.Client.MessageInfo.Key)
+- [`LocalSequence`](#Meshline.Models.Client.MessageInfo.LocalSequence)
 - [`Recipient`](#Meshline.Models.Client.MessageInfo.Recipient)
 - [`ReplyTo`](#Meshline.Models.Client.MessageInfo.ReplyTo)
 - [`SenderDeviceId`](#Meshline.Models.Client.MessageInfo.SenderDeviceId)
@@ -80,6 +81,19 @@ public Meshline.Models.Client.MessageRef Key { get; init; }
 
 #### Property Value
 [MessageRef](Meshline.Models.Client.MessageRef.md 'Meshline\.Models\.Client\.MessageRef')
+
+<a name='Meshline.Models.Client.MessageInfo.LocalSequence'></a>
+
+## MessageInfo\.LocalSequence Property
+
+The monotonically assigned sequence in this local database's account\-message stream\. Values may have gaps and are not comparable across databases or with relay timeline sequences\.
+
+```csharp
+public long LocalSequence { get; init; }
+```
+
+#### Property Value
+[System\.Int64](https://learn.microsoft.com/en-us/dotnet/api/system.int64 'System\.Int64')
 
 <a name='Meshline.Models.Client.MessageInfo.Recipient'></a>
 

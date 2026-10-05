@@ -39,6 +39,21 @@ async function create(initialize = true) {
     return { runtime, store };
 }
 const put = (key: string, value: number, collection = 'messages'): StoreMutation => ({ kind: 'put', key, collection, value: { value } });
+
+test('native bounded reverse ranges intersect prefixes and cap fixed readers across batches', async () => {
+    const { store: instance } = await create();
+    await instance.commit(0, ['a1', 'a2', 'a3', 'a4', 'b1'].map((key, i) => put(key, i)));
+    const query = { collection: 'messages', prefix: 'a', after: 'a1', before: 'b1', reverse: true, limit: 2 };
+    expect((await instance.read([query])).sets[0]!.map(row => row.key)).toEqual(['a4', 'a3']);
+    const reader = await instance.openQuery(query);
+    await instance.commit(1, [put('a5', 5)]);
+    expect((await reader.readNext(1)).map(row => row.key)).toEqual(['a4']);
+    expect((await reader.readNext(9)).map(row => row.key)).toEqual(['a3']);
+    expect(await reader.readNext(1)).toEqual([]); await reader.dispose();
+    expect((await instance.read([{ ...query, before: 'a1' }, { ...query, after: 'z' }])).sets).toEqual([[], []]);
+    expect((await instance.read([{ collection: 'messages', key: 'a2', after: 'a2' }])).sets).toEqual([[]]);
+    expect(() => instance.read([{ ...query, limit: 0 }])).toThrow();
+});
 afterEach(async () => { for (const store of stores.splice(0).reverse()) await store.dispose(); for (const directory of directories.splice(0)) await removeTestDirectory(directory); });
 
 test('native store has explicit migration and a persistent network/account binding', async () => {

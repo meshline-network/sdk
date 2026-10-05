@@ -82,7 +82,7 @@ A token that can cancel the operation\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[System\.Collections\.Generic\.IReadOnlyList&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')[T](Meshline.Storage.QueryReader_T_.md#Meshline.Storage.QueryReader_T_.T 'Meshline\.Storage\.QueryReader\<T\>\.T')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
-Up to [count](Meshline.Storage.QueryReader_T_.md#Meshline.Storage.QueryReader_T_.ReadNextAsync(int,System.Threading.CancellationToken).count 'Meshline\.Storage\.QueryReader\<T\>\.ReadNextAsync\(int, System\.Threading\.CancellationToken\)\.count') items in query order, or an empty list when the snapshot is exhausted\.
+Up to [count](Meshline.Storage.QueryReader_T_.md#Meshline.Storage.QueryReader_T_.ReadNextAsync(int,System.Threading.CancellationToken).count 'Meshline\.Storage\.QueryReader\<T\>\.ReadNextAsync\(int, System\.Threading\.CancellationToken\)\.count') items in the order specified by the originating query API, or an empty list when the snapshot is exhausted\.
 
 #### Exceptions
 

@@ -1,3 +1,4 @@
+using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Tests.Support;
 using Microsoft.EntityFrameworkCore;
@@ -121,8 +122,13 @@ public sealed class MessageEncryptionTests
         };
         var observed = AsyncTest.Signal();
         Exception? rejection = null;
+        IReadOnlyList<MessageInfo>? received = null;
         var manager = fixture.Client.MessageManager;
-        manager.MessageReceived += (_, _) => observed.TrySetResult();
+        manager.MessageReceived += (_, args) =>
+        {
+            received = args.Messages;
+            observed.TrySetResult();
+        };
         manager.BackgroundError += (_, error) =>
         {
             rejection = error.Error;
@@ -153,6 +159,13 @@ public sealed class MessageEncryptionTests
 
             var stored = await database.Messages.SingleAsync(row => row.MessageId == envelope.MessageId, Token);
 
+            Assert.True(actual.LocalSequence > 0);
+            Assert.Equal(stored.LocalSequence, actual.LocalSequence);
+            Assert.Equal(actual.LocalSequence, Assert.Single(received!).LocalSequence);
+            await using (var reader = await manager.GetMessageHistoryAsync(cancellationToken: Token))
+                Assert.Equal(actual.LocalSequence, Assert.Single(await reader.ReadNextAsync(10, Token)).LocalSequence);
+            await fixture.ReopenAsync();
+            Assert.Equal(actual.LocalSequence, (await fixture.Client.MessageManager.GetMessageAsync(actual.Key, Token))!.LocalSequence);
             Assert.NotNull(stored.PayloadJson);
             Assert.Equal(Convert.FromHexString(vector.GetProperty("plaintext_utf8_hex").GetString()!), Encoding.UTF8.GetBytes(stored.PayloadJson));
 

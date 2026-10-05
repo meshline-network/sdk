@@ -33,6 +33,10 @@ async function fixture(payloads: JsonObject[] = [direct, direct]) {
 
 test('verified messages are received once; explicit retention gaps persist with the cursor', async () => {
     const f = await fixture(); await f.sync(); expect(f.results[0]!.messages).toHaveLength(2); expect(f.results[0]!.inserted).toBe(2);
+    expect(f.results[0]!.messages.map(value => value.localSequence)).toEqual([1, 2]);
+    for (const message of f.results[0]!.messages) expect((await f.repository.get(message.key))!.localSequence).toBe(message.localSequence);
+    const history = await f.repository.history();
+    try { expect((await history.readNext(10)).map(value => value.localSequence)).toEqual([1, 2]); } finally { await history.dispose(); }
     expect(await f.repository.getProgress(relay)).toMatchObject({ sequence: 3, hasRetentionGap: true });
     await f.sync(); expect(f.cursors).toEqual([-1, 3]); expect(f.results).toHaveLength(1); expect(await f.repository.readTimeline(0, 10)).toHaveLength(2);
 });

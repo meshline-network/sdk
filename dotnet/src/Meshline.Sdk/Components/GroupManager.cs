@@ -304,26 +304,63 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
     /// <remarks>
+    /// This overload retains the original parameter list for binary compatibility. Optional arguments are provided by the HistoryRange overload.
     /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
     /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
-    public async Task<QueryReader<GroupMessageInfo>> GetMessagesAsync(string? groupId = null, string? sender = null, CancellationToken cancellationToken = default)
+    public Task<QueryReader<GroupMessageInfo>> GetMessagesAsync(string? groupId, string? sender, CancellationToken cancellationToken) =>
+        GetMessagesCoreAsync(groupId, sender, null, null, cancellationToken);
+
+    /// <summary>
+    /// Opens a snapshot reader for locally stored decrypted group messages matching the supplied filters.
+    /// </summary>
+    /// <param name="groupId">An optional group identifier filter; <see langword="null"/> includes all values.</param>
+    /// <param name="sender">An optional sender account filter; <see langword="null"/> includes all senders.</param>
+    /// <param name="range">The optional exclusive local sequence bounds, copied when this method is called. Null means unbounded.</param>
+    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
+    /// <remarks>
+    /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
+    /// Each batch is returned in ascending sequence order. With before, successive batches move toward older messages; otherwise they move toward newer messages.
+    /// When reopening, use the first item of a backward batch as before, or the last item of a forward batch as after.
+    /// Sequence bounds must be nonnegative safe integers; when both are supplied, after must be less than before and before determines the direction.
+    /// Supply groupId when using sequence bounds.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
+    /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
+    /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
+    /// <exception cref="ArgumentException">The history bounds or resource scope are invalid.</exception>
+    public Task<QueryReader<GroupMessageInfo>> GetMessagesAsync(string? groupId = null, string? sender = null, HistoryRange? range = null, CancellationToken cancellationToken = default)
+    {
+        long? after = null, before = null;
+        if (range is not null) (after, before) = range;
+        return GetMessagesCoreAsync(groupId, sender, after, before, cancellationToken);
+    }
+
+    async Task<QueryReader<GroupMessageInfo>> GetMessagesCoreAsync(string? groupId, string? sender, long? after, long? before, CancellationToken cancellationToken)
     {
         EnsureInitialized();
         using var operation = BeginOperation(ref cancellationToken);
+        if (groupId is null && (after.HasValue || before.HasValue))
+            throw new ArgumentException("A resource identifier is required for sequence bounds.", nameof(groupId));
         return await QueryReader<GroupMessageInfo>.OpenAsync(databaseOptions, database =>
         {
             var messages = database.GroupEvents.AsNoTracking().Where(value => value.IsMessage && value.DecryptedPayloadJson != null);
             if (groupId is not null) messages = messages.Where(value => value.GroupId == groupId);
             if (sender is not null) messages = messages.Where(value => value.Sender == sender);
-            return from message in messages
-                   join hosting in database.Groups.AsNoTracking() on message.GroupId equals hosting.GroupId
-                   orderby message.CreatedAt, message.GroupId, message.Sequence
-                   select MessageSnapshot(new GroupRef { RelayId = hosting.RelayId, GroupId = message.GroupId }, message);
-        }, cancellationToken).ConfigureAwait(false);
+            if (after.HasValue) messages = messages.Where(value => value.Sequence > after.Value);
+            if (before.HasValue) messages = messages.Where(value => value.Sequence < before.Value);
+            var joined = from message in messages
+                         join hosting in database.Groups.AsNoTracking() on message.GroupId equals hosting.GroupId
+                         select new { Message = message, hosting.RelayId };
+            var ordered = before.HasValue ? joined.OrderByDescending(value => value.Message.Sequence)
+                : joined.OrderBy(value => value.Message.GroupId).ThenBy(value => value.Message.Sequence);
+            return ordered.Select(value => MessageSnapshot(new GroupRef { RelayId = value.RelayId, GroupId = value.Message.GroupId }, value.Message));
+        }, cancellationToken, reverseBatch: before.HasValue).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -900,6 +900,11 @@
     "notes": "MessageKey carries sender and messageId for persisted direct-message lookup."
   },
   {
+    "type": "Meshline.Models.Client.HistoryRange",
+    "path": "packages/sdk/src/models/history.ts",
+    "notes": "Shared exclusive sequence bounds for local history overloads; before selects earlier batches, with each batch ascending. C# Deconstruct validates the bounds; TypeScript uses object destructuring without validation and validates ranges when opening history queries."
+  },
+  {
     "type": "Meshline.Models.Client.PageRequest",
     "path": "packages/sdk/src/components/group.ts",
     "notes": "GroupPageRequest has cursor/limit; channel history exposes the same fields as ChannelHistoryRequest."

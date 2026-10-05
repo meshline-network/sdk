@@ -409,26 +409,63 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
     /// <remarks>
+    /// This overload retains the original parameter list for binary compatibility. Optional arguments are provided by the HistoryRange overload.
     /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
     /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
-    public async Task<QueryReader<ChannelPostInfo>> GetPostsAsync(string? channelId = null, string? author = null, CancellationToken cancellationToken = default)
+    public Task<QueryReader<ChannelPostInfo>> GetPostsAsync(string? channelId, string? author, CancellationToken cancellationToken) =>
+        GetPostsCoreAsync(channelId, author, null, null, cancellationToken);
+
+    /// <summary>
+    /// Opens a snapshot reader for locally stored, undeleted channel posts matching the supplied filters.
+    /// </summary>
+    /// <param name="channelId">An optional channel identifier filter; <see langword="null"/> includes all values.</param>
+    /// <param name="author">An optional author account filter; <see langword="null"/> includes all authors.</param>
+    /// <param name="range">The optional exclusive local sequence bounds, copied when this method is called. Null means unbounded.</param>
+    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
+    /// <remarks>
+    /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
+    /// Each batch is returned in ascending sequence order. With before, successive batches move toward older messages; otherwise they move toward newer messages.
+    /// When reopening, use the first item of a backward batch as before, or the last item of a forward batch as after.
+    /// Sequence bounds must be nonnegative safe integers; when both are supplied, after must be less than before and before determines the direction.
+    /// Supply channelId when using sequence bounds.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
+    /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
+    /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
+    /// <exception cref="ArgumentException">The history bounds or resource scope are invalid.</exception>
+    public Task<QueryReader<ChannelPostInfo>> GetPostsAsync(string? channelId = null, string? author = null, HistoryRange? range = null, CancellationToken cancellationToken = default)
+    {
+        long? after = null, before = null;
+        if (range is not null) (after, before) = range;
+        return GetPostsCoreAsync(channelId, author, after, before, cancellationToken);
+    }
+
+    async Task<QueryReader<ChannelPostInfo>> GetPostsCoreAsync(string? channelId, string? author, long? after, long? before, CancellationToken cancellationToken)
     {
         EnsureInitialized();
         using var operation = BeginOperation(ref cancellationToken);
+        if (channelId is null && (after.HasValue || before.HasValue))
+            throw new ArgumentException("A resource identifier is required for sequence bounds.", nameof(channelId));
         return await QueryReader<ChannelPostInfo>.OpenAsync(databaseOptions, database =>
         {
             var posts = database.ChannelPosts.AsNoTracking().Where(value => !value.IsDeleted && value.PostJson != null);
             if (channelId is not null) posts = posts.Where(value => value.ChannelId == channelId);
             if (author is not null) posts = posts.Where(value => value.Author == author);
-            return from post in posts
-                   join channel in database.Channels.AsNoTracking() on post.ChannelId equals channel.ChannelId
-                   orderby post.ChannelId, post.Sequence
-                   select PostSnapshot(post, new ChannelRef { ChannelId = post.ChannelId, RelayId = channel.RelayId });
-        }, cancellationToken).ConfigureAwait(false);
+            if (after.HasValue) posts = posts.Where(value => value.Sequence > after.Value);
+            if (before.HasValue) posts = posts.Where(value => value.Sequence < before.Value);
+            var joined = from post in posts
+                         join channel in database.Channels.AsNoTracking() on post.ChannelId equals channel.ChannelId
+                         select new { Post = post, channel.RelayId };
+            var ordered = before.HasValue ? joined.OrderByDescending(value => value.Post.Sequence)
+                : joined.OrderBy(value => value.Post.ChannelId).ThenBy(value => value.Post.Sequence);
+            return ordered.Select(value => PostSnapshot(value.Post, new ChannelRef { ChannelId = value.Post.ChannelId, RelayId = value.RelayId }));
+        }, cancellationToken, reverseBatch: before.HasValue).ConfigureAwait(false);
     }
 
     /// <summary>

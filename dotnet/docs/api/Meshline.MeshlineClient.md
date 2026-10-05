@@ -11,6 +11,7 @@
 - [`EstablishAccountAsync(AccountEstablishmentOptions, CancellationToken)`](#Meshline.MeshlineClient.EstablishAccountAsync%28Meshline.Models.Client.AccountEstablishmentOptions%2CSystem.Threading.CancellationToken%29)
 - [`GetConversationAsync(string, CancellationToken)`](#Meshline.MeshlineClient.GetConversationAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetConversationsAsync(ConversationQuery, CancellationToken)`](#Meshline.MeshlineClient.GetConversationsAsync%28Meshline.Models.Client.ConversationQuery%2CSystem.Threading.CancellationToken%29)
+- [`MarkReadAsync(string, long, CancellationToken)`](#Meshline.MeshlineClient.MarkReadAsync%28string%2Clong%2CSystem.Threading.CancellationToken%29)
 - [`MarkReadAsync(string, CancellationToken)`](#Meshline.MeshlineClient.MarkReadAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`RecoverAccountAsync(AccountRecoveryOptions, CancellationToken)`](#Meshline.MeshlineClient.RecoverAccountAsync%28Meshline.Models.Client.AccountRecoveryOptions%2CSystem.Threading.CancellationToken%29)
 - [`AccountManager`](#Meshline.MeshlineClient.AccountManager)
@@ -472,6 +473,71 @@ The query contains unsupported conversation\-kind flags\.
 ### Remarks
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
+<a name='Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken)'></a>
+
+## MeshlineClient\.MarkReadAsync\(string, long, CancellationToken\) Method
+
+Advances a conversation's local read position through the supplied message position, inclusively\.
+
+```csharp
+public System.Threading.Tasks.Task MarkReadAsync(string conversationId, long localSequence, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken).conversationId'></a>
+
+`conversationId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The peer account identifier for a direct conversation, or the group or channel identifier\.
+
+<a name='Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken).localSequence'></a>
+
+`localSequence` [System\.Int64](https://learn.microsoft.com/en-us/dotnet/api/system.int64 'System\.Int64')
+
+The positive `LocalSequence` of a message the application has read in this conversation\.
+
+<a name='Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task 'System\.Threading\.Tasks\.Task')<br>
+A task that completes when the operation finishes\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation observes cancellation of [cancellationToken](Meshline.MeshlineClient.md#Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken).cancellationToken 'Meshline\.MeshlineClient\.MarkReadAsync\(string, long, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. The conversation kind cannot be handled by the local read\-position update\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component or a component used by the operation has been disposed\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The conversation identifier is not a valid peer account, group, or channel identifier\.
+
+[System\.ArgumentOutOfRangeException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentoutofrangeexception 'System\.ArgumentOutOfRangeException')<br>
+The position is not positive, or advancing to it would not identify a locally known message in this conversation\.
+
+[System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
+A direct\-conversation identifier uses an unsupported account namespace\.
+
+### Remarks
+The position only advances; repeated or older positions are no\-ops\. New messages beyond this fixed boundary remain unread\.<br>
+Advancing requires a locally stored direct message, decrypted group message, or known original channel publication at this position\.<br>
+A channel publication remains a valid boundary after deletion while its original metadata is retained\.<br>
+This is a cumulative read position, so filtered or incomplete history must not be treated as proof that every earlier message was read\.
+
 <a name='Meshline.MeshlineClient.MarkReadAsync(string,System.Threading.CancellationToken)'></a>
 
 ## MeshlineClient\.MarkReadAsync\(string, CancellationToken\) Method
@@ -521,6 +587,11 @@ The conversation identifier is not a valid peer account, group, or channel ident
 
 [System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
 A direct\-conversation identifier uses an unsupported account namespace\.
+
+### Remarks
+This overload marks all currently stored readable messages as read, including arrivals since an earlier query\.<br>
+To acknowledge only messages already viewed, use the overload that accepts their `LocalSequence`\.<br>
+An empty conversation is a no\-op, and the read position never moves backward\.
 
 <a name='Meshline.MeshlineClient.RecoverAccountAsync(Meshline.Models.Client.AccountRecoveryOptions,System.Threading.CancellationToken)'></a>
 

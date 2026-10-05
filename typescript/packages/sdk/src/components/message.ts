@@ -16,6 +16,7 @@ import { MessageReceiver, type ReceptionResult } from '../messages/receiver.js';
 import { registerAccountSender } from '../messages/account-sender.js';
 import { requireObject, type JsonObject } from '../protocol/json.js';
 import type { ResourceSyncStatus } from '../models/resource-sync.js';
+import { historyArguments, type HistoryRange } from '../models/history.js';
 import { ResourceSyncTracker } from '../runtime/resource-sync.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { AsyncPulse } from '../runtime/async-pulse.js';
@@ -156,7 +157,14 @@ export class MessageManager extends ClientComponent {
         this.#sendPulse?.pulse(); this.#notify('timelineChanged', undefined); this.#notify('sendStatusChanged', status); return status;
     }
     getMessage(key: MessageKey, signal?: AbortSignal): Promise<MessageInfo | undefined> { const copy = { ...key }; return this.runOperation(scope => this.#repository.get(copy, scope), signal); }
-    getMessageHistory(peer?: string, signal?: AbortSignal): Promise<QueryReader<MessageInfo>> { return this.runOperation(scope => this.#repository.history(peer, scope), signal); }
+    /** Opens a fixed local snapshot in ascending localSequence order. Does not synchronize or mark read. */
+    getMessageHistory(peer: string | undefined, signal: AbortSignal | undefined): Promise<QueryReader<MessageInfo>>;
+    /** Opens a fixed local snapshot within optional exclusive bounds. Omitted/null range is unbounded. before reads older batches; each batch is ascending. */
+    getMessageHistory(peer?: string, range?: HistoryRange | null, signal?: AbortSignal): Promise<QueryReader<MessageInfo>>;
+    getMessageHistory(peer?: string, rangeOrSignal?: HistoryRange | AbortSignal | null, signal?: AbortSignal): Promise<QueryReader<MessageInfo>> {
+        const args = historyArguments(rangeOrSignal, signal);
+        return this.runOperation(scope => this.#repository.history(peer, scope, args.range), args.signal);
+    }
     readTimeline(after: number, count: number, signal?: AbortSignal): Promise<readonly AccountMessage[]> { return this.runOperation(scope => this.#repository.readTimeline(after, count, scope), signal); }
     getOutbox(query: OutboxQuery = {}, signal?: AbortSignal): Promise<QueryReader<MessageSendStatus>> {
         const recipient = query.recipient; const states = query.states && [...query.states]; if (recipient !== undefined) validateAccountId(recipient);
