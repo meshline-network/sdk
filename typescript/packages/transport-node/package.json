@@ -1,6 +1,6 @@
 {
   "name": "@meshline/transport-node",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Node.js HTTPS and WebSocket adapters for Meshline",
   "license": "MIT",
   "type": "module",
@@ -21,7 +21,7 @@
     }
   },
   "peerDependencies": {
-    "@meshline/sdk": "0.1.0-alpha.2"
+    "@meshline/sdk": "0.1.0-alpha.3"
   },
   "dependencies": {
     "ws": "8.22.0"

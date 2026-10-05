@@ -1,6 +1,6 @@
 {
   "name": "@meshline/storage-browser",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Transactional IndexedDB storage for the Meshline TypeScript SDK",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,7 @@
     }
   },
   "peerDependencies": {
-    "@meshline/sdk": "0.1.0-alpha.2"
+    "@meshline/sdk": "0.1.0-alpha.3"
   },
   "repository": {
     "type": "git",
