@@ -9,7 +9,24 @@ namespace Meshline.Components;
 
 sealed partial class GroupManager
 {
-    async Task SynchronizeCoreAsync(GroupRef group, CancellationToken cancellationToken, bool includeKeys = true)
+    Task SynchronizeCoreAsync(GroupRef group, CancellationToken cancellationToken, bool includeKeys = true) =>
+        includeKeys ? SynchronizeGroupAsync(group, cancellationToken) : SynchronizeTimelineCoreAsync(group, cancellationToken, false);
+
+    Task<ResourceSyncStatus> SynchronizeGroupAsync(GroupRef group, CancellationToken cancellationToken, bool manual = false) =>
+        _syncStatus.RunAsync(group.GroupId, async () =>
+        {
+            if (manual) await ProcessAccountMessagesAsync(cancellationToken).ConfigureAwait(false);
+            Exception? keyError = null;
+            await SynchronizeTimelineCoreAsync(group, cancellationToken, true, error => keyError ??= error).ConfigureAwait(false);
+            if (keyError is not null) return new SyncBlock(ResourceSyncBlockReason.Verification, keyError);
+            await using var database = new MeshlineDbContext(databaseOptions);
+            var pending = await database.GroupEvents.AnyAsync(message => message.GroupId == group.GroupId
+                && message.MessageId != null && message.DecryptedPayloadJson == null && message.Rejection == null
+                && database.GroupEpochs.Any(epoch => epoch.GroupId == message.GroupId && epoch.Epoch == message.Epoch && epoch.MemberPublicKey != null), cancellationToken).ConfigureAwait(false);
+            return pending ? new SyncBlock(ResourceSyncBlockReason.MissingKey) : null;
+        }, OnSyncStatusChanged, cancellationToken, preserveOnStop: manual);
+
+    async Task SynchronizeTimelineCoreAsync(GroupRef group, CancellationToken cancellationToken, bool includeKeys, Action<Exception>? keyFailure = null)
     {
         var relay = await GetRelayAsync(group.RelayId, cancellationToken).ConfigureAwait(false);
         while (true)
@@ -110,7 +127,7 @@ sealed partial class GroupManager
         }
         if (includeKeys)
         {
-            await SynchronizeKeysAsync(group, cancellationToken).ConfigureAwait(false);
+            await SynchronizeKeysAsync(group, cancellationToken, keyFailure).ConfigureAwait(false);
             await DecryptPendingAsync(group, cancellationToken).ConfigureAwait(false);
         }
     }

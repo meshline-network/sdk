@@ -9,6 +9,7 @@
 - [`ContactRequestChanged`](#Meshline.Components.MessageManager.ContactRequestChanged)
 - [`MessageReceived`](#Meshline.Components.MessageManager.MessageReceived)
 - [`SendStatusChanged`](#Meshline.Components.MessageManager.SendStatusChanged)
+- [`SyncStatusChanged`](#Meshline.Components.MessageManager.SyncStatusChanged)
 - [`TimelineChanged`](#Meshline.Components.MessageManager.TimelineChanged)
 - [`MessageManager(ClientOptions, DatabaseOptions, RelayClientPool, AccountManager, DeviceManager, ISecretProtector)`](#Meshline.Components.MessageManager.MessageManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Components.AccountManager%2CMeshline.Components.DeviceManager%2CMeshline.Interactions.ISecretProtector%29)
 - [`AcceptContactRequestAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.AcceptContactRequestAsync%28string%2CSystem.Threading.CancellationToken%29)
@@ -24,9 +25,11 @@
 - [`GetMessageHistoryAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetMessageHistoryAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetOutboxAsync(string, MessageSendState, CancellationToken)`](#Meshline.Components.MessageManager.GetOutboxAsync%28string%2CMeshline.Models.Client.MessageSendState%2CSystem.Threading.CancellationToken%29)
 - [`GetSendStatusAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetSendStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`RemoveContactAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.RemoveContactAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`SendMessageAsync(string, DirectMessageDraft, CancellationToken)`](#Meshline.Components.MessageManager.SendMessageAsync%28string%2CMeshline.Models.Client.DirectMessageDraft%2CSystem.Threading.CancellationToken%29)
 - [`SetAliasAsync(string, string, CancellationToken)`](#Meshline.Components.MessageManager.SetAliasAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
+- [`SynchronizeAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.SynchronizeAsync%28string%2CSystem.Threading.CancellationToken%29)
 
 </details>
 
@@ -815,6 +818,47 @@ This component or a component used by the operation has been disposed\.
 [Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
 The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
 
+<a name='Meshline.Components.MessageManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)'></a>
+
+## MessageManager\.GetSyncStatusAsync\(string, CancellationToken\) Method
+
+Returns the current local synchronization snapshot for the account timeline on this relay, without network access\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ResourceSyncStatus> GetSyncStatusAsync(string relayId, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.MessageManager.GetSyncStatusAsync(string,System.Threading.CancellationToken).relayId'></a>
+
+`relayId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The canonical resource identifier\.
+
+<a name='Meshline.Components.MessageManager.GetSyncStatusAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+An immutable runtime snapshot, initially Idle with no successful completion time\.
+
+#### Exceptions
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The resource identifier is invalid\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component has not been initialized\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation was canceled\.
+
 <a name='Meshline.Components.MessageManager.RemoveContactAsync(string,System.Threading.CancellationToken)'></a>
 
 ## MessageManager\.RemoveContactAsync\(string, CancellationToken\) Method
@@ -1027,6 +1071,68 @@ The local device key cannot be validated against its certificate, or cryptograph
 
 [System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
 The device certificates used for the account synchronization message contain duplicate devices or another account\.
+
+<a name='Meshline.Components.MessageManager.SynchronizeAsync(string,System.Threading.CancellationToken)'></a>
+
+## MessageManager\.SynchronizeAsync\(string, CancellationToken\) Method
+
+Performs and awaits one incremental synchronization pass for the account timeline on the specified relay\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ResourceSyncStatus> SynchronizeAsync(string relayId, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.MessageManager.SynchronizeAsync(string,System.Threading.CancellationToken).relayId'></a>
+
+`relayId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The resource to synchronize\.
+
+<a name='Meshline.Components.MessageManager.SynchronizeAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels this call, including queued work; already committed data is retained\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+This pass's completion snapshot, including any processing block such as missing group keys\.
+
+#### Exceptions
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The resource identifier is invalid\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component is not initialized, or authorization is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The call, component lifetime, or relay request was canceled\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery or a network request fails\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects synchronization\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Remote or stored data fails validation\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+Local storage cannot be accessed\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting synchronized data fails\.
+
+### Remarks
+Requires initialization and usable authorization, but not StartAsync\. Every call performs a fresh pass,<br>
+serialized with background synchronization\. Reads forward from local progress until the relay reports no more pages;<br>
+this does not freeze a remote sequence at call time or guarantee complete historical data\.<br>
+Transport and storage failures update synchronization status and propagate to the caller\.
 ### Events
 
 <a name='Meshline.Components.MessageManager.ContactChanged'></a>
@@ -1080,6 +1186,19 @@ public event EventHandler<MessageSendStatusChangedEventArgs>? SendStatusChanged;
 
 #### Event Type
 [System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[MessageSendStatusChangedEventArgs](Meshline.Components.MessageSendStatusChangedEventArgs.md 'Meshline\.Components\.MessageSendStatusChangedEventArgs')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
+
+<a name='Meshline.Components.MessageManager.SyncStatusChanged'></a>
+
+## MessageManager\.SyncStatusChanged Event
+
+Occurs after the local synchronization snapshot changes\. Handlers must not synchronously wait for component operations\.
+
+```csharp
+public event EventHandler<ResourceSyncStatus>? SyncStatusChanged;
+```
+
+#### Event Type
+[System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
 
 <a name='Meshline.Components.MessageManager.TimelineChanged'></a>
 

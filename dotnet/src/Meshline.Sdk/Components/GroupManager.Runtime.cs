@@ -70,6 +70,7 @@ sealed partial class GroupManager
         foreach (var relay in relays) DetachRelay(relay);
         if (_subscriptionWorker is not null) await _subscriptionWorker.DisposeAsync().ConfigureAwait(false);
         _subscriptionWorker = null;
+        _syncStatus.Stop(OnSyncStatusChanged);
     }
 
     void OnAccountTimelineChanged(object? sender, EventArgs args) => Wake();
@@ -93,7 +94,7 @@ sealed partial class GroupManager
             while (await _refreshRequests.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 while (_refreshRequests.Reader.TryRead(out _)) { }
-                try { await ProcessAccountMessagesAsync(cancellationToken).ConfigureAwait(false); }
+                try { await RunAsync(ProcessAccountMessagesAsync, cancellationToken).ConfigureAwait(false); }
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
                 try
                 {

@@ -22,9 +22,11 @@ import { certificateId } from '../models/identity.js';
 import { signingInput } from '../protocol/context.js';
 import type { ProtocolCodec } from '../protocol/codec.js';
 import { canonicalJson, requireObject, requireSafeInteger, type JsonObject } from '../protocol/json.js';
+import type { ResourceSyncStatus } from '../models/resource-sync.js';
+import { ResourceSyncTracker, type SyncBlock } from '../runtime/resource-sync.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { AsyncPulse } from '../runtime/async-pulse.js';
-import { throwIfAborted } from '../runtime/clock.js';
+import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
 import type { MeshlineStore, QueryReader } from '../storage/store.js';
 import type { RelayClient } from '../transport/client.js';
@@ -55,6 +57,7 @@ export interface GroupPage<T> { readonly items: readonly T[]; readonly nextCurso
 export interface GroupApplicationInfo extends admission.GroupApplicationEntry { readonly group: GroupRef }
 export interface GroupKeyRecoveryInfo extends admission.GroupRecoveryEntry { readonly group: GroupRef }
 export interface GroupEvents {
+    readonly syncStatusChanged: ResourceSyncStatus;
     readonly groupChanged: GroupChange;
     readonly timelineChanged: { readonly group: GroupRef; readonly sequence: number; readonly message?: GroupMessageInfo };
     readonly applicationsChanged: GroupRef;
@@ -64,6 +67,16 @@ interface Subscription { client: RelayClient; subscription: RelaySubscription; s
 
 /** Verified history determines authority; local secrets and exact signed submissions survive restart. */
 export class GroupManager extends ClientComponent {
+    readonly #syncStatus = new ResourceSyncTracker(this.clock, status => this.#notify('syncStatusChanged', status));
+    /** Performs a fresh timeline/key/decryption pass without requiring start(); returns caughtUp or a processing block. */
+    synchronize(group: GroupRef, signal?: AbortSignal): Promise<ResourceSyncStatus> {
+        group = { ...group }; validateGroupRef(group);
+        return awaitWithSignal(this.runOperation(scope => this.#writes.run(() => this.#synchronizeGroup(undefined, group, scope, true), scope), signal), signal);
+    }
+    /** Reads an in-memory resource snapshot without network access. Completion times reset with a new component instance. */
+    getSyncStatus(groupId: string, signal?: AbortSignal): Promise<ResourceSyncStatus> {
+        validateIdentifier('group', groupId); return this.runOperation(async () => this.#syncStatus.get(groupId), signal);
+    }
     readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #device: DeviceManager; readonly #random: RandomSource;
     readonly #repository: GroupRepository; readonly #secrets: GroupSecrets; readonly #messages: GroupMessageProcessor; readonly #operations: GroupOperations;
     readonly #accountMessages: MessageManager; readonly #accountSync: GroupAccountSync; #detachMessages: (() => void) | undefined;
@@ -130,16 +143,29 @@ export class GroupManager extends ClientComponent {
         if (operation.method.startsWith('group.application.')) this.#notify('applicationsChanged', operation.group);
         if (operation.method.startsWith('group.member.recovery.')) this.#notify('keyRecoveryChanged', operation.group);
     }
-    async #localRecovery(group: GroupRef, signal: AbortSignal): Promise<void> {
+    async #localRecovery(group: GroupRef, signal: AbortSignal): Promise<SyncBlock | undefined> {
         const recovery = await this.#secrets.derivePending(group, this.#device, signal);
         for (const failure of recovery.rejected) this.notifyBackgroundError({ operation: 'recover_group_key', resource: `${group.groupId}/${failure.epoch}`, error: failure.error });
-        await this.#messages.processPending(group, (sequence, result) => {
+        const pending = await this.#messages.processPending(group, (sequence, result) => {
             if (result.error) this.notifyBackgroundError({ operation: 'decrypt_group', resource: `${group.groupId}/${sequence}`, error: result.error });
             if (result.groupRecord) this.#notify('groupChanged', { ...this.#snapshot(group, result.groupRecord)!, kinds: ['nickname'] });
             this.#notify('timelineChanged', { group, sequence, ...(result.message ? { message: result.message } : {}) });
         }, signal);
+        if (recovery.rejected.length) return { reason: 'verification', error: recovery.rejected[0]!.error };
+        return pending ? { reason: 'missingKey' } : undefined;
     }
-    async #synchronize(relay: RelayClient, group: GroupRef, signal: AbortSignal, includeKeys = true): Promise<void> {
+    async #synchronize(relay: RelayClient | undefined, group: GroupRef, signal: AbortSignal, includeKeys = true): Promise<void> {
+        if (!includeKeys) { await this.#synchronizeCore(relay ?? await this.#hosting(group.relayId, signal), group, signal, false); return; }
+        await this.#synchronizeGroup(relay, group, signal);
+        await this.#accountSync.shareCurrent(group, signal);
+    }
+    #synchronizeGroup(relay: RelayClient | undefined, group: GroupRef, signal: AbortSignal, manual = false): Promise<ResourceSyncStatus> {
+        return this.#syncStatus.run(group.groupId, async () => {
+            if (manual) await this.#accountSync.consume(signal);
+            return this.#synchronizeCore(relay ?? await this.#hosting(group.relayId, signal), group, signal, true);
+        }, signal, manual);
+    }
+    async #synchronizeCore(relay: RelayClient, group: GroupRef, signal: AbortSignal, includeKeys: boolean): Promise<SyncBlock | undefined> {
         let projection: GroupProjection | undefined;
         for (;;) {
             const page = await this.#repository.synchronizePage(group, { read: async query => groupSyncPageCodec.decode((await relay.requestHttp('GET', 'group.sync', groupSequenceQueryCodec.encode(query), { signal }))!) }, signal);
@@ -155,8 +181,7 @@ export class GroupManager extends ClientComponent {
                 await this.#repository.saveKeyPage(group, page, after, signal); if (!page.hasMore) break; after = page.keys.at(-1)!.epoch;
             }
         }
-        await this.#localRecovery(group, signal);
-        await this.#accountSync.shareCurrent(group, signal);
+        return this.#localRecovery(group, signal);
     }
     async #execute(relay: RelayClient, initial: GroupOperation, recovering: boolean, signal: AbortSignal): Promise<JsonObject | undefined> {
         let operation = initial;
@@ -254,7 +279,7 @@ export class GroupManager extends ClientComponent {
             return this.runOperation(scope => this.#writes.run(async () => { const preview = await this.#previewInvitation(invitation, scope); await this.#repository.savePreview(invitation.group, preview.state, scope); return this.#info(invitation.group, scope); }, scope), signal);
         }
         const group = { ...source }; validateGroupRef(group);
-        return this.runOperation(scope => this.#writes.run(async () => { await this.#synchronize(await this.#hosting(group.relayId, scope), group, scope); return this.#info(group, scope); }, scope), signal);
+        return this.runOperation(scope => this.#writes.run(async () => { await this.#synchronize(undefined, group, scope); return this.#info(group, scope); }, scope), signal);
     }
     #manage(group: GroupRef, method: GroupOperationMethod, create: (state: GroupProjection) => GroupManagementPayload, signal?: AbortSignal): Promise<GroupInfo> {
         group = { ...group }; validateGroupRef(group);
@@ -536,11 +561,11 @@ export class GroupManager extends ClientComponent {
                         try { await this.#subscribe(relay, groups.filter(group => { const row = rows.find(value => value.key === group.groupId)!; return this.#snapshot(group, row.value)?.membership === 'member'; }).map(group => group.groupId), signal); }
                         catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'subscribe_group', resource: relayId, error }); }
                         for (const group of groups) { try { await this.#writes.run(() => this.#synchronize(relay, group, signal), signal); } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'synchronize_group', resource: group.groupId, error }); } }
-                    } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'connect_group', resource: relayId, error }); }
+                    } catch (error) { throwIfAborted(signal); for (const group of groups) this.#syncStatus.block(group.groupId, error); this.notifyBackgroundError({ operation: 'connect_group', resource: relayId, error }); }
                 }
             } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'refresh_groups', error }); }
         } } catch (error) { if (!signal.aborted) throw error; }
     }
-    protected override async onStop(): Promise<void> { this.#detachMessages?.(); this.#detachMessages = undefined; try { await Promise.all(this.#jobs); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; } }
-    protected override async onDispose(): Promise<void> { this.#events.clear(); }
+    protected override async onStop(): Promise<void> { this.#detachMessages?.(); this.#detachMessages = undefined; try { await Promise.all(this.#jobs); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop(); } }
+    protected override async onDispose(): Promise<void> { this.#syncStatus.stop(true); this.#events.clear(); }
 }

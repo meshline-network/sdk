@@ -6,7 +6,7 @@ namespace Meshline.Models.Client;
 public sealed class ResourceSyncStatus
 {
     /// <summary>
-    /// The resource identifier associated with the synchronization or error, when available.
+    /// The relay ID for account messages, group ID for groups, or channel ID for channels.
     /// </summary>
     public required string Resource { get; init; }
     /// <summary>
@@ -14,7 +14,7 @@ public sealed class ResourceSyncStatus
     /// </summary>
     public required ResourceSyncState State { get; init; }
     /// <summary>
-    /// The time synchronization last completed successfully, or <see langword="null"/> before any completion.
+    /// The time a full pass last completed successfully in this component instance, or <see langword="null"/> before any completion. It is not restored on restart.
     /// </summary>
     public DateTimeOffset? LastSynchronizedAt { get; init; }
     /// <summary>
@@ -26,7 +26,7 @@ public sealed class ResourceSyncStatus
     /// </summary>
     public Exception? Error { get; init; }
     /// <summary>
-    /// Whether retained history omits entries needed to span the requested synchronization range.
+    /// Whether a retention gap has been observed. This is independent of CaughtUp; false does not guarantee complete history.
     /// </summary>
     public bool HasRetentionGap { get; init; }
 }

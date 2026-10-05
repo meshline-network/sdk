@@ -40,7 +40,7 @@ sealed partial class GroupManager
         }
     }
 
-    async Task SynchronizeKeysAsync(GroupRef group, CancellationToken cancellationToken)
+    async Task SynchronizeKeysAsync(GroupRef group, CancellationToken cancellationToken, Action<Exception>? keyFailure = null)
     {
         var relay = await GetRelayAsync(group.RelayId, cancellationToken).ConfigureAwait(false);
         long after;
@@ -70,10 +70,10 @@ sealed partial class GroupManager
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             if (!page.HasMore) break;
         }
-        await DerivePendingEpochsAsync(group.GroupId, cancellationToken).ConfigureAwait(false);
+        await DerivePendingEpochsAsync(group.GroupId, cancellationToken, keyFailure).ConfigureAwait(false);
     }
 
-    async Task DerivePendingEpochsAsync(string groupId, CancellationToken cancellationToken)
+    async Task DerivePendingEpochsAsync(string groupId, CancellationToken cancellationToken, Action<Exception>? keyFailure = null)
     {
         await using var database = new MeshlineDbContext(databaseOptions);
         var epochs = await database.GroupEpochs.Where(value => value.GroupId == groupId && value.KeyEntryJson != null && value.ProtectedClientSecret == null).OrderBy(value => value.Epoch).ToListAsync(cancellationToken).ConfigureAwait(false);
@@ -115,6 +115,7 @@ sealed partial class GroupManager
             }
             catch (Exception exception) when (exception is InvalidDataException or CryptographicException or ArgumentException { ParamName: "peerPublicKey" })
             {
+                keyFailure?.Invoke(exception);
                 ReportBackgroundError(BackgroundOperation.Synchronize, groupId, exception);
             }
             finally

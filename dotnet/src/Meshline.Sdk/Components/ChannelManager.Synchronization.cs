@@ -48,6 +48,7 @@ sealed partial class ChannelManager
         foreach (var relay in relays) DetachRelay(relay);
         if (_subscriptionWorker is not null) await _subscriptionWorker.DisposeAsync().ConfigureAwait(false);
         _subscriptionWorker = null;
+        _syncStatus.Stop(OnSyncStatusChanged);
     }
 
     void QueueRefresh()
@@ -86,6 +87,7 @@ sealed partial class ChannelManager
                         try { relay = await GetHostingRelayAsync(group.Key, cancellationToken).ConfigureAwait(false); }
                         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                         {
+                            foreach (var record in group) _syncStatus.Block(record.ChannelId, exception, OnSyncStatusChanged);
                             ReportBackgroundError(BackgroundOperation.Connect, group.Key, exception);
                             continue;
                         }
@@ -95,14 +97,7 @@ sealed partial class ChannelManager
                         {
                             try
                             {
-                                await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-                                try
-                                {
-                                    var channel = new ChannelRef { ChannelId = record.ChannelId, RelayId = record.RelayId };
-                                    await SaveDescriptorAsync(channel, await ResolveDescriptorAsync(relay, channel, null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
-                                    await SynchronizeAsync(relay, channel, record.SyncSequence, true, cancellationToken).ConfigureAwait(false);
-                                }
-                                finally { _writeGate.Release(); }
+                                await SynchronizeChannelAsync(new() { ChannelId = record.ChannelId, RelayId = record.RelayId }, cancellationToken).ConfigureAwait(false);
                             }
                             catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, record.ChannelId, exception); }
                         }
@@ -117,6 +112,24 @@ sealed partial class ChannelManager
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    async Task<ResourceSyncStatus> SynchronizeChannelAsync(ChannelRef channel, CancellationToken cancellationToken, bool manual = false)
+    {
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await _syncStatus.RunAsync(channel.ChannelId, async () =>
+            {
+                var relay = await GetHostingRelayAsync(channel.RelayId, cancellationToken).ConfigureAwait(false);
+                await SaveDescriptorAsync(channel, await ResolveDescriptorAsync(relay, channel, null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+                await using var database = new MeshlineDbContext(databaseOptions);
+                var after = await database.Channels.Where(value => value.ChannelId == channel.ChannelId).Select(value => value.SyncSequence).SingleAsync(cancellationToken).ConfigureAwait(false);
+                await SynchronizeAsync(relay, channel, after, true, cancellationToken).ConfigureAwait(false);
+                return null;
+            }, OnSyncStatusChanged, cancellationToken, preserveOnStop: manual).ConfigureAwait(false);
+        }
+        finally { _writeGate.Release(); }
     }
 
     async Task SynchronizeAsync(RelayClient relay, ChannelRef channel, long after, bool advance, CancellationToken cancellationToken)

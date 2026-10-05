@@ -11,6 +11,7 @@
 - [`MissingKey`](#Meshline.Models.Client.ResourceSyncBlockReason.MissingKey)
 - [`Permission`](#Meshline.Models.Client.ResourceSyncBlockReason.Permission)
 - [`Storage`](#Meshline.Models.Client.ResourceSyncBlockReason.Storage)
+- [`Unknown`](#Meshline.Models.Client.ResourceSyncBlockReason.Unknown)
 - [`Verification`](#Meshline.Models.Client.ResourceSyncBlockReason.Verification)
 
 </details>
@@ -68,3 +69,9 @@ Local persistence prevents synchronization\.
 `HistoryUnavailable` 6
 
 Required history is no longer available from the relay\.
+
+<a name='Meshline.Models.Client.ResourceSyncBlockReason.Unknown'></a>
+
+`Unknown` 7
+
+Synchronization failed for a reason not classified by this SDK; inspect the original error\.

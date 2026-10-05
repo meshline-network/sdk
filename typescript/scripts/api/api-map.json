@@ -1103,5 +1103,20 @@
     "type": "Meshline.Validation.ProtocolViolationKind",
     "path": "packages/sdk/src/errors.ts",
     "notes": "ProtocolError codes identify individual validation failures; the eight-value CLR classification enum is not separately exported. Codes are not a one-to-one rename of that enum."
+  },
+  {
+    "type": "Meshline.Models.Client.ResourceSyncStatus",
+    "path": "packages/sdk/src/models/resource-sync.ts",
+    "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
+  },
+  {
+    "type": "Meshline.Models.Client.ResourceSyncState",
+    "path": "packages/sdk/src/models/resource-sync.ts",
+    "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
+  },
+  {
+    "type": "Meshline.Models.Client.ResourceSyncBlockReason",
+    "path": "packages/sdk/src/models/resource-sync.ts",
+    "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
   }
 ]

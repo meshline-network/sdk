@@ -6,7 +6,7 @@ namespace Meshline.Models.Client;
 public enum ResourceSyncState
 {
     /// <summary>
-    /// No synchronization pass is currently active.
+    /// Synchronization has not started, was canceled, or has stopped.
     /// </summary>
     Idle,
     /// <summary>
@@ -14,11 +14,11 @@ public enum ResourceSyncState
     /// </summary>
     Synchronizing,
     /// <summary>
-    /// The last synchronization pass reached the observed timeline head.
+    /// The last complete pass reached the observed timeline head and processed readable messages, including required group decryption. This does not guarantee complete retained history.
     /// </summary>
     CaughtUp,
     /// <summary>
-    /// Synchronization cannot advance until its blocking condition is resolved.
+    /// Synchronization cannot complete until its blocking condition is resolved. Timeline ingestion may continue while group keys are unavailable.
     /// </summary>
     Blocked
 }

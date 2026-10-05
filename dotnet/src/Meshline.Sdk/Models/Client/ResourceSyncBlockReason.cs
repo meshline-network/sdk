@@ -32,5 +32,9 @@ public enum ResourceSyncBlockReason
     /// <summary>
     /// Required history is no longer available from the relay.
     /// </summary>
-    HistoryUnavailable
+    HistoryUnavailable,
+    /// <summary>
+    /// Synchronization failed for a reason not classified by this SDK; inspect the original error.
+    /// </summary>
+    Unknown
 }

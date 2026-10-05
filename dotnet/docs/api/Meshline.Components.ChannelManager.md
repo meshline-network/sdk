@@ -7,6 +7,7 @@
 
 - [`ChannelChanged`](#Meshline.Components.ChannelManager.ChannelChanged)
 - [`FollowChanged`](#Meshline.Components.ChannelManager.FollowChanged)
+- [`SyncStatusChanged`](#Meshline.Components.ChannelManager.SyncStatusChanged)
 - [`TimelineChanged`](#Meshline.Components.ChannelManager.TimelineChanged)
 - [`ChannelManager(ClientOptions, DatabaseOptions, RelayClientPool, DeviceManager)`](#Meshline.Components.ChannelManager.ChannelManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Components.DeviceManager%29)
 - [`CloseChannelAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.CloseChannelAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
@@ -17,9 +18,11 @@
 - [`GetChannelAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.GetChannelAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`GetFollowedAsync(string, CancellationToken)`](#Meshline.Components.ChannelManager.GetFollowedAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetPostsAsync(string, string, CancellationToken)`](#Meshline.Components.ChannelManager.GetPostsAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
+- [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.ChannelManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`LoadChannelHistoryAsync(ChannelRef, PageRequest, CancellationToken)`](#Meshline.Components.ChannelManager.LoadChannelHistoryAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
 - [`PublishPostAsync(ChannelRef, ChannelPostDraft, CancellationToken)`](#Meshline.Components.ChannelManager.PublishPostAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.ChannelPostDraft%2CSystem.Threading.CancellationToken%29)
 - [`ReportPostAsync(ChannelPostRef, string, CancellationToken)`](#Meshline.Components.ChannelManager.ReportPostAsync%28Meshline.Models.Client.ChannelPostRef%2Cstring%2CSystem.Threading.CancellationToken%29)
+- [`SynchronizeAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.SynchronizeAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`UnfollowAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.UnfollowAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`UpdateChannelAsync(ChannelRef, ChannelUpdate, CancellationToken)`](#Meshline.Components.ChannelManager.UpdateChannelAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.ChannelUpdate%2CSystem.Threading.CancellationToken%29)
 
@@ -650,6 +653,47 @@ The SQLite database cannot be opened or a database command fails, for example be
 ### Remarks
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
+<a name='Meshline.Components.ChannelManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)'></a>
+
+## ChannelManager\.GetSyncStatusAsync\(string, CancellationToken\) Method
+
+Returns the current local synchronization snapshot for the channel, without network access\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ResourceSyncStatus> GetSyncStatusAsync(string channelId, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ChannelManager.GetSyncStatusAsync(string,System.Threading.CancellationToken).channelId'></a>
+
+`channelId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The canonical resource identifier\.
+
+<a name='Meshline.Components.ChannelManager.GetSyncStatusAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+An immutable runtime snapshot, initially Idle with no successful completion time\.
+
+#### Exceptions
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The resource identifier is invalid\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component has not been initialized\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation was canceled\.
+
 <a name='Meshline.Components.ChannelManager.LoadChannelHistoryAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken)'></a>
 
 ## ChannelManager\.LoadChannelHistoryAsync\(ChannelRef, PageRequest, CancellationToken\) Method
@@ -884,6 +928,68 @@ The hosting relay does not advertise channel hosting\.
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
 The post reference or report reason violates protocol constraints\.
 
+<a name='Meshline.Components.ChannelManager.SynchronizeAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)'></a>
+
+## ChannelManager\.SynchronizeAsync\(ChannelRef, CancellationToken\) Method
+
+Performs and awaits one incremental synchronization pass for the specified channel's descriptor and forward timeline\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ResourceSyncStatus> SynchronizeAsync(Meshline.Models.Client.ChannelRef channel, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ChannelManager.SynchronizeAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken).channel'></a>
+
+`channel` [ChannelRef](Meshline.Models.Client.ChannelRef.md 'Meshline\.Models\.Client\.ChannelRef')
+
+The resource to synchronize\.
+
+<a name='Meshline.Components.ChannelManager.SynchronizeAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels this call, including queued work; already committed data is retained\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+This pass's completion snapshot, including any processing block such as missing group keys\.
+
+#### Exceptions
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The resource identifier is invalid\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component is not initialized, or authorization is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The call, component lifetime, or relay request was canceled\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery or a network request fails\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects synchronization\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Remote or stored data fails validation\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+Local storage cannot be accessed\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting synchronized data fails\.
+
+### Remarks
+Requires initialization and usable authorization, but not StartAsync\. Every call performs a fresh pass,<br>
+serialized with background synchronization\. Reads forward from local progress until the relay reports no more pages;<br>
+this does not freeze a remote sequence at call time or guarantee complete historical data\.<br>
+Transport and storage failures update synchronization status and propagate to the caller\.
+
 <a name='Meshline.Components.ChannelManager.UnfollowAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)'></a>
 
 ## ChannelManager\.UnfollowAsync\(ChannelRef, CancellationToken\) Method
@@ -1040,6 +1146,19 @@ public event EventHandler<ChannelFollowChangedEventArgs>? FollowChanged;
 
 #### Event Type
 [System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[ChannelFollowChangedEventArgs](Meshline.Components.ChannelFollowChangedEventArgs.md 'Meshline\.Components\.ChannelFollowChangedEventArgs')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
+
+<a name='Meshline.Components.ChannelManager.SyncStatusChanged'></a>
+
+## ChannelManager\.SyncStatusChanged Event
+
+Occurs after the local synchronization snapshot changes\. Handlers must not synchronously wait for component operations\.
+
+```csharp
+public event EventHandler<ResourceSyncStatus>? SyncStatusChanged;
+```
+
+#### Event Type
+[System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
 
 <a name='Meshline.Components.ChannelManager.TimelineChanged'></a>
 

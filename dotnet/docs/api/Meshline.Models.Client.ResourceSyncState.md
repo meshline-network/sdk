@@ -28,7 +28,7 @@ public enum ResourceSyncState
 
 `Idle` 0
 
-No synchronization pass is currently active\.
+Synchronization has not started, was canceled, or has stopped\.
 
 <a name='Meshline.Models.Client.ResourceSyncState.Synchronizing'></a>
 
@@ -40,10 +40,10 @@ A synchronization pass is running\.
 
 `CaughtUp` 2
 
-The last synchronization pass reached the observed timeline head\.
+The last complete pass reached the observed timeline head and processed readable messages, including required group decryption\. This does not guarantee complete retained history\.
 
 <a name='Meshline.Models.Client.ResourceSyncState.Blocked'></a>
 
 `Blocked` 3
 
-Synchronization cannot advance until its blocking condition is resolved\.
+Synchronization cannot complete until its blocking condition is resolved\. Timeline ingestion may continue while group keys are unavailable\.

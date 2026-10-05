@@ -58,7 +58,7 @@ public System.Exception? Error { get; init; }
 
 ## ResourceSyncStatus\.HasRetentionGap Property
 
-Whether retained history omits entries needed to span the requested synchronization range\.
+Whether a retention gap has been observed\. This is independent of CaughtUp; false does not guarantee complete history\.
 
 ```csharp
 public bool HasRetentionGap { get; init; }
@@ -71,7 +71,7 @@ public bool HasRetentionGap { get; init; }
 
 ## ResourceSyncStatus\.LastSynchronizedAt Property
 
-The time synchronization last completed successfully, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') before any completion\.
+The time a full pass last completed successfully in this component instance, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') before any completion\. It is not restored on restart\.
 
 ```csharp
 public System.Nullable<System.DateTimeOffset> LastSynchronizedAt { get; init; }
@@ -84,7 +84,7 @@ public System.Nullable<System.DateTimeOffset> LastSynchronizedAt { get; init; }
 
 ## ResourceSyncStatus\.Resource Property
 
-The resource identifier associated with the synchronization or error, when available\.
+The relay ID for account messages, group ID for groups, or channel ID for channels\.
 
 ```csharp
 public string Resource { get; init; }

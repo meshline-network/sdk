@@ -9,6 +9,7 @@ namespace Meshline.Components;
 
 sealed partial class MessageManager
 {
+    readonly SemaphoreSlim _synchronizationGate = new(1, 1);
     readonly Lock _relayGate = new();
     readonly Dictionary<string, RelayClient> _observedRelays = new(StringComparer.Ordinal);
 
@@ -90,15 +91,7 @@ sealed partial class MessageManager
                     {
                         try
                         {
-                            var relay = await relayClients.GetAsync(relayId, deviceManager, cancellationToken).ConfigureAwait(false);
-                            ObserveRelay(relay);
-                            try
-                            {
-                                if ((await relay.GetDescriptorAsync(cancellationToken).ConfigureAwait(false)).Endpoints.Any(value => value.StartsWith("wss://", StringComparison.Ordinal)))
-                                    relay.StartNotifications();
-                            }
-                            catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Connect, relayId, exception); }
-                            await SynchronizeAsync(relayId, cancellationToken).ConfigureAwait(false);
+                            await SynchronizePassAsync(relayId, cancellationToken, observe: true).ConfigureAwait(false);
                         }
                         catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, relayId, exception); }
                     }
@@ -109,9 +102,34 @@ sealed partial class MessageManager
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
-    async Task SynchronizeAsync(string relayId, CancellationToken cancellationToken)
+    async Task<ResourceSyncStatus> SynchronizePassAsync(string relayId, CancellationToken cancellationToken, bool observe = false)
     {
-        var relay = await relayClients.GetAsync(relayId, deviceManager, cancellationToken).ConfigureAwait(false);
+        await _synchronizationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await _syncStatus.RunAsync(relayId, async () =>
+            {
+                var relay = await relayClients.GetAsync(relayId, deviceManager, cancellationToken).ConfigureAwait(false);
+                if (observe)
+                {
+                    ObserveRelay(relay);
+                    try
+                    {
+                        if ((await relay.GetDescriptorAsync(cancellationToken).ConfigureAwait(false)).Endpoints.Any(value => value.StartsWith("wss://", StringComparison.Ordinal)))
+                            relay.StartNotifications();
+                    }
+                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Connect, relayId, exception); }
+                }
+                await SynchronizeTimelineAsync(relay, cancellationToken).ConfigureAwait(false);
+                return null;
+            }, OnSyncStatusChanged, cancellationToken, preserveOnStop: !observe).ConfigureAwait(false);
+        }
+        finally { _synchronizationGate.Release(); }
+    }
+
+    async Task SynchronizeTimelineAsync(RelayClient relay, CancellationToken cancellationToken)
+    {
+        var relayId = relay.RelayId;
         while (true)
         {
             long after;
@@ -138,8 +156,12 @@ sealed partial class MessageManager
             try
             {
                 foreach (var entry in page.Items)
+                {
                     notifications.AddRange(await ReceiveMessageAsync(relayId, entry, certificates[entry.Envelope.FromDeviceId], page.HasRetentionGap == true, messages, cancellationToken).ConfigureAwait(false));
+                    if (page.HasRetentionGap == true) _syncStatus.ObserveGap(relayId, OnSyncStatusChanged);
+                }
                 if (page.Items.IsEmpty)
+                {
                     await TransactAsync(async (database, _, token) =>
                     {
                         var progress = await database.AccountTimelines.FindAsync([relayId], token).ConfigureAwait(false);
@@ -147,6 +169,8 @@ sealed partial class MessageManager
                         progress.HasRetentionGap |= page.HasRetentionGap == true;
                         progress.LastSynchronizedAt = Clock.UtcNow;
                     }, cancellationToken).ConfigureAwait(false);
+                    if (page.HasRetentionGap == true) _syncStatus.ObserveGap(relayId, OnSyncStatusChanged);
+                }
             }
             finally
             {

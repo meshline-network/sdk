@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "8104e06a7256b87432bce2d3408d19dfcc43aeba76b7dd4a5a7d90c333576530",
+  "sourceSha256": "89dac696856c54ab5fc11d27b5dbd56ca6de6b86122673280eee5c5b95959097",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -21,6 +21,13 @@
     {
       "symbol": "E:Meshline.Components.ChannelManager.FollowChanged",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.FollowChanged",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/channel.ts",
+      "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+    },
+    {
+      "symbol": "E:Meshline.Components.ChannelManager.SyncStatusChanged",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.SyncStatusChanged",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/channel.ts",
       "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
@@ -82,6 +89,13 @@
       "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
     },
     {
+      "symbol": "E:Meshline.Components.GroupManager.SyncStatusChanged",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.SyncStatusChanged",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/group.ts",
+      "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
+    },
+    {
       "symbol": "E:Meshline.Components.GroupManager.TimelineChanged",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.TimelineChanged",
       "status": "mapped-requires-behavior-review",
@@ -112,6 +126,13 @@
     {
       "symbol": "E:Meshline.Components.MessageManager.SendStatusChanged",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.SendStatusChanged",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
+      "symbol": "E:Meshline.Components.MessageManager.SyncStatusChanged",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.SyncStatusChanged",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/message.ts",
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
@@ -637,57 +658,86 @@
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.Authentication",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.Authentication",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.Connection",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.Connection",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.HistoryUnavailable",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.HistoryUnavailable",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.MissingKey",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.MissingKey",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.Permission",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.Permission",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.Storage",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.Storage",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.Unknown",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.Unknown",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.Verification",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md#Meshline.Models.Client.ResourceSyncBlockReason.Verification",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncState.Blocked",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncState.md#Meshline.Models.Client.ResourceSyncState.Blocked",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncState.CaughtUp",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncState.md#Meshline.Models.Client.ResourceSyncState.CaughtUp",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncState.Idle",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncState.md#Meshline.Models.Client.ResourceSyncState.Idle",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncState.Synchronizing",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncState.md#Meshline.Models.Client.ResourceSyncState.Synchronizing",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "F:Meshline.Models.Protocol.ChannelStatus.Active",
@@ -1082,6 +1132,13 @@
       "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
     },
     {
+      "symbol": "M:Meshline.Components.ChannelManager.GetSyncStatusAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/channel.ts",
+      "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+    },
+    {
       "symbol": "M:Meshline.Components.ChannelManager.LoadChannelHistoryAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.LoadChannelHistoryAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1098,6 +1155,13 @@
     {
       "symbol": "M:Meshline.Components.ChannelManager.ReportPostAsync(Meshline.Models.Client.ChannelPostRef,System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.ReportPostAsync(Meshline.Models.Client.ChannelPostRef,string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/channel.ts",
+      "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+    },
+    {
+      "symbol": "M:Meshline.Components.ChannelManager.SynchronizeAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.SynchronizeAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/channel.ts",
       "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
@@ -1418,6 +1482,13 @@
       "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
     },
     {
+      "symbol": "M:Meshline.Components.GroupManager.GetSyncStatusAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/group.ts",
+      "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
+    },
+    {
       "symbol": "M:Meshline.Components.GroupManager.LeaveGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.LeaveGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1483,6 +1554,13 @@
     {
       "symbol": "M:Meshline.Components.GroupManager.SetRoleAsync(Meshline.Models.Client.GroupRef,System.String,Meshline.Models.Protocol.GroupRole,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.SetRoleAsync(Meshline.Models.Client.GroupRef,string,Meshline.Models.Protocol.GroupRole,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/group.ts",
+      "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
+    },
+    {
+      "symbol": "M:Meshline.Components.GroupManager.SynchronizeAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.SynchronizeAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/group.ts",
       "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
@@ -1614,6 +1692,13 @@
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
     },
     {
+      "symbol": "M:Meshline.Components.MessageManager.GetSyncStatusAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
       "symbol": "M:Meshline.Components.MessageManager.RemoveContactAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.RemoveContactAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1630,6 +1715,13 @@
     {
       "symbol": "M:Meshline.Components.MessageManager.SetAliasAsync(System.String,System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.SetAliasAsync(string,string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
+      "symbol": "M:Meshline.Components.MessageManager.SynchronizeAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.SynchronizeAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/message.ts",
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
@@ -4626,32 +4718,44 @@
     {
       "symbol": "P:Meshline.Models.Client.ResourceSyncStatus.BlockReason",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncStatus.md#Meshline.Models.Client.ResourceSyncStatus.BlockReason",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "P:Meshline.Models.Client.ResourceSyncStatus.Error",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncStatus.md#Meshline.Models.Client.ResourceSyncStatus.Error",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "P:Meshline.Models.Client.ResourceSyncStatus.HasRetentionGap",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncStatus.md#Meshline.Models.Client.ResourceSyncStatus.HasRetentionGap",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "P:Meshline.Models.Client.ResourceSyncStatus.LastSynchronizedAt",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncStatus.md#Meshline.Models.Client.ResourceSyncStatus.LastSynchronizedAt",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "P:Meshline.Models.Client.ResourceSyncStatus.Resource",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncStatus.md#Meshline.Models.Client.ResourceSyncStatus.Resource",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "P:Meshline.Models.Client.ResourceSyncStatus.State",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncStatus.md#Meshline.Models.Client.ResourceSyncStatus.State",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "P:Meshline.Models.FieldUpdate`1.Delete",
@@ -7876,17 +7980,23 @@
     {
       "symbol": "T:Meshline.Models.Client.ResourceSyncBlockReason",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncBlockReason.md",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "T:Meshline.Models.Client.ResourceSyncState",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncState.md",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "T:Meshline.Models.Client.ResourceSyncStatus",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ResourceSyncStatus.md",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/resource-sync.ts",
+      "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
     },
     {
       "symbol": "T:Meshline.Models.FieldUpdate`1",

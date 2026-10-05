@@ -8,6 +8,7 @@
 - [`ApplicationsChanged`](#Meshline.Components.GroupManager.ApplicationsChanged)
 - [`GroupChanged`](#Meshline.Components.GroupManager.GroupChanged)
 - [`KeyRecoveryChanged`](#Meshline.Components.GroupManager.KeyRecoveryChanged)
+- [`SyncStatusChanged`](#Meshline.Components.GroupManager.SyncStatusChanged)
 - [`TimelineChanged`](#Meshline.Components.GroupManager.TimelineChanged)
 - [`GroupManager(ClientOptions, DatabaseOptions, RelayClientPool, DeviceManager, MessageManager, ISecretProtector)`](#Meshline.Components.GroupManager.GroupManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Components.DeviceManager%2CMeshline.Components.MessageManager%2CMeshline.Interactions.ISecretProtector%29)
 - [`ApplyToGroupAsync(GroupInvite, CancellationToken)`](#Meshline.Components.GroupManager.ApplyToGroupAsync%28Meshline.Models.Client.GroupInvite%2CSystem.Threading.CancellationToken%29)
@@ -28,6 +29,7 @@
 - [`GetKeyRecoveryRequestsAsync(GroupRef, PageRequest, CancellationToken)`](#Meshline.Components.GroupManager.GetKeyRecoveryRequestsAsync%28Meshline.Models.Client.GroupRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
 - [`GetMembersAsync(GroupRef, Nullable<GroupRole>, string, CancellationToken)`](#Meshline.Components.GroupManager.GetMembersAsync%28Meshline.Models.Client.GroupRef%2CSystem.Nullable_Meshline.Models.Protocol.GroupRole_%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`GetMessagesAsync(string, string, CancellationToken)`](#Meshline.Components.GroupManager.GetMessagesAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
+- [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.GroupManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`LeaveGroupAsync(GroupRef, CancellationToken)`](#Meshline.Components.GroupManager.LeaveGroupAsync%28Meshline.Models.Client.GroupRef%2CSystem.Threading.CancellationToken%29)
 - [`RejectApplicationsAsync(GroupRef, IReadOnlyList<string>, CancellationToken)`](#Meshline.Components.GroupManager.RejectApplicationsAsync%28Meshline.Models.Client.GroupRef%2CSystem.Collections.Generic.IReadOnlyList_string_%2CSystem.Threading.CancellationToken%29)
 - [`RejectKeyRecoveryAsync(GroupRef, IReadOnlyList<string>, CancellationToken)`](#Meshline.Components.GroupManager.RejectKeyRecoveryAsync%28Meshline.Models.Client.GroupRef%2CSystem.Collections.Generic.IReadOnlyList_string_%2CSystem.Threading.CancellationToken%29)
@@ -38,6 +40,7 @@
 - [`SendMessageAsync(GroupRef, GroupMessageDraft, CancellationToken)`](#Meshline.Components.GroupManager.SendMessageAsync%28Meshline.Models.Client.GroupRef%2CMeshline.Models.Client.GroupMessageDraft%2CSystem.Threading.CancellationToken%29)
 - [`SetNicknameAsync(GroupRef, string, CancellationToken)`](#Meshline.Components.GroupManager.SetNicknameAsync%28Meshline.Models.Client.GroupRef%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`SetRoleAsync(GroupRef, string, GroupRole, CancellationToken)`](#Meshline.Components.GroupManager.SetRoleAsync%28Meshline.Models.Client.GroupRef%2Cstring%2CMeshline.Models.Protocol.GroupRole%2CSystem.Threading.CancellationToken%29)
+- [`SynchronizeAsync(GroupRef, CancellationToken)`](#Meshline.Components.GroupManager.SynchronizeAsync%28Meshline.Models.Client.GroupRef%2CSystem.Threading.CancellationToken%29)
 - [`TransferOwnershipAsync(GroupRef, string, CancellationToken)`](#Meshline.Components.GroupManager.TransferOwnershipAsync%28Meshline.Models.Client.GroupRef%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`UnbanAsync(GroupRef, IReadOnlyList<string>, CancellationToken)`](#Meshline.Components.GroupManager.UnbanAsync%28Meshline.Models.Client.GroupRef%2CSystem.Collections.Generic.IReadOnlyList_string_%2CSystem.Threading.CancellationToken%29)
 - [`UpdateGroupAsync(GroupRef, GroupUpdate, CancellationToken)`](#Meshline.Components.GroupManager.UpdateGroupAsync%28Meshline.Models.Client.GroupRef%2CMeshline.Models.Client.GroupUpdate%2CSystem.Threading.CancellationToken%29)
@@ -1429,6 +1432,47 @@ The SQLite database cannot be opened or a database command fails, for example be
 ### Remarks
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
 
+<a name='Meshline.Components.GroupManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)'></a>
+
+## GroupManager\.GetSyncStatusAsync\(string, CancellationToken\) Method
+
+Returns the current local synchronization snapshot for the group, without network access\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ResourceSyncStatus> GetSyncStatusAsync(string groupId, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.GroupManager.GetSyncStatusAsync(string,System.Threading.CancellationToken).groupId'></a>
+
+`groupId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The canonical resource identifier\.
+
+<a name='Meshline.Components.GroupManager.GetSyncStatusAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+An immutable runtime snapshot, initially Idle with no successful completion time\.
+
+#### Exceptions
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The resource identifier is invalid\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component has not been initialized\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation was canceled\.
+
 <a name='Meshline.Components.GroupManager.LeaveGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)'></a>
 
 ## GroupManager\.LeaveGroupAsync\(GroupRef, CancellationToken\) Method
@@ -2196,6 +2240,68 @@ The relay does not host groups, or the verified management history contains an u
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
 The supplied group fields, account list, invitation, or message content violates the operation's protocol constraints\.
 
+<a name='Meshline.Components.GroupManager.SynchronizeAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)'></a>
+
+## GroupManager\.SynchronizeAsync\(GroupRef, CancellationToken\) Method
+
+Performs and awaits one incremental synchronization pass for the specified group's timeline, keys, and readable messages\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ResourceSyncStatus> SynchronizeAsync(Meshline.Models.Client.GroupRef group, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.GroupManager.SynchronizeAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken).group'></a>
+
+`group` [GroupRef](Meshline.Models.Client.GroupRef.md 'Meshline\.Models\.Client\.GroupRef')
+
+The resource to synchronize\.
+
+<a name='Meshline.Components.GroupManager.SynchronizeAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels this call, including queued work; already committed data is retained\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+This pass's completion snapshot, including any processing block such as missing group keys\.
+
+#### Exceptions
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The resource identifier is invalid\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component is not initialized, or authorization is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The call, component lifetime, or relay request was canceled\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery or a network request fails\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects synchronization\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Remote or stored data fails validation\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+Local storage cannot be accessed\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting synchronized data fails\.
+
+### Remarks
+Requires initialization and usable authorization, but not StartAsync\. Every call performs a fresh pass,<br>
+serialized with background synchronization\. Reads forward from local progress until the relay reports no more pages;<br>
+this does not freeze a remote sequence at call time or guarantee complete historical data\.<br>
+Transport and storage failures update synchronization status and propagate to the caller\.
+
 <a name='Meshline.Components.GroupManager.TransferOwnershipAsync(Meshline.Models.Client.GroupRef,string,System.Threading.CancellationToken)'></a>
 
 ## GroupManager\.TransferOwnershipAsync\(GroupRef, string, CancellationToken\) Method
@@ -2537,6 +2643,19 @@ public event EventHandler<GroupKeyRecoveryChangedEventArgs>? KeyRecoveryChanged;
 
 #### Event Type
 [System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[GroupKeyRecoveryChangedEventArgs](Meshline.Components.GroupKeyRecoveryChangedEventArgs.md 'Meshline\.Components\.GroupKeyRecoveryChangedEventArgs')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
+
+<a name='Meshline.Components.GroupManager.SyncStatusChanged'></a>
+
+## GroupManager\.SyncStatusChanged Event
+
+Occurs after the local synchronization snapshot changes\. Handlers must not synchronously wait for component operations\.
+
+```csharp
+public event EventHandler<ResourceSyncStatus>? SyncStatusChanged;
+```
+
+#### Event Type
+[System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
 
 <a name='Meshline.Components.GroupManager.TimelineChanged'></a>
 

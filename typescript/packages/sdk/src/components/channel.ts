@@ -14,9 +14,11 @@ import { ChannelRepository, type ChannelChanges, type ChannelInfo, type ChannelO
 import { snapshotReader } from '../messages/repository.js';
 import { nextRevision } from '../protocol/context.js';
 import { canonicalJson, requireObject, requireSafeInteger } from '../protocol/json.js';
+import type { ResourceSyncStatus } from '../models/resource-sync.js';
+import { ResourceSyncTracker } from '../runtime/resource-sync.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { AsyncPulse } from '../runtime/async-pulse.js';
-import { throwIfAborted } from '../runtime/clock.js';
+import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
 import type { MeshlineStore, QueryReader } from '../storage/store.js';
 import type { RelayClient } from '../transport/client.js';
@@ -34,6 +36,7 @@ export interface ChannelPostUpdate { readonly body?: MessageBody | null; readonl
 export interface ChannelHistoryRequest { readonly cursor?: string; readonly limit?: number }
 export interface ChannelHistoryPage { readonly items: readonly ChannelPostInfo[]; readonly nextCursor?: string }
 export interface ChannelEvents {
+    readonly syncStatusChanged: ResourceSyncStatus;
     readonly channelChanged: ChannelInfo;
     readonly timelineChanged: { readonly channel: ChannelRef; readonly changes: readonly ChannelPostChange[] };
     readonly followChanged: { readonly channel: ChannelRef; readonly isFollowed: boolean };
@@ -42,6 +45,16 @@ interface Subscription { client: RelayClient; subscription: RelaySubscription; s
 
 /** Public channels with verified historical permissions, durable exact requests and explicit runtime ownership. */
 export class ChannelManager extends ClientComponent {
+    readonly #syncStatus = new ResourceSyncTracker(this.clock, status => this.#notify('syncStatusChanged', status));
+    /** Performs a fresh descriptor/forward-timeline pass without requiring start() or changing follow state. */
+    synchronize(channel: ChannelRef, signal?: AbortSignal): Promise<ResourceSyncStatus> {
+        channel = { ...channel }; validateChannelRef(channel);
+        return awaitWithSignal(this.runOperation(scope => this.#synchronizeChannel(channel, scope, true), signal), signal);
+    }
+    /** Reads an in-memory resource snapshot without network access. Completion times reset with a new component instance. */
+    getSyncStatus(channelId: string, signal?: AbortSignal): Promise<ResourceSyncStatus> {
+        validateIdentifier('channel', channelId); return this.runOperation(async () => this.#syncStatus.get(channelId), signal);
+    }
     readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #device: DeviceManager; readonly #random: RandomSource;
     readonly #repository: ChannelRepository; readonly #writes = new AsyncGate(); readonly #events = new EventHub<ChannelEvents>();
     readonly #subscriptions = new Map<string, Subscription>(); #pulse: AsyncPulse | undefined; #jobs: Promise<void>[] = [];
@@ -237,17 +250,25 @@ export class ChannelManager extends ClientComponent {
                         const client = await this.#hosting(id, signal); const channels = records.filter(record => record.channel.relayId === id);
                         try { await this.#subscribe(client, channels.map(record => record.channel.channelId), signal); } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'subscribe_channel', resource: id, error }); }
                         for (const record of channels) {
-                            try { await this.#writes.run(async () => { const changed = await this.#repository.saveDescriptor(record.channel, await this.#resolve(client, record.channel, undefined, signal), undefined, signal); if (changed) this.#notify('channelChanged', changed);
-                                await this.#synchronize(client, record.channel, (await this.#repository.get(record.channel, signal)).syncSequence, true, signal); }, signal);
+                            try { await this.#synchronizeChannel(record.channel, signal);
                             } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'synchronize_channel', resource: record.channel.channelId, error }); }
                         }
-                    } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'connect_channel', resource: id, error }); }
+                    } catch (error) { throwIfAborted(signal); for (const record of records.filter(value => value.channel.relayId === id)) this.#syncStatus.block(record.channel.channelId, error); this.notifyBackgroundError({ operation: 'connect_channel', resource: id, error }); }
                 }
             } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'synchronize_channels', error }); }
         } } catch (error) { if (!signal.aborted) throw error; }
     }
-    protected override async onStop(): Promise<void> {
-        try { await Promise.all(this.#jobs); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; }
+    #synchronizeChannel(channel: ChannelRef, signal: AbortSignal, manual = false): Promise<ResourceSyncStatus> {
+        return this.#writes.run(() => this.#syncStatus.run(channel.channelId, async () => {
+            const client = await this.#hosting(channel.relayId, signal);
+            const changed = await this.#repository.saveDescriptor(channel, await this.#resolve(client, channel, undefined, signal), undefined, signal);
+            if (changed) this.#notify('channelChanged', changed);
+            await this.#synchronize(client, channel, (await this.#repository.get(channel, signal)).syncSequence, true, signal);
+            return undefined;
+        }, signal, manual), signal);
     }
-    protected override async onDispose(): Promise<void> { this.#events.clear(); }
+    protected override async onStop(): Promise<void> {
+        try { await Promise.all(this.#jobs); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop(); }
+    }
+    protected override async onDispose(): Promise<void> { this.#syncStatus.stop(true); this.#events.clear(); }
 }

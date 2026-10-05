@@ -25,7 +25,7 @@ export class MessageReceiver {
     readonly #gate = new AsyncGate();
     constructor(readonly repository: MessageRepository, readonly context: NetworkContext, readonly device: MessageDecryptor, readonly policy: MessageReceptionPolicy) {}
     /** Results are emitted after every committed page; callbacks must not block on stopping the owning runtime. */
-    synchronize(relayId: string, source: TimelineSource, committed: (result: ReceptionResult) => void, signal?: AbortSignal): Promise<void> {
+    synchronize(relayId: string, source: TimelineSource, committed: (result: ReceptionResult) => void, signal?: AbortSignal, observedGap?: () => void): Promise<void> {
         return this.#gate.run(async () => {
             while (true) {
                 throwIfAborted(signal);
@@ -36,10 +36,14 @@ export class MessageReceiver {
                 try {
                     for (const entry of page.items) {
                         const result = await this.#receive(relayId, entry, certificates.get(entry.envelope.fromDeviceId)!, page.hasRetentionGap === true, signal);
+                        if (page.hasRetentionGap === true) observedGap?.();
                         if (result.error) rejected.push({ sequence: entry.sequence, error: result.error });
                         if (result.inserted) { inserted++; if (result.message) messages.push(result.message); }
                     }
-                    if (!page.items.length) await this.repository.acceptEmptyPage(relayId, page.hasRetentionGap === true, signal);
+                    if (!page.items.length) {
+                        await this.repository.acceptEmptyPage(relayId, page.hasRetentionGap === true, signal);
+                        if (page.hasRetentionGap === true) observedGap?.();
+                    }
                 } finally {
                     // Earlier entries stay committed if a later entry fails, and their notifications must not be lost.
                     if (inserted || rejected.length) committed({ messages, rejected, inserted });

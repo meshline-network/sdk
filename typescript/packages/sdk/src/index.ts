@@ -43,6 +43,7 @@ export * from './models/group-management.js';
 export * from './models/group-keys.js';
 export * from './models/group-admission.js';
 export * from './crypto/groups.js';
+export * from './models/resource-sync.js';
 export * from './components/message.js';
 export * from './components/channel.js';
 export type { ChannelInfo, ChannelPostInfo, ChannelPostChange } from './channels/repository.js';

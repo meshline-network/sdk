@@ -3,7 +3,7 @@ import { systemRandom, type RandomSource } from '../crypto/primitives.js';
 import { ProtocolError } from '../errors.js';
 import { certificateId, accountDeviceStateCodec, accountRouteCodec, authorizedDevice, validateDeviceState } from '../models/identity.js';
 import { createIdentifier, validateIdentifier } from '../identity/identifiers.js';
-import { validateAccountId } from '../identity/neo.js';
+import { validateAccountId, validateRelayId } from '../identity/neo.js';
 import type { SecretProtector } from '../interactions.js';
 import { accountContactSyncCodec, contactAuthorizationCodec, contactConsentCodec, contactGrantCodec, verifyContactGrant, verifyContactInvite,
     type ContactAuthorization, type ContactGrant, type ContactInvite } from '../models/contacts.js';
@@ -15,9 +15,11 @@ import { MessageRepository, snapshotReader, type AccountMessage, type MessageInf
 import { MessageReceiver, type ReceptionResult } from '../messages/receiver.js';
 import { registerAccountSender } from '../messages/account-sender.js';
 import { requireObject, type JsonObject } from '../protocol/json.js';
+import type { ResourceSyncStatus } from '../models/resource-sync.js';
+import { ResourceSyncTracker } from '../runtime/resource-sync.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { AsyncPulse } from '../runtime/async-pulse.js';
-import { throwIfAborted } from '../runtime/clock.js';
+import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
 import type { MeshlineStore, QueryReader, RecordKey } from '../storage/store.js';
 import { readSignedRequest, requestKey } from '../storage/signed-request.js';
@@ -32,6 +34,7 @@ export interface MessageManagerOptions extends ClientOptions {
     readonly secretProtector?: SecretProtector; readonly random?: RandomSource;
 }
 export interface MessageEvents {
+    readonly syncStatusChanged: ResourceSyncStatus;
     readonly timelineChanged: undefined; readonly messageReceived: readonly MessageInfo[]; readonly sendStatusChanged: MessageSendStatus;
     readonly contactChanged: ContactChange;
     readonly contactRequestChanged: ContactRequestChange;
@@ -43,6 +46,16 @@ const routeKey = (account: string): RecordKey => ({ collection: 'account_routes'
 
 /** Account messaging and contact relationships share durable authorization, delivery and synchronization transactions. */
 export class MessageManager extends ClientComponent {
+    readonly #syncStatus = new ResourceSyncTracker(this.clock, status => this.#notify('syncStatusChanged', status));
+    readonly #synchronization = new AsyncGate();
+    /** Performs a fresh incremental pass without requiring start(); returns this pass's result and propagates operational failures. */
+    synchronize(relayId: string, signal?: AbortSignal): Promise<ResourceSyncStatus> {
+        validateRelayId(relayId); return awaitWithSignal(this.runOperation(scope => this.#synchronizePass(relayId, scope), signal), signal);
+    }
+    /** Reads an in-memory resource snapshot without network access. Completion times reset with a new component instance. */
+    getSyncStatus(relayId: string, signal?: AbortSignal): Promise<ResourceSyncStatus> {
+        validateRelayId(relayId); return this.runOperation(async () => this.#syncStatus.get(relayId), signal);
+    }
     readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #account: AccountManager; readonly #device: DeviceManager; readonly #random: RandomSource;
     readonly #events = new EventHub<MessageEvents>(); readonly #writes = new AsyncGate();
     readonly #repository: MessageRepository; readonly #contacts: MessageContacts; readonly #outbox: MessageOutbox; readonly #receiver: MessageReceiver;
@@ -91,6 +104,8 @@ export class MessageManager extends ClientComponent {
     protected override async onInitialize(signal: AbortSignal): Promise<void> {
         this.#account.ensureInitialized(); this.#device.ensureInitialized(); await this.#store.initialize({ context: this.context.toString(), accountId: this.accountId }, signal);
         await this.#outbox.recover(signal);
+        for (const row of (await this.#store.read([{ collection: 'message_timelines' }], signal)).sets[0]!)
+            if (row.value.hasRetentionGap === true) this.#syncStatus.observeGap(row.key, false);
         this.#removeRouteListener?.(); this.#removeRouteListener = this.#account.on('accountChanged', value => { if (value.route) this.#observeRoute(value.route.relayId); });
         if (this.#account.route) this.#observeRoute(this.#account.route.relayId); await this.#routeRecording;
     }
@@ -223,12 +238,22 @@ export class MessageManager extends ClientComponent {
                 await this.#routeRecording;
                 const rows = await this.#store.read([{ collection: 'message_timelines' }], signal);
                 for (const row of rows.sets[0]!) {
-                    try { const client = await this.#pool.get(row.key, { mode: 'device', signer: this.#device }, signal); await this.#observeClient(client, signal);
-                        await this.#receiver.synchronize(row.key, { read: async (after, scope) => (await client.requestHttp('GET', 'message.timeline.sync', { after }, { ...(scope ? { signal: scope } : {}) }))! }, result => this.#received(row.key, result), signal);
+                    if (row.value.hasRetentionGap === true) this.#syncStatus.observeGap(row.key);
+                    try { await this.#synchronizePass(row.key, signal, true);
                     } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'synchronize_messages', resource: row.key, error }); }
                 }
             } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'synchronize_messages', error }); }
         } } catch (error) { if (!signal.aborted) throw error; }
+    }
+    #synchronizePass(relayId: string, signal: AbortSignal, observe = false): Promise<ResourceSyncStatus> {
+        return this.#synchronization.run(() => this.#syncStatus.run(relayId, async () => {
+            const client = await this.#pool.get(relayId, { mode: 'device', signer: this.#device }, signal);
+            if (observe) {
+                try { await this.#observeClient(client, signal); } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'connect', resource: relayId, error }); }
+            }
+            await this.#receiver.synchronize(relayId, { read: async (after, scope) => (await client.requestHttp('GET', 'message.timeline.sync', { after }, { ...(scope ? { signal: scope } : {}) }))! }, result => this.#received(relayId, result), signal, () => this.#syncStatus.observeGap(relayId));
+            return undefined;
+        }, signal, !observe), signal);
     }
     async #observeClient(client: RelayClient, signal: AbortSignal): Promise<void> {
         const previous = this.#observed.get(client.relayId); if (previous?.client === client) return;
@@ -246,8 +271,8 @@ export class MessageManager extends ClientComponent {
     protected override async onStop(): Promise<void> {
         try { const results = await Promise.allSettled(this.#runtimeJobs); const failures = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected'); if (failures.length) throw new AggregateError(failures.map(value => value.reason), 'Message runtime failed.'); }
         finally { for (const observed of this.#observed.values()) for (const remove of observed.detach) remove(); this.#observed.clear();
-            for (const remove of this.#deviceListeners) remove(); this.#deviceListeners = []; this.#runtimeJobs = []; this.#sendPulse = this.#syncPulse = this.#maintenancePulse = undefined; this.#pendingDeviceRevision = undefined; }
+            for (const remove of this.#deviceListeners) remove(); this.#deviceListeners = []; this.#runtimeJobs = []; this.#sendPulse = this.#syncPulse = this.#maintenancePulse = undefined; this.#pendingDeviceRevision = undefined; this.#syncStatus.stop(); }
     }
-    protected override async onDispose(): Promise<void> { this.#removeRouteListener?.(); this.#removeRouteListener = undefined; await this.#routeRecording; if (this.#pendingRoutes.size) throw new Error('Some observed message timelines could not be persisted.'); this.#events.clear(); }
+    protected override async onDispose(): Promise<void> { this.#removeRouteListener?.(); this.#removeRouteListener = undefined; await this.#routeRecording; if (this.#pendingRoutes.size) throw new Error('Some observed message timelines could not be persisted.'); this.#syncStatus.stop(true); this.#events.clear(); }
 }
 function ordinal(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }

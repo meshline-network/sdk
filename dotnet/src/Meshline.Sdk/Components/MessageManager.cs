@@ -51,6 +51,8 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
             .SetProperty(value => value.State, MessageSendState.SubmissionUnknown), cancellationToken).ConfigureAwait(false);
         await database.ContactRequests.Where(value => value.SendState == MessageSendState.Submitting).ExecuteUpdateAsync(set => set
             .SetProperty(value => value.SendState, MessageSendState.SubmissionUnknown), cancellationToken).ConfigureAwait(false);
+        foreach (var timeline in await database.AccountTimelines.AsNoTracking().Where(value => value.HasRetentionGap).ToListAsync(cancellationToken).ConfigureAwait(false))
+            _syncStatus.ObserveGap(timeline.RelayId);
         accountManager.AccountChanged += OnAccountChanged;
         lock (_relayGate) _observingRoutes = true;
         await ObserveAccountRoute().ConfigureAwait(false);
@@ -97,6 +99,7 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
         deviceManager.DeviceStateChanged -= OnOwnDeviceStateChanged;
         await Task.WhenAll(_sender, _synchronizer, _poller, _refresh, _poll).ConfigureAwait(false);
         DetachRelays();
+        _syncStatus.Stop(OnSyncStatusChanged);
     }
 
     /// <inheritdoc/>
@@ -114,6 +117,7 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
         accountManager.AccountChanged -= OnAccountChanged;
         await recorder.ConfigureAwait(false);
         await PersistObservedRoutesAsync().ConfigureAwait(false);
+        _syncStatus.Stop(OnSyncStatusChanged, resetAll: true);
         await base.DisposeAsyncCore().ConfigureAwait(false);
     }
 

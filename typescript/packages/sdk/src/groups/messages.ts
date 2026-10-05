@@ -15,7 +15,7 @@ import type { GroupProjection } from './state.js';
 export interface GroupMessageInfo extends GroupMessage {
     readonly group: GroupRef; readonly sequence: number; readonly messageId: string; readonly sender: string; readonly senderDeviceId: string; readonly createdAt: number; readonly acceptedAt: number;
 }
-export interface GroupMessageProcessingResult { readonly state: 'waitingForKey' | 'processed' | 'alreadyProcessed'; readonly message?: GroupMessageInfo; readonly nicknameChanged?: boolean; readonly groupRecord?: JsonObject; readonly error?: ProtocolError }
+export interface GroupMessageProcessingResult { readonly state: 'waitingForKey' | 'processed' | 'alreadyProcessed'; readonly requiresKey?: boolean; readonly message?: GroupMessageInfo; readonly nicknameChanged?: boolean; readonly groupRecord?: JsonObject; readonly error?: ProtocolError }
 export interface GroupApplicationSecrets {
     /** Returns a fresh owned buffer only after the epoch's authority is verified. Caller erases it. */
     readApplicationSecret(group: GroupRef, epoch: number, signal?: AbortSignal): Promise<Uint8Array | undefined>;
@@ -32,14 +32,17 @@ export function applyGroupNickname(projection: GroupProjection, accountId: strin
 /** Decryption is separate from verified timeline ingestion, so a missing old key cannot prevent recovery of later epochs. */
 export class GroupMessageProcessor {
     constructor(readonly store: MeshlineStore, readonly context: NetworkContext, readonly accountId: string, readonly secrets: GroupApplicationSecrets) {}
-    async processPending(group: GroupRef, committed: (sequence: number, result: GroupMessageProcessingResult) => void, signal?: AbortSignal): Promise<void> {
+    async processPending(group: GroupRef, committed: (sequence: number, result: GroupMessageProcessingResult) => void, signal?: AbortSignal): Promise<boolean> {
+        let pending = false;
         validateGroupRef(group); const reader = await this.store.openQuery({ collection: 'group_pending_messages', prefix: `${group.groupId}|` }, signal);
         try {
             while (true) {
                 const rows = await reader.readNext(128, signal); if (!rows.length) break;
-                for (const row of rows) { requireSafeInteger(row.value.sequence, 1); const result = await this.process(group, row.value.sequence, signal); if (result.state === 'processed') committed(row.value.sequence, result); }
+                for (const row of rows) { requireSafeInteger(row.value.sequence, 1); const result = await this.process(group, row.value.sequence, signal); if (result.state === 'processed') committed(row.value.sequence, result);
+                    if (result.requiresKey) pending = true; }
             }
         } finally { await reader.dispose(); }
+        return pending;
     }
     async process(group: GroupRef, sequence: number, signal?: AbortSignal): Promise<GroupMessageProcessingResult> {
         validateGroupRef(group); requireSafeInteger(sequence, 1); throwIfAborted(signal);
@@ -55,7 +58,7 @@ export class GroupMessageProcessor {
         const epoch = (await this.store.read([groupEpochKey(group, event.epoch)], signal)).sets[0]![0];
         if (!epoch?.value.commitment) throw new ProtocolError('invalid_storage', 'Verified group message has no established epoch.');
         // Key access is outside the permanent-content rejection boundary, even when a local provider throws ProtocolError.
-        const secret = await this.secrets.readApplicationSecret(group, event.epoch, signal); if (!secret) return { state: 'waitingForKey' };
+        const secret = await this.secrets.readApplicationSecret(group, event.epoch, signal); if (!secret) return { state: 'waitingForKey', requiresKey: epoch.value.memberPublicKey !== undefined };
         let payload: JsonObject | undefined; let error: ProtocolError | undefined;
         try {
             throwIfAborted(signal); try { requireLength(secret, 32, 'Stored application secret'); } catch (cause) { throw new GroupKeyAccessError('Local group application secret has an invalid length.', { cause }); }
