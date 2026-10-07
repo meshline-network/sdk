@@ -28,7 +28,8 @@ export async function runReconnectChecks(options: ReconnectOptions, onResult: (r
             const response = await options.fetch(`${options.origin}/reconnect/${path}`, { method: body ? 'POST' : 'GET', headers: { ...(body ? { 'Content-Type': 'application/json' } : {}) },
                 ...(body ? { body: JSON.stringify(body) } : {}), signal: scope.signal, credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer' });
             const text = sdk.decodeUtf8(new Uint8Array(await response.arrayBuffer())); check(response.status === 200, `Reconnect fixture returned ${response.status}: ${text}`); return JSON.parse(text) as ReconnectSnapshot;
-        } finally { scope.dispose(); }
+        } catch (cause) { throw new Error(`Reconnect fixture request '${path}' failed.`, { cause }); }
+        finally { scope.dispose(); }
     }
     const fixture = await fetchSnapshot('begin', { run });
     const observe = () => fetchSnapshot(`${run}/observations`);

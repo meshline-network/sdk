@@ -139,18 +139,24 @@ export function createReconnectPeer(https: string, wss: string) {
         http(request: IncomingMessage, response: ServerResponse, body: string): boolean {
             const url = new URL(request.url!, https); if (!url.pathname.startsWith('/reconnect/')) return false;
             response.setHeader('Content-Type', 'application/json');
+            const replySnapshot = (session: Session) => {
+                // Keep fault-control traffic off idle pooled TLS connections. Relay /v1
+                // requests still exercise normal keep-alive, disconnects and recovery.
+                response.setHeader('Connection', 'close');
+                response.end(JSON.stringify(session.snapshot()));
+            };
             let activeSession: Session | undefined;
             try {
                 const value = body ? sdk.requireObject(sdk.parseJson(body)) : Object.fromEntries(url.searchParams) as sdk.JsonObject;
                 if (url.pathname === '/reconnect/begin' && request.method === 'POST') {
                     const run = String(value.run); if (!/^[a-f0-9]{24}$/.test(run) || sessions.has(run)) throw new Error('Invalid or reused native fixture run.');
-                    const session = create(run); sessions.set(run, session); response.end(JSON.stringify(session.snapshot())); return true;
+                    const session = create(run); sessions.set(run, session); replySnapshot(session); return true;
                 }
                 const match = /^\/reconnect\/([a-f0-9]{24})\/(.+)$/.exec(url.pathname); const session = match && sessions.get(match[1]!); if (!session) throw new Error('Unknown native reconnect run.');
                 activeSession = session;
                 const path = match![2]!;
-                if (path === 'control' && request.method === 'POST') { session.control(String(value.action)); response.end(JSON.stringify(session.snapshot())); }
-                else if (path === 'observations') response.end(JSON.stringify(session.snapshot()));
+                if (path === 'control' && request.method === 'POST') { session.control(String(value.action)); replySnapshot(session); }
+                else if (path === 'observations') replySnapshot(session);
                 else if (path.startsWith('v1/')) response.end(JSON.stringify(session.request(path.slice(3).replaceAll('/', '.'), value, request.headers['x-meshline-session'] as string | undefined)));
                 else throw new Error('Unknown reconnect route.');
             } catch (error) { activeSession?.fail(error); response.statusCode = 500; response.end(JSON.stringify({ code: 'internal_error', message: String(error) })); }
