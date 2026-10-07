@@ -14,6 +14,7 @@ Choose an SDK for its requirements, installation instructions, and application g
 ## Related resources
 
 - [Meshline website and developer resources](https://meshline.org/en/resources)
+- [Meshline CLI](https://github.com/meshline-network/client) — a development-preview client for people, scripts, and AI agents; see [downloads](https://github.com/meshline-network/client/releases/latest) and the [automation guide](https://github.com/meshline-network/client/blob/main/docs/automation.md).
 - [Protocol specification](https://github.com/meshline-network/protocol) and [online reader](https://meshline.org/protocol/v1/en/index.html)
 - [Registry reference contracts](https://github.com/meshline-network/contracts)
 
