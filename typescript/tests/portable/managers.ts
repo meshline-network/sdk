@@ -129,7 +129,9 @@ export async function managerRoundtrip({ createStore, random = sdk.systemRandom 
             nickname: resumed.profiles.profile?.nickname, pending: snapshot.sets[0]![0]!.value.pending === true,
             protectedKeys: typeof snapshot.sets[1]![0]!.value.protectedSigningKey === 'string',
             recoveredMessage: history?.body?.text === '持久化加密消息 😀' && sdk.directMessageCodec.decode(plaintext).body?.text === history.body.text,
-            retriedEncryptedMessage: messageSubmissions.length === 2 && messageSubmissions[0] === messageSubmissions[1] && await queue.get(encrypted!.envelope.messageId) === undefined,
+            retriedEncryptedMessage: messageSubmissions.length === 2 && messageSubmissions[0] === messageSubmissions[1]
+                && (await queue.get(encrypted!.envelope.messageId))?.state === 'targetAccepted'
+                && (await resumed.messages.getSendStatus(encrypted!.envelope.messageId))?.state === 'targetAccepted',
             recoveredChannel, channelPublishedOnce: channelPublications.length === 1,
             ...await recoverGroup({ store: resumed.store, device: resumed.device, accountMessages: resumed.messages, protector, random }, stagedGroup!) };
     } finally { await resumed.dispose(); master.fill(0); }
