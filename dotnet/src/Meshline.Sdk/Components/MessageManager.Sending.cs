@@ -131,16 +131,32 @@ sealed partial class MessageManager
 
     async Task RefreshSendStateAsync(string recipient, TypedProtocolModel? authorization, CancellationToken cancellationToken)
     {
-        _ = await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The account device state is unavailable.");
-        if (recipient == Options.AccountId) return;
-        var state = authorization switch
+        var ownState = RefreshOwnStateAsync();
+        if (recipient == Options.AccountId)
         {
-            ContactGrant grant => await deviceManager.GetDeviceStateAsync(grant, cancellationToken).ConfigureAwait(false),
-            ContactInvite invite => await deviceManager.GetDeviceStateAsync(invite, cancellationToken).ConfigureAwait(false),
-            _ => await deviceManager.GetDeviceStateAsync(recipient, cancellationToken).ConfigureAwait(false)
-        };
-        if (state is null) throw new InvalidOperationException("The recipient device state is unavailable.");
+            await ownState.ConfigureAwait(false);
+            return;
+        }
+        // Both lookups include verification and persistence. Drain both before enqueueing or
+        // propagating failure, including synchronous validation errors captured by the async helpers.
+        await Task.WhenAll(ownState, RefreshRecipientStateAsync()).ConfigureAwait(false);
+
+        async Task RefreshOwnStateAsync()
+        {
+            _ = await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("The account device state is unavailable.");
+        }
+
+        async Task RefreshRecipientStateAsync()
+        {
+            var state = authorization switch
+            {
+                ContactGrant grant => await deviceManager.GetDeviceStateAsync(grant, cancellationToken).ConfigureAwait(false),
+                ContactInvite invite => await deviceManager.GetDeviceStateAsync(invite, cancellationToken).ConfigureAwait(false),
+                _ => await deviceManager.GetDeviceStateAsync(recipient, cancellationToken).ConfigureAwait(false)
+            };
+            if (state is null) throw new InvalidOperationException("The recipient device state is unavailable.");
+        }
     }
 
     static bool IsSecretPayload(TypedProtocolModel payload) => payload is AccountGroupPrivateStateSync or AccountGroupHistorySecretSync;

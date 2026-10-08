@@ -26,6 +26,8 @@ public static async Task<MessageSendStatus> SendTextAsync(
 
 Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs). `SendMessageAsync` queues a local outbox operation and returns `MessageSendStatus`. The running component submits pending messages. Retain the message ID to query `GetSendStatusAsync` and observe `SendStatusChanged` for progress.
 
+Before enqueueing, the SDK queries and verifies both accounts' device states concurrently (once for a self-send). Failure or cancellation prevents enqueueing. See [query reuse and freshness](accounts-and-devices.md#device-state-queries).
+
 ## Interpret send status
 
 | State | Application interpretation |
