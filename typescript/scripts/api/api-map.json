@@ -167,7 +167,7 @@
   {
     "type": "Meshline.Components.AccountManager",
     "path": "packages/sdk/src/components/account.ts",
-    "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+    "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
   },
   {
     "type": "Meshline.Components.DeviceManager",

@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "485fae388d11000b08def1d3b2a107a717a35cb5e6a4669f1b7f7f64360bba7a",
+  "sourceSha256": "290420bc6bbedacbf2f885a3731235f3fd2837dce0c62a966cda207efc92dce5",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -9,7 +9,7 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.AccountChanged",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "E:Meshline.Components.ChannelManager.ChannelChanged",
@@ -1052,21 +1052,35 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.AccountManager(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Interactions.IAccountSigner)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "M:Meshline.Components.AccountManager.GetRouteAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.GetRouteAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "M:Meshline.Components.AccountManager.PublishRouteAsync(System.String,System.TimeSpan,System.Nullable{System.Int64},System.Boolean,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.PublishRouteAsync(string,System.TimeSpan,System.Nullable_long_,bool,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
+    },
+    {
+      "symbol": "M:Meshline.Components.AccountManager.RefreshRouteAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.RefreshRouteAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account.ts",
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
+    },
+    {
+      "symbol": "M:Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account.ts",
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "M:Meshline.Components.ChannelManager.#ctor(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Components.DeviceManager)",
@@ -3383,21 +3397,21 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.AccountId",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "P:Meshline.Components.AccountManager.Route",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.Route",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "P:Meshline.Components.AccountManager.State",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.State",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "P:Meshline.Components.BackgroundErrorEventArgs.Error",
@@ -7485,7 +7499,7 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
-      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration."
+      "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
     },
     {
       "symbol": "T:Meshline.Components.AccountState",

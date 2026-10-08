@@ -89,9 +89,14 @@ public sealed class MessageSynchronizationTests
             Certificates = [fixture.Client.Device!],
             HasMore = false
         }) : fixture.Relay.Respond(http));
+        var routeQueries = fixture.Relay.Requests.Count(request => request.Method == "account.route.resolve");
+        var deviceQueries = fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve");
         await fixture.Client.MessageManager.StartAsync(Token);
         await AwaitSignal(observed.Task, fixture);
         await fixture.Client.MessageManager.StopAsync(Token);
+        Assert.Equal(routeQueries, fixture.Relay.Requests.Count(request => request.Method == "account.route.resolve"));
+        if (variation == "valid")
+            Assert.True(fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve") > deviceQueries);
         await using var verify = fixture.Database.Open();
 
         Assert.Equal(1, (await verify.AccountTimelines.SingleAsync(Token)).Sequence);

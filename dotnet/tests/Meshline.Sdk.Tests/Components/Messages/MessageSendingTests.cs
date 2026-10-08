@@ -17,6 +17,25 @@ public sealed class MessageSendingTests
             Text = text
         }
     };
+
+    [Fact]
+    public async Task Warm_route_is_reused_for_self_and_peer_device_queries_when_enqueueing()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        using var peer = new AccountSigner();
+        await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
+        var routes = fixture.Relay.Requests.Count(request => request.Method == "account.route.resolve");
+        var devices = fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve");
+
+        var queued = await fixture.Client.MessageManager.SendMessageAsync(peer.AccountId, Draft(), Token);
+
+        Assert.Equal(MessageSendState.Queued, queued.State);
+        Assert.Equal(routes, fixture.Relay.Requests.Count(request => request.Method == "account.route.resolve"));
+        Assert.Equal(devices + 2, fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve"));
+    }
+
     [Fact]
     public async Task Queued_message_can_be_canceled()
     {

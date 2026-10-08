@@ -106,7 +106,7 @@ sealed partial class MeshlineClient
     async Task<AccountRoute?> ReadMigrationRouteAsync(CancellationToken cancellationToken)
     {
         var previous = Route;
-        try { return await AccountManager.GetRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false) ?? previous; }
+        try { return await AccountManager.RefreshRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false) ?? previous; }
         catch (Exception exception) when (previous is not null && IsRelayUnavailable(exception, cancellationToken))
         {
             ReportBackgroundError(BackgroundOperation.Connect, previous.RelayId, exception);

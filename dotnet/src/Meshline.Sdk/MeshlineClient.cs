@@ -201,7 +201,7 @@ public sealed partial class MeshlineClient : ClientComponent
         await _accountGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var route = await AccountManager.GetRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            var route = await AccountManager.RefreshRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             if (route is not null)
             {
                 if (Device is not null)
@@ -280,7 +280,7 @@ public sealed partial class MeshlineClient : ClientComponent
             AccountRoute? route = null;
             try
             {
-                route = await AccountManager.GetRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                route = await AccountManager.RefreshRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exception) when (exception is HttpRequestException or InvalidDataException or RelayException || exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {

@@ -10,6 +10,14 @@ Use `AccountManager.GetRouteAsync` to resolve the current or another account's r
 
 For first-time setup, use the [quick-start establishment workflow](quick-start.md). It coordinates device creation, device-state publication, and route publication. Lower-level `PublishRouteAsync` and `PublishDeviceStateAsync` exist for applications managing those operations explicitly and require an account signer.
 
+### Route queries
+
+`GetRouteAsync` reuses verified routes for **one hour** after discovery or publication. It then returns an unexpired route immediately while refreshing in the background. `ExpiresAt` remains a hard limit; without a usable route, queries await discovery. Concurrent refreshes for one account share a request; different accounts resolve independently.
+
+Failures and `not_found` impose a **one-minute** cooldown and preserve unexpired routes. During cooldown, a query without a usable route receives the previous error or null. Background errors raise `BackgroundError`. `RefreshRouteAsync` bypasses freshness and cooldown, awaits any shared discovery, and reports its result. Establishment, recovery and migration use it. Publication immediately updates the cache and takes precedence over older responses; unchanged results do not repeat `AccountChanged`.
+
+The cache belongs to one `AccountManager`, isolated by its network, Registry and account. Reopening requires discovery; persisted revisions still prevent rollback. Caller cancellation affects only that wait. Stop and disposal drain refreshes; stop retains verified entries and permits later queries, while disposal clears them.
+
 ## Renew a local device
 
 Prerequisites: initialize the client with the account signer, resolve its route, and retain the local device keys. Select a valid certificate lifetime for your application. Renew the certificate and publish the resulting device state:

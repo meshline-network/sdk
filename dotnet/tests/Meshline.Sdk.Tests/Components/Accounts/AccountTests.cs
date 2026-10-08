@@ -83,7 +83,7 @@ public sealed class AccountTests
 
         fixture.Relay.Routes[fixture.Account.AccountId] = previous;
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.Client.AccountManager.GetRouteAsync(cancellationToken: Token));
+        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.Client.AccountManager.RefreshRouteAsync(cancellationToken: Token));
         Assert.Equal(next.Revision, fixture.Client.Route!.Revision);
     }
 
@@ -106,7 +106,7 @@ public sealed class AccountTests
             }
             return fixture.Relay.Respond(request);
         };
-        var pending = fixture.Client.AccountManager.GetRouteAsync(cancellationToken: Token);
+        var pending = fixture.Client.AccountManager.RefreshRouteAsync(cancellationToken: Token);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
         fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(60));
         var route = await pending.WaitAsync(TimeSpan.FromSeconds(10), Token);

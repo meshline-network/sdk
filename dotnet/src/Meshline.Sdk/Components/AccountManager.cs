@@ -24,14 +24,16 @@ namespace Meshline.Components;
 /// <exception cref="ArgumentNullException">The network context in <paramref name="options"/> is null. The <paramref name="options"/> argument is null.</exception>
 /// <exception cref="ArgumentException">The configured account identifier is invalid.</exception>
 /// <exception cref="NotSupportedException">The configured account identifier uses an unsupported account namespace.</exception>
-public sealed class AccountManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, IAccountSigner? accountSigner = null) : ClientComponent(options)
+public sealed partial class AccountManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, IAccountSigner? accountSigner = null) : ClientComponent(options)
 {
     /// <summary>
     /// Occurs when the current account's known route or establishment state changes.
     /// </summary>
     public event EventHandler? AccountChanged;
 
-    private readonly SemaphoreSlim _routeGate = new(1, 1);
+    private readonly SemaphoreSlim _publicationGate = new(1, 1);
+    // Serializes local commits only; route discovery never holds this over network I/O.
+    private readonly SemaphoreSlim _routeSaveGate = new(1, 1);
 
     /// <summary>
     /// The account's CAIP-10 identifier.
@@ -54,6 +56,8 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     protected override async Task OnInitializeAsync(CancellationToken cancellationToken)
     {
+        if (Context != relayClients.Context)
+            throw new InvalidOperationException("The relay pool belongs to another network or registry.");
         await using var database = new MeshlineDbContext(databaseOptions);
         await EnsureDatabaseBindingAsync(database, cancellationToken).ConfigureAwait(false);
         var route = await database.AccountRoutes.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false);
@@ -62,8 +66,14 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
     }
 
     /// <summary>
-    /// Resolves and verifies an account route and updates the current account's known route when applicable.
+    /// Returns a verified cached route, refreshing it in the background when due, or awaits discovery on a cache miss.
     /// </summary>
+    /// <remarks>
+    /// Verified results are fresh for one hour. Later reads return the unexpired route immediately and share a background refresh.
+    /// Failed refreshes retain unexpired routes and defer ordinary retries for one minute. Signed expiration is a hard limit.
+    /// The cache belongs to this component, network and registry; persisted routes are re-resolved before entering it.
+    /// Use <see cref="RefreshRouteAsync"/> when the operation requires a remote lookup.
+    /// </remarks>
     /// <param name="accountId">The target account identifier, or <see langword="null"/> for the current account.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The verified route, or <see langword="null"/> when no route can be resolved.</returns>
@@ -79,33 +89,20 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
     /// <exception cref="DbUpdateException">Persisting local changes fails, including database constraint or optimistic-concurrency failures.</exception>
     /// <exception cref="ArgumentException">The requested account identifier is invalid.</exception>
     /// <exception cref="NotSupportedException">The requested account uses an unsupported account namespace.</exception>
-    public async Task<AccountRoute?> GetRouteAsync(string? accountId = null, CancellationToken cancellationToken = default)
-    {
-        EnsureInitialized();
-        using var _ = BeginOperation(ref cancellationToken);
-        accountId ??= AccountId;
-        await _routeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        bool changed = false;
-        AccountRoute? route;
-        try
-        {
-            route = await ResolveRouteAsync(accountId, cancellationToken).ConfigureAwait(false);
-            if (accountId == AccountId)
-            {
-                var state = route is null ? AccountState.Unknown : AccountState.Established;
-                changed = route is not null && Route?.ToJson() != route.ToJson() || State != state;
-                Route = route ?? Route;
-                State = state;
-            }
-        }
-        finally
-        {
-            _routeGate.Release();
-        }
-        if (changed)
-            AccountChanged?.Invoke(this, EventArgs.Empty);
-        return route;
-    }
+    public Task<AccountRoute?> GetRouteAsync(string? accountId = null, CancellationToken cancellationToken = default) =>
+        ReadRouteAsync(accountId ?? AccountId, forceRefresh: false, cancellationToken);
+
+    /// <summary>
+    /// Awaits remote route discovery, bypassing cache freshness and failure cooldown while sharing an in-flight lookup for this account.
+    /// </summary>
+    /// <remarks>
+    /// Cancellation stops only this caller's wait. Stop or disposal cancels and drains shared refreshes.
+    /// Failures propagate to this caller and leave unexpired cached routes available to ordinary reads.
+    /// A not-found result returns null without invalidating an unexpired signed route. Concurrent newer local publication takes precedence.
+    /// </remarks>
+    /// <inheritdoc cref="GetRouteAsync" path="param|returns|exception"/>
+    public Task<AccountRoute?> RefreshRouteAsync(string? accountId = null, CancellationToken cancellationToken = default) =>
+        ReadRouteAsync(accountId ?? AccountId, forceRefresh: true, cancellationToken);
 
     /// <summary>
     /// Signs and publishes a newer home-relay route using the account signer.
@@ -137,7 +134,7 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
         if (validity < TimeSpan.FromSeconds(1) || validity > TimeSpan.FromDays(3650))
             throw new ArgumentOutOfRangeException(nameof(validity));
         var signer = accountSigner ?? throw new InvalidOperationException("An account signer is required to publish an account route.");
-        await _routeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _publicationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         AccountRoute result;
         bool changed;
         try
@@ -194,14 +191,22 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
             if ((result with { RelaySignature = null }).ToJson() != request.ToJson())
                 throw new InvalidDataException("The relay modified the submitted route instead of only adding its signature.");
             await VerifyRouteRelayAsync(result, cancellationToken).ConfigureAwait(false);
-            await SaveRouteAsync(result, cancellationToken).ConfigureAwait(false);
-            changed = Route?.ToJson() != result.ToJson();
-            Route = result;
-            State = AccountState.Established;
+            await _routeSaveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await SaveRouteAsync(result, cancellationToken).ConfigureAwait(false);
+                lock (_routeCacheGate)
+                {
+                    var entry = GetRouteEntry(AccountId);
+                    entry.Publication++;
+                    changed = CacheRoute(entry, result);
+                }
+            }
+            finally { _routeSaveGate.Release(); }
         }
         finally
         {
-            _routeGate.Release();
+            _publicationGate.Release();
         }
         if (changed)
             AccountChanged?.Invoke(this, EventArgs.Empty);
@@ -244,7 +249,6 @@ public sealed class AccountManager(ClientOptions options, DatabaseOptions databa
                 ReportBackgroundError(BackgroundOperation.Connect, entry.RelayId, exception);
                 continue;
             }
-            await SaveRouteAsync(route, cancellationToken).ConfigureAwait(false);
             return route;
         }
         if (failures.Count > 0)

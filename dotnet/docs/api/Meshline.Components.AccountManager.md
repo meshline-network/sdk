@@ -9,6 +9,8 @@
 - [`AccountManager(ClientOptions, DatabaseOptions, RelayClientPool, IAccountSigner)`](#Meshline.Components.AccountManager.AccountManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Interactions.IAccountSigner%29)
 - [`GetRouteAsync(string, CancellationToken)`](#Meshline.Components.AccountManager.GetRouteAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`PublishRouteAsync(string, TimeSpan, Nullable<long>, bool, CancellationToken)`](#Meshline.Components.AccountManager.PublishRouteAsync%28string%2CSystem.TimeSpan%2CSystem.Nullable_long_%2Cbool%2CSystem.Threading.CancellationToken%29)
+- [`RefreshRouteAsync(string, CancellationToken)`](#Meshline.Components.AccountManager.RefreshRouteAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`StopAsync(CancellationToken)`](#Meshline.Components.AccountManager.StopAsync%28System.Threading.CancellationToken%29)
 - [`AccountId`](#Meshline.Components.AccountManager.AccountId)
 - [`Route`](#Meshline.Components.AccountManager.Route)
 - [`State`](#Meshline.Components.AccountManager.State)
@@ -131,7 +133,7 @@ public Meshline.Components.AccountState State { get; }
 
 ## AccountManager\.GetRouteAsync\(string, CancellationToken\) Method
 
-Resolves and verifies an account route and updates the current account's known route when applicable\.
+Returns a verified cached route, refreshing it in the background when due, or awaits discovery on a cache miss\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountRoute?> GetRouteAsync(string? accountId=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -191,6 +193,12 @@ The requested account identifier is invalid\.
 
 [System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
 The requested account uses an unsupported account namespace\.
+
+### Remarks
+Verified results are fresh for one hour\. Later reads return the unexpired route immediately and share a background refresh\.<br>
+Failed refreshes retain unexpired routes and defer ordinary retries for one minute\. Signed expiration is a hard limit\.<br>
+The cache belongs to this component, network and registry; persisted routes are re\-resolved before entering it\.<br>
+Use [RefreshRouteAsync\(string, CancellationToken\)](Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.RefreshRouteAsync(string,System.Threading.CancellationToken) 'Meshline\.Components\.AccountManager\.RefreshRouteAsync\(string, System\.Threading\.CancellationToken\)') when the operation requires a remote lookup\.
 
 <a name='Meshline.Components.AccountManager.PublishRouteAsync(string,System.TimeSpan,System.Nullable_long_,bool,System.Threading.CancellationToken)'></a>
 
@@ -280,6 +288,111 @@ The route validity is outside one second through 3650 days, or the selected revi
 
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
 The relay identifier is invalid or the account signer belongs to another account\.
+
+<a name='Meshline.Components.AccountManager.RefreshRouteAsync(string,System.Threading.CancellationToken)'></a>
+
+## AccountManager\.RefreshRouteAsync\(string, CancellationToken\) Method
+
+Awaits remote route discovery, bypassing cache freshness and failure cooldown while sharing an in\-flight lookup for this account\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountRoute?> RefreshRouteAsync(string? accountId=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.AccountManager.RefreshRouteAsync(string,System.Threading.CancellationToken).accountId'></a>
+
+`accountId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The target account identifier, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') for the current account\.
+
+<a name='Meshline.Components.AccountManager.RefreshRouteAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountRoute](Meshline.Models.Protocol.AccountRoute.md 'Meshline\.Models\.Protocol\.AccountRoute')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The verified route, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when no route can be resolved\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation is canceled through [cancellationToken](Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.RefreshRouteAsync(string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.AccountManager\.RefreshRouteAsync\(string, System\.Threading\.CancellationToken\)\.cancellationToken') or the component lifetime ends\. Per\-relay timeouts encountered during discovery are collected as transport failures\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. No active relay is available for route discovery\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component, a required component, or the shared relay pool has been disposed\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+No attempted relay can complete route discovery; individual transient or verification failures are available in the inner aggregate exception\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects the operation with a structured protocol error that is not handled by this method\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+A resolved route conflicts with or predates the route already stored locally\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Text\.DecoderFallbackException](https://learn.microsoft.com/en-us/dotnet/api/system.text.decoderfallbackexception 'System\.Text\.DecoderFallbackException')<br>
+A relay response contains bytes that are not valid UTF\-8\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The requested account identifier is invalid\.
+
+[System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
+The requested account uses an unsupported account namespace\.
+
+### Remarks
+Cancellation stops only this caller's wait\. Stop or disposal cancels and drains shared refreshes\.<br>
+Failures propagate to this caller and leave unexpired cached routes available to ordinary reads\.<br>
+A not\-found result returns null without invalidating an unexpired signed route\. Concurrent newer local publication takes precedence\.
+
+<a name='Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken)'></a>
+
+## AccountManager\.StopAsync\(CancellationToken\) Method
+
+Stops background work and subscriptions while leaving the component available to start again\.
+
+```csharp
+public override System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel waiting to begin stopping; active shutdown is drained without cancellation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task 'System\.Threading\.Tasks\.Task')<br>
+A task that completes when the operation finishes\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The [cancellationToken](Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.AccountManager\.StopAsync\(System\.Threading\.CancellationToken\)\.cancellationToken') is canceled while waiting to enter the lifecycle transition\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component, or a dependency stopped by its shutdown hook, has been disposed\.
+
+[System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
+A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup\.
+
+### Remarks
+The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, runtime shutdown is drained without that token\. The application\-owned relay pool remains available to other components\.
 ### Events
 
 <a name='Meshline.Components.AccountManager.AccountChanged'></a>
