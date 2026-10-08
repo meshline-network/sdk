@@ -206,7 +206,7 @@ public sealed partial class MeshlineClient : ClientComponent
             {
                 if (Device is not null)
                 {
-                    var state = await DeviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                    var state = await DeviceManager.GetOwnDeviceStateAsync(route.RelayId, cancellationToken).ConfigureAwait(false);
                     if (state is not null && state.ValidateDeviceAuthorization(Device.GetDeviceId(Context), Context) is null)
                     {
                         await using var completed = new MeshlineDbContext(_databaseOptions);

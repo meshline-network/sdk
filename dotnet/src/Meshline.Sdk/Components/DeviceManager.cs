@@ -29,7 +29,7 @@ namespace Meshline.Components;
 /// <exception cref="ArgumentNullException">The network context in <paramref name="options"/> is null. The <paramref name="options"/> argument is null.</exception>
 /// <exception cref="ArgumentException">The configured account identifier is invalid.</exception>
 /// <exception cref="NotSupportedException">The configured account identifier uses an unsupported account namespace.</exception>
-public sealed class DeviceManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, AccountManager accountManager, IAccountSigner? accountSigner = null, ISecretProtector? secretProtector = null) : ClientComponent(options), IDeviceSigner
+public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, AccountManager accountManager, IAccountSigner? accountSigner = null, ISecretProtector? secretProtector = null) : ClientComponent(options), IDeviceSigner
 {
     /// <summary>
     /// Occurs when the current account's known device authorization state changes.
@@ -225,7 +225,7 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
         using var _ = BeginOperation(ref cancellationToken);
         if (Identifiers.ValidateDeviceId(deviceId) is { } violation)
             throw new ArgumentException(violation.Message, nameof(deviceId));
-        var state = await GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
+        var state = await ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, shareOwnState: false).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The account has no published device state.");
         var certificates = state.Certificates.Where(certificate => certificate.GetDeviceId(Context) != deviceId).ToArray();
         if (certificates.Length == state.Certificates.Length)
@@ -399,7 +399,7 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
     /// <exception cref="ArgumentException">The target account or relay identifier is invalid, or supplied contact evidence does not authorize a query for this account.</exception>
     /// <exception cref="NotSupportedException">An account identifier in the query uses an unsupported namespace.</exception>
     public Task<AccountDeviceState?> GetOwnDeviceStateAsync(string relayId, CancellationToken cancellationToken = default) =>
-        ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, relayId);
+        ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, relayId, shareOwnState: false);
 
     /// <summary>
     /// Signs and publishes a complete device authorization state and reports acceptance or staging.
@@ -782,7 +782,7 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
         return route.RelayId;
     }
 
-    async Task<AccountDeviceState?> ResolveDeviceStateAsync(string accountId, TypedProtocolModel? authorization, CancellationToken cancellationToken, string? relayId = null)
+    async Task<AccountDeviceState?> ResolveDeviceStateAsync(string accountId, TypedProtocolModel? authorization, CancellationToken cancellationToken, string? relayId = null, bool shareOwnState = true)
     {
         EnsureInitialized();
         using var _ = BeginOperation(ref cancellationToken);
@@ -793,6 +793,13 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
         relayId ??= await GetHomeRelayIdAsync(cancellationToken).ConfigureAwait(false);
         var useAccount = accountId == Options.AccountId && accountSigner is not null
             && (Local is null || DeviceState?.ValidateDeviceAuthorization(Local.GetDeviceId(Context), Context) is not null || DeviceState is null);
+        if (shareOwnState && accountId == Options.AccountId)
+            return await ResolveSharedOwnStateAsync(relayId, useAccount, cancellationToken).ConfigureAwait(false);
+        return await ResolveDeviceStateCoreAsync(accountId, authorization, relayId, useAccount, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<AccountDeviceState?> ResolveDeviceStateCoreAsync(string accountId, TypedProtocolModel? authorization, string relayId, bool useAccount, CancellationToken cancellationToken)
+    {
         ProtocolModel parameters = new AccountQuery { Account = accountId };
         if (authorization is not null)
         {
@@ -961,7 +968,7 @@ public sealed class DeviceManager(ClientOptions options, DatabaseOptions databas
                 try
                 {
                     var relayId = await GetHomeRelayIdAsync(cancellationToken).ConfigureAwait(false);
-                    var state = await GetOwnDeviceStateAsync(relayId, cancellationToken).ConfigureAwait(false)
+                    var state = await ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, relayId).ConfigureAwait(false)
                         ?? throw new InvalidDataException("The home relay has no device state for the account.");
                     if (state.ValidateDeviceAuthorization(Local!.GetDeviceId(Context), Context) is { } violation)
                         throw new InvalidOperationException(violation.Message ?? "The local device is no longer authorized.");

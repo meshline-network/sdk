@@ -18,6 +18,12 @@ Failures and `not_found` impose a **one-minute** cooldown and preserve unexpired
 
 The cache belongs to one `AccountManager`, isolated by its network, Registry and account. Reopening requires discovery; persisted revisions still prevent rollback. Caller cancellation affects only that wait. Stop and disposal drain refreshes; stop retains verified entries and permits later queries, while disposal clears them.
 
+### Device-state queries
+
+`GetDeviceStateAsync()` and background synchronization may share an in-flight query for the current account within one `DeviceManager`. Completed results are not cached. New certificates, known revisions or relay notifications prevent reuse of an older query. Other-account queries and explicit `GetOwnDeviceStateAsync(relayId)` calls remain independent; authorization and signature checks still run.
+
+Canceling one waiter preserves the others. The last waiter cancels and drains the request. Stop releases background waiters; disposal drains all queries.
+
 ## Renew a local device
 
 Prerequisites: initialize the client with the account signer, resolve its route, and retain the local device keys. Select a valid certificate lifetime for your application. Renew the certificate and publish the resulting device state:
@@ -44,7 +50,7 @@ Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). Inspect
 
 ## Removing devices and preserving access
 
-`RemoveDeviceAsync` publishes updated device authorization; it is an account-authorized operation. Do not treat deletion of a local database as remote device revocation. Removing a device's authorization affects future authorized operations, while local copies of already retrieved data remain under the application's storage policy.
+`RemoveDeviceAsync` independently reads the latest device state before publishing updated authorization; it requires the account signer. Do not treat deletion of a local database as remote device revocation. Removing a device's authorization affects future authorized operations, while local copies of already retrieved data remain under the application's storage policy.
 
 Routine startup uses an already authorized device and need not request an account signature. Expired or unavailable authorization requires deliberate handling: renew or republish with the account signer when appropriate, or use the [account recovery workflow](recovery-and-migration.md). Transport outages alone do not justify replacing authorization.
 
