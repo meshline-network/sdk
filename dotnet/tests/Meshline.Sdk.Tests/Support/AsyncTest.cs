@@ -23,4 +23,16 @@ internal static class AsyncTest
     }
 
     internal static TaskCompletionSource Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    // Expose cancellation, then hold completion until the test permits request cleanup.
+    internal static async Task WaitForCancellationAndCleanupAsync(CancellationToken token, TaskCompletionSource canceled, Task cleanupReleased)
+    {
+        try { await Task.Delay(Timeout.InfiniteTimeSpan, token); }
+        catch (OperationCanceledException)
+        {
+            canceled.TrySetResult();
+            await cleanupReleased.WaitAsync(TestContext.Current.CancellationToken);
+            throw;
+        }
+    }
 }

@@ -15,6 +15,8 @@ Construction performs no I/O. Create the database directory and call `MeshlineDa
 
 Observe `LifecycleState` and `StateChanged` for lifecycle changes. Pass cancellation tokens to awaited operations. Shutdown itself must still be awaited when the application's ordinary operation token is canceled; the examples call `StopAsync` without that canceled token.
 
+Cancellation callback errors are reported after cleanup is attempted; multiple failures are retained in an `AggregateException`. Check `LifecycleState` after a disposal error: `Disposed` is terminal and repeated disposal is harmless. If resource cleanup itself failed, address the error and call `DisposeAsync` again; new tracked operations remain blocked.
+
 ## Reopen an authorized device
 
 Use the existing database, matching account/network options, and the same protection keys. This method intentionally has no account signer and performs no account-establishment or recovery write:

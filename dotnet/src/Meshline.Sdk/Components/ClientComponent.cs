@@ -4,6 +4,7 @@ using Meshline.Storage;
 using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -175,7 +176,7 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <exception cref="ArgumentException">A startup hook encounters invalid input while resuming a pending account operation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A startup hook resumes an account operation whose validity interval or revision is outside the supported range.</exception>
     /// <exception cref="NotSupportedException">A startup hook encounters an account namespace unsupported by this SDK.</exception>
-    /// <exception cref="AggregateException">A runtime cancellation callback throws while a failed startup is being cleaned up.</exception>
+    /// <exception cref="AggregateException">Startup and cleanup both fail, or a runtime cancellation callback throws during cleanup.</exception>
     public virtual async Task StartAsync(CancellationToken cancellationToken = default)
     {
         ComponentStateChangedEventArgs change;
@@ -192,9 +193,10 @@ public abstract class ClientComponent : IAsyncDisposable
                 await OnStartAsync(linked.Token).ConfigureAwait(false);
                 linked.Token.ThrowIfCancellationRequested();
             }
-            catch
+            catch (Exception startError)
             {
-                await EndRuntimeAsync().ConfigureAwait(false);
+                try { await EndRuntimeAsync().ConfigureAwait(false); }
+                catch (Exception cleanupError) { throw new AggregateException(startError, cleanupError); }
                 throw;
             }
             change = new(LifecycleState, ComponentState.Running);
@@ -217,7 +219,7 @@ public abstract class ClientComponent : IAsyncDisposable
     /// </remarks>
     /// <exception cref="OperationCanceledException">The <paramref name="cancellationToken"/> is canceled while waiting to enter the lifecycle transition.</exception>
     /// <exception cref="ObjectDisposedException">This component, or a dependency stopped by its shutdown hook, has been disposed.</exception>
-    /// <exception cref="AggregateException">An exception thrown by a runtime cancellation callback is aggregated while stopping background work.</exception>
+    /// <exception cref="AggregateException">A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup.</exception>
     public virtual async Task StopAsync(CancellationToken cancellationToken = default)
     {
         ComponentStateChangedEventArgs change;
@@ -261,16 +263,21 @@ public abstract class ClientComponent : IAsyncDisposable
     {
         if (_runtime is null)
             return;
-        await _runtime.CancelAsync().ConfigureAwait(false);
+        List<Exception> failures = [];
         try
         {
-            await OnStopAsync().ConfigureAwait(false);
+            // Cancellation failures must not prevent the hook from draining background work.
+            try { await _runtime.CancelAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            try { await OnStopAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
         }
         finally
         {
             _runtime.Dispose();
             _runtime = null;
         }
+        ThrowCleanupFailures(failures);
     }
 
     /// <summary>
@@ -302,7 +309,7 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <returns>A value task that completes when owned resources and active work have been released.</returns>
     /// <exception cref="SqliteException">A component cleanup hook fails to access SQLite while persisting pending local observations.</exception>
     /// <exception cref="DbUpdateException">A component cleanup hook cannot save its pending local observations.</exception>
-    /// <exception cref="AggregateException">An exception thrown by a registered lifetime cancellation callback is aggregated during cancellation.</exception>
+    /// <exception cref="AggregateException">A lifetime cancellation callback fails, or multiple cleanup failures are reported after the remaining cleanup steps have been attempted.</exception>
     public async ValueTask DisposeAsync()
     {
         ComponentStateChangedEventArgs change;
@@ -318,14 +325,24 @@ public abstract class ClientComponent : IAsyncDisposable
                 _disposing = true;
                 drained = _operations == 0 ? Task.CompletedTask : (_drained ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
             }
-            await _lifetime.CancelAsync().ConfigureAwait(false);
-            await EndRuntimeAsync().ConfigureAwait(false);
+            List<Exception> failures = [];
+            try { await _lifetime.CancelAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            try { await EndRuntimeAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
             await drained.ConfigureAwait(false);
-            await DisposeAsyncCore().ConfigureAwait(false);
+            try { await DisposeAsyncCore().ConfigureAwait(false); }
+            catch (Exception error)
+            {
+                failures.Add(error);
+                // Keep disposal retryable when the resource cleanup hook itself fails.
+                ThrowCleanupFailures(failures);
+            }
             _lifetime.Dispose();
             GC.SuppressFinalize(this);
             change = new(LifecycleState, ComponentState.Disposed);
             LifecycleState = ComponentState.Disposed;
+            ThrowCleanupFailures(failures);
         }
         finally
         {
@@ -333,6 +350,14 @@ public abstract class ClientComponent : IAsyncDisposable
         }
 
         StateChanged?.Invoke(this, change);
+    }
+
+    static void ThrowCleanupFailures(List<Exception> failures)
+    {
+        if (failures.Count == 1)
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1)
+            throw new AggregateException(failures);
     }
 
     /// <summary>

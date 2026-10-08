@@ -192,7 +192,7 @@ A component cleanup hook fails to access SQLite while persisting pending local o
 A component cleanup hook cannot save its pending local observations\.
 
 [System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
-An exception thrown by a registered lifetime cancellation callback is aggregated during cancellation\.
+A lifetime cancellation callback fails, or multiple cleanup failures are reported after the remaining cleanup steps have been attempted\.
 
 <a name='Meshline.Components.ClientComponent.DisposeAsyncCore()'></a>
 
@@ -412,7 +412,7 @@ A startup hook resumes an account operation whose validity interval or revision 
 A startup hook encounters an account namespace unsupported by this SDK\.
 
 [System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
-A runtime cancellation callback throws while a failed startup is being cleaned up\.
+Startup and cleanup both fail, or a runtime cancellation callback throws during cleanup\.
 
 ### Remarks
 The caller token controls startup\. Once startup completes, background work uses the component runtime token and ends through stop or disposal\. A client device must already have published authorization before its device component can start\.
@@ -447,7 +447,7 @@ The [cancellationToken](Meshline.Components.ClientComponent.md#Meshline.Componen
 This component, or a dependency stopped by its shutdown hook, has been disposed\.
 
 [System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
-An exception thrown by a runtime cancellation callback is aggregated while stopping background work\.
+A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup\.
 
 ### Remarks
 The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, runtime shutdown is drained without that token\. The application\-owned relay pool remains available to other components\.
