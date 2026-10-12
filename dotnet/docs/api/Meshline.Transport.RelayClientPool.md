@@ -60,7 +60,7 @@ The network and account configuration for this component\.
 
 `registry` [IRelayRegistry](Meshline.Interactions.IRelayRegistry.md 'Meshline\.Interactions\.IRelayRegistry')
 
-The application's relay registry for the configured network\.
+The application's relay registry for the configured network\. The pool uses it unchanged and does not dispose it\. Supply a [CachedRelayRegistry](Meshline.Interactions.CachedRelayRegistry.md 'Meshline\.Interactions\.CachedRelayRegistry') to opt into registry caching\.
 
 <a name='Meshline.Transport.RelayClientPool.RelayClientPool(Meshline.Models.Client.ClientOptions,Meshline.Interactions.IRelayRegistry,System.Net.Http.HttpClient).httpClient'></a>
 
@@ -71,7 +71,7 @@ An optional caller\-owned HTTP client used for requests and WebSocket handshakes
 #### Exceptions
 
 [System\.ArgumentNullException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentnullexception 'System\.ArgumentNullException')<br>
-The network context in [options](Meshline.Transport.RelayClientPool.md#Meshline.Transport.RelayClientPool.RelayClientPool(Meshline.Models.Client.ClientOptions,Meshline.Interactions.IRelayRegistry,System.Net.Http.HttpClient).options 'Meshline\.Transport\.RelayClientPool\.RelayClientPool\(Meshline\.Models\.Client\.ClientOptions, Meshline\.Interactions\.IRelayRegistry, System\.Net\.Http\.HttpClient\)\.options') is null\.
+The network context in [options](Meshline.Transport.RelayClientPool.md#Meshline.Transport.RelayClientPool.RelayClientPool(Meshline.Models.Client.ClientOptions,Meshline.Interactions.IRelayRegistry,System.Net.Http.HttpClient).options 'Meshline\.Transport\.RelayClientPool\.RelayClientPool\(Meshline\.Models\.Client\.ClientOptions, Meshline\.Interactions\.IRelayRegistry, System\.Net\.Http\.HttpClient\)\.options') or [registry](Meshline.Transport.RelayClientPool.md#Meshline.Transport.RelayClientPool.RelayClientPool(Meshline.Models.Client.ClientOptions,Meshline.Interactions.IRelayRegistry,System.Net.Http.HttpClient).registry 'Meshline\.Transport\.RelayClientPool\.RelayClientPool\(Meshline\.Models\.Client\.ClientOptions, Meshline\.Interactions\.IRelayRegistry, System\.Net\.Http\.HttpClient\)\.registry') is null\.
 
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
 The configured account identifier is invalid\.

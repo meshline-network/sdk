@@ -8,6 +8,8 @@ namespace Meshline.Interactions;
 /// </summary>
 /// <remarks>
 /// Return entries for the declared network context and preserve their registry status. Relay selection and transport validate whether an entry is usable for the requested operation.
+/// Results describe the provider's current available view; they need not reflect the latest chain head.
+/// Failures must remain errors rather than being reported as missing registrations.
 /// </remarks>
 public interface IRelayRegistry
 {
@@ -21,14 +23,14 @@ public interface IRelayRegistry
     /// </summary>
     /// <param name="relayId">The relay's canonical lowercase Neo script-hash identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
-    /// <returns>The matching registry entry, or <see langword="null"/> if the relay is not registered.</returns>
+    /// <returns>The matching registry entry, or <see langword="null"/> if absent from the provider's current view.</returns>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>.</exception>
     Task<RelayEntry?> GetRelayAsync(string relayId, CancellationToken cancellationToken = default);
     /// <summary>
     /// Enumerates the relay registrations available through the registry integration.
     /// </summary>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
-    /// <returns>An asynchronous sequence of registry entries; entries may have inactive statuses.</returns>
+    /// <returns>A complete, consistent snapshot of the provider's available registrations; entries may have inactive statuses.</returns>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>.</exception>
     IAsyncEnumerable<RelayEntry> GetRelaysAsync(CancellationToken cancellationToken = default);
 }

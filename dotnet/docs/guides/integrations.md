@@ -24,7 +24,7 @@ Source: [Integration.cs](../../examples/Meshline.Sdk.Examples/Integration.cs). V
 | Interface | Required behavior |
 | --- | --- |
 | `IAccountSigner` | Return the account identifier and matching public key. Sign the exact supplied bytes using the account namespace's signing rules. Keep the private key in the wallet or application's key service. |
-| `IRelayRegistry` | Expose `Context`, look up relay registrations by canonical ID, and enumerate registrations. Preserve registry status, including inactive entries; the SDK evaluates usability. Return `null` for an unknown relay. |
+| `IRelayRegistry` | Expose `Context`, look up relay registrations by canonical ID, and enumerate a consistent snapshot. Preserve registry status, including inactive entries; the SDK evaluates usability. Return `null` for a relay absent from the provider's current view; errors remain errors. |
 | `ISecretProtector` | Protect and restore secret bytes, enforcing the supplied purpose string. Preserve the ability to decrypt previously stored values after an application restart. |
 | `IDeviceSigner` | Supply a device certificate and signatures for lower-level transport use. `DeviceManager` implements this interface for normal client applications. |
 
@@ -44,11 +44,13 @@ public static void RegisterRpcRegistry(
     IServiceCollection services, HttpClient rpcHttp, NetworkContext context, Uri rpcUrl)
 {
     // This is application registration code; the SDK never adds this service automatically.
-    services.AddSingleton<IRelayRegistry>(_ => new RpcRelayRegistry(rpcHttp,
-        new RpcRelayRegistryOptions { Context = context, RpcUrl = rpcUrl }));
+    services.AddSingleton<IRelayRegistry>(_ => new CachedRelayRegistry(new RpcRelayRegistry(rpcHttp,
+        new RpcRelayRegistryOptions { Context = context, RpcUrl = rpcUrl })));
 }
 ```
 <!-- /snippet -->
+
+`RelayClientPool` uses the supplied provider unchanged. Pass a provider backed by locally synchronized blocks directly to read its current view, or a raw `RpcRelayRegistry` for uncached RPC reads. The interface does not require a synchronization-complete signal.
 
 `Nep6AccountSigner` reads a Neo N3 NEP-6 version 1.0 wallet and decrypts its selected NEP-2 key. It defaults to account index 0 in file order, ignoring `isDefault`; pass another index explicitly when needed. It rejects watch-only, deployed, multisignature, mismatched-address, and mismatched-contract accounts without trying a later account. `Parse` accepts JSON already loaded by the application. The wallet is never modified. Supply the password at runtime, keep the signer available while it is in use, and dispose it afterward.
 

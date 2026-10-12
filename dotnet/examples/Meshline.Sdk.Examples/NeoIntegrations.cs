@@ -11,8 +11,8 @@ public static class NeoIntegrations
         IServiceCollection services, HttpClient rpcHttp, NetworkContext context, Uri rpcUrl)
     {
         // This is application registration code; the SDK never adds this service automatically.
-        services.AddSingleton<IRelayRegistry>(_ => new RpcRelayRegistry(rpcHttp,
-            new RpcRelayRegistryOptions { Context = context, RpcUrl = rpcUrl }));
+        services.AddSingleton<IRelayRegistry>(_ => new CachedRelayRegistry(new RpcRelayRegistry(rpcHttp,
+            new RpcRelayRegistryOptions { Context = context, RpcUrl = rpcUrl })));
     }
     #endregion
 

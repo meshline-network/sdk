@@ -66,19 +66,21 @@ public sealed class RelayClientPool : IAsyncDisposable
     /// Initializes a new instance of <see cref="RelayClientPool"/>.
     /// </summary>
     /// <param name="options">The network and account configuration for this component.</param>
-    /// <param name="registry">The application's relay registry for the configured network.</param>
+    /// <param name="registry">The application's relay registry for the configured network. The pool uses it unchanged and does not dispose it. Supply a <see cref="CachedRelayRegistry"/> to opt into registry caching.</param>
     /// <param name="httpClient">An optional caller-owned HTTP client used for requests and WebSocket handshakes; it must outlive the pool. When omitted, the pool creates and owns a client.</param>
     /// <remarks>
     /// A supplied HTTP client is used unchanged. Configure its pipeline to disable redirects, cookies, and implicit business-request retries. The pool creates and owns each WebSocket. Keyed dependency injection selects <see cref="HttpClientName"/>; the optional null default creates a pool-owned HTTP client.
     /// </remarks>
-    /// <exception cref="ArgumentNullException">The network context in <paramref name="options"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">The network context in <paramref name="options"/> or <paramref name="registry"/> is null.</exception>
     /// <exception cref="ArgumentException">The configured account identifier is invalid.</exception>
     /// <exception cref="NotSupportedException">The configured account identifier uses an unsupported account namespace.</exception>
     public RelayClientPool(ClientOptions options, IRelayRegistry registry, [FromKeyedServices(HttpClientName)] HttpClient? httpClient = null)
     {
         options.Validate();
+        ArgumentNullException.ThrowIfNull(registry);
         Context = options.Context;
         AccountId = options.AccountId;
+        if (registry.Context != Context) throw new ArgumentException("The Registry belongs to another network.", nameof(registry));
         Registry = registry;
         _ownsHttp = httpClient is null;
         _http = httpClient ?? new HttpClient(new SocketsHttpHandler

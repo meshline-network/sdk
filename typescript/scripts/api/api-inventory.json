@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "6f509949b3c87fddd9e120cb7e65dba4ebaeb6a2c48608213f18f70a1eaef66d",
+  "sourceSha256": "ab70f25316afc024603c71397e39615f8b0fc5b459e6a62a0a18897cb5e62947",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1881,6 +1881,26 @@
       "notes": "getRelayId, validateRelayId and verifyRelay provide relay identity operations; verifyAccount provides raw P-256 signature verification."
     },
     {
+      "symbol": "M:Meshline.Interactions.CachedRelayRegistry.#ctor(Meshline.Interactions.IRelayRegistry)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.CachedRelayRegistry.md#Meshline.Interactions.CachedRelayRegistry.CachedRelayRegistry(Meshline.Interactions.IRelayRegistry)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Interactions.CachedRelayRegistry.DisposeAsync",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.CachedRelayRegistry.md#Meshline.Interactions.CachedRelayRegistry.DisposeAsync()",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Interactions.CachedRelayRegistry.GetRelayAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.CachedRelayRegistry.md#Meshline.Interactions.CachedRelayRegistry.GetRelayAsync(string,System.Threading.CancellationToken)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Interactions.CachedRelayRegistry.GetRelaysAsync(System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.CachedRelayRegistry.md#Meshline.Interactions.CachedRelayRegistry.GetRelaysAsync(System.Threading.CancellationToken)",
+      "status": "unmapped"
+    },
+    {
       "symbol": "M:Meshline.Interactions.IAccountSigner.SignAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Interactions.IAccountSigner.md#Meshline.Interactions.IAccountSigner.SignAsync(System.ReadOnlyMemory_byte_,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -3685,6 +3705,11 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/identity/neo.ts",
       "notes": "Neo identity uses getAccountId, validateAccountId and matchesAccount; raw signature verification is verifyAccount in crypto/primitives.ts. Identity-bound verification composes signature and identity checks. No adapter class/registry, protected subclass hooks or standalone generic CAIP-10 GetChainId equivalent is exported; this is not one-to-one utility API parity."
+    },
+    {
+      "symbol": "P:Meshline.Interactions.CachedRelayRegistry.Context",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.CachedRelayRegistry.md#Meshline.Interactions.CachedRelayRegistry.Context",
+      "status": "unmapped"
     },
     {
       "symbol": "P:Meshline.Interactions.IAccountSigner.AccountId",
@@ -7717,6 +7742,11 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/identity/neo.ts",
       "notes": "getRelayId, validateRelayId and verifyRelay provide relay identity operations; verifyAccount provides raw P-256 signature verification."
+    },
+    {
+      "symbol": "T:Meshline.Interactions.CachedRelayRegistry",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.CachedRelayRegistry.md",
+      "status": "unmapped"
     },
     {
       "symbol": "T:Meshline.Interactions.IAccountSigner",

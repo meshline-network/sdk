@@ -98,7 +98,7 @@ Implements [GetRelayAsync\(string, CancellationToken\)](Meshline.Interactions.IR
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[RelayEntry](Meshline.Models.Registry.RelayEntry.md 'Meshline\.Models\.Registry\.RelayEntry')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
-The matching registry entry, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') if the relay is not registered\.
+The matching registry entry, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') if absent from the provider's current view\.
 
 #### Exceptions
 
@@ -129,7 +129,7 @@ Implements [GetRelaysAsync\(CancellationToken\)](Meshline.Interactions.IRelayReg
 
 #### Returns
 [System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[RelayEntry](Meshline.Models.Registry.RelayEntry.md 'Meshline\.Models\.Registry\.RelayEntry')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')<br>
-An asynchronous sequence of registry entries; entries may have inactive statuses\.
+A complete, consistent snapshot of the provider's available registrations; entries may have inactive statuses\.
 
 #### Exceptions
 

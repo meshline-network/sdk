@@ -6,6 +6,8 @@
 
 Share one `RelayClientPool` among components for a single network/account/device session. Account and device authentication use separate pooled sessions. The first device-authenticated request binds the pool to that device; do not share it across independent devices or accounts.
 
+The pool uses the supplied `IRelayRegistry` directly and does not dispose it. Opt into `CachedRelayRegistry` when the provider needs caching; see [integrations](integrations.md).
+
 `GetClientAsync` discovers a relay and acquires an authenticated session using an account or device signer. Returned clients are pool-owned. `RelayClient.GetDescriptorAsync` and `GetInfoAsync` read validated metadata. `SendHttpAsync` and `SendWebSocketAsync` expose lower-level protocol calls for applications that need them; preserve the operation's authentication, model validation, and response semantics.
 
 Observe `PoolChanged`, `RelayChanged`, or a relay client's `StateChanged`. `ConnectionState` and `AuthenticationState` describe different things. HTTP connection state reflects observed communication rather than a continuously monitored connection. `SessionMode` is bound after successful authentication and remains bound after session expiry; authentication state also reflects expiry.
