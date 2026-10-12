@@ -30,7 +30,8 @@ public sealed partial class RelayClient
     readonly HttpClient _http;
     readonly TimeProvider Clock = Meshline.Clock.Provider;
     readonly IRelayRegistry _registry;
-    readonly SemaphoreSlim _discoveryGate = new(1, 1);
+    readonly MetadataCache<RelayDescriptor> _descriptors;
+    readonly MetadataCache<RelayLimits> _limits;
     readonly SemaphoreSlim _authenticationGate = new(1, 1);
     readonly SemaphoreSlim _httpAuthenticationGate = new(1, 1);
     readonly CancellationTokenSource _lifetime = new();
@@ -40,7 +41,6 @@ public sealed partial class RelayClient
     volatile RelayConnectionState _connectionState;
     volatile RelayAuthenticationState _authenticationState;
     volatile Exception? _lastError;
-    RelayDescriptor? _descriptor;
     Uri? _httpEndpoint;
     AuthenticationIdentity? _identity;
     Session? _httpSession;
@@ -79,9 +79,11 @@ public sealed partial class RelayClient
     /// </summary>
     public Exception? LastError => _lastError;
 
-    internal RelayClient(string relayId, IRelayRegistry registry, HttpClient httpClient)
+    internal RelayClient(string relayId, IRelayRegistry registry, HttpClient httpClient, MetadataCache<RelayDescriptor> descriptors, MetadataCache<RelayLimits> limits)
     {
         _http = httpClient;
+        _descriptors = descriptors;
+        _limits = limits;
         if (RelayIdentity.ValidateRelayId(relayId) is { } violation)
             throw new ArgumentException(violation.Message, nameof(relayId));
         _registry = registry;
@@ -137,35 +139,39 @@ public sealed partial class RelayClient
     {
         ThrowIfDisposed();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
-        await _discoveryGate.WaitAsync(linked.Token).ConfigureAwait(false);
-        try
+        // Consult the provider's current view even when the descriptor is cached.
+        var entry = await GetActiveRegistrationAsync(linked.Token).ConfigureAwait(false);
+        var descriptor = await _descriptors.ReadAsync(value => value.ExpiresAt > Clock.GetUtcNow().ToUnixTimeSeconds(), async token =>
         {
-            if (_descriptor is { } cached && cached.ExpiresAt > Clock.GetUtcNow().ToUnixTimeSeconds())
-                return cached;
-            var entry = await _registry.GetRelayAsync(RelayId, linked.Token).ConfigureAwait(false)
-                ?? throw new InvalidOperationException("The relay is not registered.");
-            if (entry.RelayId != RelayId || entry.Status != RelayStatus.Active)
-                throw new InvalidOperationException("The registry does not identify an active relay with the requested ID.");
-            var violation = RelayEndpointValidator.Validate(entry.Endpoint, out var kind, out _);
-            if (violation is not null || kind != RelayEndpointKind.Https)
-                throw new InvalidDataException(violation?.Message ?? "The relay discovery endpoint must use HTTPS.");
-            var json = await SendHttpAsync(new(entry.Endpoint), HttpMethod.Get, "relay.descriptor", null, null, linked.Token).ConfigureAwait(false);
-            var descriptor = ReadModel<RelayDescriptor>(json);
-            if (descriptor.Validate(_registry.Context) is { } descriptorViolation)
-                throw new InvalidDataException(descriptorViolation.Message);
-            if (descriptor.RelayId != RelayId)
-                throw new InvalidDataException("The descriptor does not identify the registered relay.");
-            var endpoint = new Uri(descriptor.Endpoints.First(static value => value.StartsWith("https://", StringComparison.Ordinal)));
-            if (_httpEndpoint is not null && GetOrigin(_httpEndpoint) != GetOrigin(endpoint))
-                _httpSession = null;
+            var json = await SendHttpAsync(new(entry.Endpoint), HttpMethod.Get, "relay.descriptor", null, null, token).ConfigureAwait(false);
+            var result = ReadModel<RelayDescriptor>(json);
+            if (result.Validate(_registry.Context) is { } invalid) throw new InvalidDataException(invalid.Message);
+            if (result.RelayId != RelayId) throw new InvalidDataException("The descriptor does not identify the registered relay.");
+            // Registration may have changed while the descriptor request was in flight.
+            await GetActiveRegistrationAsync(token).ConfigureAwait(false);
+            return result;
+        }, error => { ReportFailure(error); ErrorOccurred?.Invoke(this, error); }, linked.Token).ConfigureAwait(false)
+            ?? throw new InvalidDataException("Relay descriptor resolution returned no result.");
+        if (descriptor.ExpiresAt <= Clock.GetUtcNow().ToUnixTimeSeconds()) throw new InvalidDataException("The relay descriptor has expired.");
+        var endpoint = new Uri(descriptor.Endpoints.First(static value => value.StartsWith("https://", StringComparison.Ordinal)));
+        lock (_stateGate)
+        {
+            if (_httpEndpoint is not null && GetOrigin(_httpEndpoint) != GetOrigin(endpoint)) _httpSession = null;
             _httpEndpoint = endpoint;
-            _descriptor = descriptor;
-            return descriptor;
         }
-        finally
-        {
-            _discoveryGate.Release();
-        }
+        return descriptor;
+    }
+
+    async Task<RelayEntry> GetActiveRegistrationAsync(CancellationToken cancellationToken)
+    {
+        var entry = await _registry.GetRelayAsync(RelayId, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The relay is not registered.");
+        if (entry.RelayId != RelayId || entry.Status != RelayStatus.Active)
+            throw new InvalidOperationException("The registry does not identify an active relay with the requested ID.");
+        var violation = RelayEndpointValidator.Validate(entry.Endpoint, out var kind, out _);
+        if (violation is not null || kind != RelayEndpointKind.Https)
+            throw new InvalidDataException(violation?.Message ?? "The relay discovery endpoint must use HTTPS.");
+        return entry;
     }
 
     /// <summary>
@@ -189,13 +195,41 @@ public sealed partial class RelayClient
         var info = await SendHttpAsync<RelayInfo>(HttpMethod.Get, "relay.info", authenticated: false, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (info.RelayId != RelayId)
             throw new InvalidDataException("The relay information does not identify the connected relay.");
+        ValidateLimits(info.Limits, descriptor);
+        return info;
+    }
+
+    // Cache only operational limits; GetInfoAsync keeps its live server-time semantics.
+    internal async Task<RelayLimits> GetLimitsAsync(CancellationToken cancellationToken)
+    {
+        var descriptor = await GetDescriptorAsync(cancellationToken).ConfigureAwait(false);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        var limits = await _limits.ReadAsync(value => LimitsMatch(value, descriptor), async token =>
+        {
+            var endpoint = new Uri(descriptor.Endpoints.First(value => value.StartsWith("https://", StringComparison.Ordinal)));
+            var info = ReadModel<RelayInfo>(await SendHttpAsync(endpoint, HttpMethod.Get, "relay.info", null, null, token).ConfigureAwait(false));
+            if (info.Validate() is { } violation) throw new InvalidDataException(violation.Message);
+            if (info.RelayId != RelayId) throw new InvalidDataException("The relay information identifies another relay.");
+            ValidateLimits(info.Limits, descriptor);
+            return info.Limits;
+        }, error => { ReportFailure(error); ErrorOccurred?.Invoke(this, error); }, linked.Token).ConfigureAwait(false)
+            ?? throw new InvalidDataException("The relay limits are unavailable.");
+        ValidateLimits(limits, descriptor);
+        return limits;
+    }
+
+    static bool LimitsMatch(RelayLimits limits, RelayDescriptor descriptor)
+    {
         var channels = !descriptor.Capabilities.IsDefault && descriptor.Capabilities.Contains("channel.host.v1");
         var groups = !descriptor.Capabilities.IsDefault && descriptor.Capabilities.Contains("group.host.v1");
         var sockets = descriptor.Endpoints.Any(static value => value.StartsWith("wss://", StringComparison.Ordinal));
-        if (channels && (info.Limits.ChannelTimelineRetention is null || sockets && info.Limits.MaxChannelSubscriptions is null)
-            || groups && (info.Limits.GroupMessageRetention is null || info.Limits.MaxGroupMembers is null || info.Limits.MaxGroupInviteTtl is null || sockets && info.Limits.MaxGroupSubscriptions is null))
-            throw new InvalidDataException("The relay information omits limits required by its advertised capabilities.");
-        return info;
+        return !(channels && (limits.ChannelTimelineRetention is null || sockets && limits.MaxChannelSubscriptions is null)
+            || groups && (limits.GroupMessageRetention is null || limits.MaxGroupMembers is null || limits.MaxGroupInviteTtl is null || sockets && limits.MaxGroupSubscriptions is null));
+    }
+
+    static void ValidateLimits(RelayLimits limits, RelayDescriptor descriptor)
+    {
+        if (!LimitsMatch(limits, descriptor)) throw new InvalidDataException("The relay information omits limits required by its advertised capabilities.");
     }
 
     /// <summary>

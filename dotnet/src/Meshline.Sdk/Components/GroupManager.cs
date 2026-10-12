@@ -78,8 +78,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
         await using (var database = new MeshlineDbContext(databaseOptions))
         {
             var relay = await GetRelayAsync(relayId, token).ConfigureAwait(false);
-            var info = await relay.GetInfoAsync(token).ConfigureAwait(false);
-            if (options.MemberCapacity > info.Limits.MaxGroupMembers) throw new ArgumentOutOfRangeException(nameof(options), "The capacity exceeds the hosting relay limit.");
+            var limits = await relay.GetLimitsAsync(token).ConfigureAwait(false);
+            if (options.MemberCapacity > limits.MaxGroupMembers) throw new ArgumentOutOfRangeException(nameof(options), "The capacity exceeds the hosting relay limit.");
             var nonce = RandomNumberGenerator.GetBytes(16);
             var groupId = Identifiers.DeriveGroupId(Options.AccountId, relayId, nonce, Context);
             var privateKey = RandomNumberGenerator.GetBytes(32);

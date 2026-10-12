@@ -196,7 +196,7 @@ sealed partial class ChannelManager
     {
         var descriptor = await relay.GetDescriptorAsync(cancellationToken).ConfigureAwait(false);
         if (!descriptor.Endpoints.Any(value => value.StartsWith("wss://", StringComparison.Ordinal))) return;
-        var limits = (await relay.GetInfoAsync(cancellationToken).ConfigureAwait(false)).Limits;
+        var limits = await relay.GetLimitsAsync(cancellationToken).ConfigureAwait(false);
         var selected = channels.Take((int)Math.Min(limits.MaxChannelSubscriptions ?? 0, int.MaxValue)).ToImmutableArray();
         lock (_subscriptionsGate)
         {

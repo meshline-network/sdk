@@ -159,7 +159,7 @@ sealed partial class GroupManager
     {
         var relay = await GetRelayAsync(relayId, cancellationToken).ConfigureAwait(false);
         if (!(await relay.GetDescriptorAsync(cancellationToken).ConfigureAwait(false)).Endpoints.Any(value => value.StartsWith("wss://", StringComparison.Ordinal))) return;
-        var limits = (await relay.GetInfoAsync(cancellationToken).ConfigureAwait(false)).Limits;
+        var limits = await relay.GetLimitsAsync(cancellationToken).ConfigureAwait(false);
         lock (_subscriptionGate)
         {
             if (!_subscriptions.TryGetValue(relayId, out var previous) || !ReferenceEquals(previous, relay))

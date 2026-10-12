@@ -17,7 +17,8 @@ public sealed class RelayDiscoveryTests
         using var time = Clock.Use(new ManualClock());
         using var relay = new OfflineRelay();
         using var account = new AccountSigner();
-        await using var pool = relay.Pool(account);
+        await using var registry = new CachedRelayRegistry(relay);
+        await using var pool = new RelayClientPool(relay.Options(account), registry, relay.Http);
         var client = await pool.GetAsync(relay.RelayId, cancellationToken: Token);
         var descriptors = await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => client.GetDescriptorAsync()));
 
@@ -28,7 +29,7 @@ public sealed class RelayDiscoveryTests
         relay.Descriptor = relay.SignDescriptor(relay.Descriptor with { ExpiresAt = relay.Clock.GetUtcNow().AddDays(1).ToUnixTimeSeconds() });
         await client.GetDescriptorAsync(cancellationToken: Token);
 
-        Assert.Equal(2, relay.RegistryReads);
+        await AsyncTest.UntilAsync(() => relay.RegistryReads == 2);
     }
 
     [Fact]
@@ -62,6 +63,30 @@ public sealed class RelayDiscoveryTests
     }
 
     [Fact]
+    public async Task Descriptor_failure_keeps_unexpired_data_but_never_extends_its_signed_lifetime()
+    {
+        using var time = Clock.Use(new ManualClock());
+        using var relay = new OfflineRelay();
+        using var account = new AccountSigner();
+        await using var pool = relay.Pool(account);
+        var client = await pool.GetAsync(relay.RelayId, cancellationToken: Token);
+        var original = await client.GetDescriptorAsync(Token);
+        var failed = AsyncTest.Signal();
+        client.ErrorOccurred += (_, _) => failed.TrySetResult();
+        var queries = relay.Requests.Count(request => request.Method == "relay.descriptor");
+        relay.Handler = (request, _) => request.Method == "relay.descriptor" ? throw new HttpRequestException("offline") : Task.FromResult(relay.Respond(request));
+        relay.Clock.Advance(TimeSpan.FromHours(1));
+        Assert.Same(original, await client.GetDescriptorAsync(Token));
+        await failed.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+        relay.Clock.Advance(TimeSpan.FromSeconds(59));
+        for (var i = 0; i < 10; i++)
+            Assert.Same(original, await client.GetDescriptorAsync(Token));
+        Assert.Equal(queries + 1, relay.Requests.Count(request => request.Method == "relay.descriptor"));
+        relay.Clock.Advance(TimeSpan.FromDays(7));
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetDescriptorAsync(Token));
+    }
+
+    [Fact]
     public async Task Registry_status_changes_with_equal_timestamps_take_effect()
     {
         using var time = Clock.Use(new ManualClock());
@@ -73,6 +98,96 @@ public sealed class RelayDiscoveryTests
         relay.Clock.Advance(TimeSpan.FromHours(1));
         await registry.GetRelayAsync(relay.RelayId, Token);
         await AsyncTest.UntilAsync(async () => (await registry.GetRelayAsync(relay.RelayId, Token))?.Status == RelayStatus.Disabled);
+    }
+
+    [Fact]
+    public async Task Limits_reuse_results_while_server_time_queries_remain_live()
+    {
+        using var time = Clock.Use(new ManualClock());
+        using var relay = new OfflineRelay();
+        using var account = new AccountSigner();
+        await using var pool = relay.Pool(account);
+        var client = await pool.GetAsync(relay.RelayId, cancellationToken: Token);
+        for (var i = 0; i < 8; i++)
+            await client.GetLimitsAsync(Token);
+        Assert.Single(relay.Requests, request => request.Method == "relay.info");
+        await client.GetInfoAsync(Token);
+        Assert.Equal(2, relay.Requests.Count(request => request.Method == "relay.info"));
+    }
+
+    [Fact]
+    public async Task Descriptor_reads_can_observe_a_later_registry_reactivation()
+    {
+        using var time = Clock.Use(new ManualClock());
+        using var relay = new OfflineRelay();
+        using var account = new AccountSigner();
+        await using var registry = new CachedRelayRegistry(relay);
+        await using var pool = new RelayClientPool(relay.Options(account), registry, relay.Http);
+        var client = await pool.GetAsync(relay.RelayId, cancellationToken: Token);
+        await client.GetDescriptorAsync(Token);
+        relay.Entry = relay.Entry with { Status = RelayStatus.Disabled, UpdatedAt = 2 };
+        relay.Clock.Advance(TimeSpan.FromHours(1));
+        await registry.GetRelayAsync(relay.RelayId, Token);
+        await AsyncTest.UntilAsync(async () => (await registry.GetRelayAsync(relay.RelayId, Token))?.Status == RelayStatus.Disabled);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetDescriptorAsync(Token));
+        relay.Entry = relay.Entry with { Status = RelayStatus.Active, UpdatedAt = 3 };
+        relay.Clock.Advance(TimeSpan.FromHours(1));
+        // The registry refresh may finish before or after this descriptor read.
+        var refreshError = await Record.ExceptionAsync(() => client.GetDescriptorAsync(Token));
+        Assert.True(refreshError is null or InvalidOperationException);
+        await AsyncTest.UntilAsync(async () => (await registry.GetRelayAsync(relay.RelayId, Token))?.Status == RelayStatus.Active);
+        Assert.Equal(relay.RelayId, (await client.GetDescriptorAsync(Token)).RelayId);
+    }
+
+    [Theory]
+    [InlineData(RelayStatus.Disabled)]
+    [InlineData(RelayStatus.Suspended)]
+    [InlineData(null)]
+    public async Task Direct_registry_changes_take_effect_without_expiring_the_descriptor(RelayStatus? status)
+    {
+        using var time = Clock.Use(new ManualClock());
+        using var relay = new OfflineRelay();
+        using var account = new AccountSigner();
+        var source = new RegistrySource(relay.Entry);
+        await using var pool = new RelayClientPool(relay.Options(account), source, relay.Http);
+        Assert.Same(source, pool.Registry);
+        var client = await pool.GetAsync(relay.RelayId, Token);
+        var descriptor = await client.GetDescriptorAsync(Token);
+        source.Read = _ => Task.FromResult(status is { } value ? relay.Entry with { Status = value } : null);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.SendHttpAsync(HttpMethod.Get, "probe", authenticated: false, cancellationToken: Token));
+        Assert.DoesNotContain(relay.Requests, request => request.Method == "probe");
+        source.Read = _ => Task.FromResult<RelayEntry?>(relay.Entry);
+        Assert.Same(descriptor, await client.GetDescriptorAsync(Token));
+        Assert.Single(relay.Requests, request => request.Method == "relay.descriptor");
+        await pool.DisposeAsync();
+        Assert.Equal(0, source.Disposals);
+        Assert.Equal(relay.Entry, await source.GetRelayAsync(relay.RelayId, Token));
+    }
+
+    [Fact]
+    public async Task Descriptor_request_rechecks_registration_after_network_completion()
+    {
+        using var time = Clock.Use(new ManualClock());
+        using var relay = new OfflineRelay();
+        using var account = new AccountSigner();
+        await using var pool = relay.Pool(account);
+        var client = await pool.GetAsync(relay.RelayId, Token);
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        relay.Handler = async (request, token) =>
+        {
+            entered.TrySetResult();
+            await release.Task.WaitAsync(token);
+            return relay.Respond(request);
+        };
+        var pending = client.GetDescriptorAsync(Token);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            relay.Entry = relay.Entry with { Status = RelayStatus.Disabled };
+        }
+        finally { release.TrySetResult(); }
+        await Assert.ThrowsAsync<InvalidOperationException>(() => pending);
     }
 
     [Fact]

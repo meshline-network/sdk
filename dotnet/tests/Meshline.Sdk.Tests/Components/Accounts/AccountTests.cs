@@ -92,9 +92,9 @@ public sealed class AccountTests
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
-        await fixture.InitializeAsync();
         using var other = new OfflineRelay("other.test");
         fixture.Relay.LinkTo(other);
+        await fixture.InitializeAsync();
         other.Routes[fixture.Account.AccountId] = fixture.Client.Route!;
         var entered = AsyncTest.Signal();
         fixture.Relay.Handler = async (request, token) =>

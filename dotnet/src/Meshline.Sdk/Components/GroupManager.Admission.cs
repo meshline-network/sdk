@@ -21,7 +21,7 @@ sealed partial class GroupManager
             throw new UnauthorizedAccessException("The account cannot create this group invitation.");
         var relay = await GetRelayAsync(group.RelayId, token).ConfigureAwait(false);
         var now = Clock.UtcNow.ToUnixTimeSeconds();
-        var limits = (await relay.GetInfoAsync(token).ConfigureAwait(false)).Limits;
+        var limits = await relay.GetLimitsAsync(token).ConfigureAwait(false);
         if (expiry.ToUnixTimeSeconds() - now > limits.MaxGroupInviteTtl) throw new ArgumentOutOfRangeException(nameof(expiry), "The invitation lifetime exceeds the hosting relay limit.");
         var invite = await SignAsync(new SignedInvite
         {

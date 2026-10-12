@@ -33,6 +33,8 @@ public sealed class RelayClientPool : IAsyncDisposable
     readonly HttpClient _http;
     readonly bool _ownsHttp;
     readonly Dictionary<string, List<Entry>> _entries = new(StringComparer.Ordinal);
+    readonly Dictionary<string, MetadataCache<RelayDescriptor>> _descriptors = new(StringComparer.Ordinal);
+    readonly Dictionary<string, MetadataCache<RelayLimits>> _limits = new(StringComparer.Ordinal);
     string? _deviceId;
     readonly List<Task> _retirements = [];
     readonly CancellationTokenSource _lifetime = new();
@@ -186,7 +188,9 @@ public sealed class RelayClientPool : IAsyncDisposable
                 : entries?.FirstOrDefault(candidate => candidate.Mode == mode) ?? entries?.FirstOrDefault(static candidate => candidate.Mode is null))!;
             if (entry is null)
             {
-                entry = new(new(relayId, Registry, _http), _lifetime.Token);
+                if (!_descriptors.TryGetValue(relayId, out var descriptors)) _descriptors.Add(relayId, descriptors = new());
+                if (!_limits.TryGetValue(relayId, out var limits)) _limits.Add(relayId, limits = new());
+                entry = new(new(relayId, Registry, _http, descriptors, limits), _lifetime.Token);
                 entry.Client.StateChanged += OnRelayStateChanged;
                 entry.Client.Faulted += OnClientFaulted;
                 if (entries is null)
@@ -313,7 +317,7 @@ public sealed class RelayClientPool : IAsyncDisposable
         {
             foreach (var entry in _entries.Values.SelectMany(static entries => entries).ToArray())
                 Retire(entry);
-            tasks = _retirements.ToArray();
+            tasks = [.. _retirements, .. _descriptors.Values.Select(cache => cache.StopAsync(dispose: true)), .. _limits.Values.Select(cache => cache.StopAsync(dispose: true))];
         }
         try
         {
