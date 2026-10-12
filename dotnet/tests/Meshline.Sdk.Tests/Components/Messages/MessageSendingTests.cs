@@ -33,7 +33,7 @@ public sealed class MessageSendingTests
 
         Assert.Equal(MessageSendState.Queued, queued.State);
         Assert.Equal(routes, fixture.Relay.Requests.Count(request => request.Method == "account.route.resolve"));
-        Assert.Equal(devices + 2, fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve"));
+        Assert.Equal(devices, fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve"));
     }
 
     [Fact]

@@ -17,6 +17,9 @@
 - [`GetDeviceStateAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.GetDeviceStateAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetOwnDeviceStateAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.GetOwnDeviceStateAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`PublishDeviceStateAsync(string, IReadOnlyList<DeviceCertificate>, DeviceStatePublishOptions, CancellationToken)`](#Meshline.Components.DeviceManager.PublishDeviceStateAsync%28string%2CSystem.Collections.Generic.IReadOnlyList_Meshline.Models.Protocol.DeviceCertificate_%2CMeshline.Models.Client.DeviceStatePublishOptions%2CSystem.Threading.CancellationToken%29)
+- [`RefreshDeviceStateAsync(ContactGrant, CancellationToken)`](#Meshline.Components.DeviceManager.RefreshDeviceStateAsync%28Meshline.Models.Protocol.ContactGrant%2CSystem.Threading.CancellationToken%29)
+- [`RefreshDeviceStateAsync(ContactInvite, CancellationToken)`](#Meshline.Components.DeviceManager.RefreshDeviceStateAsync%28Meshline.Models.Protocol.ContactInvite%2CSystem.Threading.CancellationToken%29)
+- [`RefreshDeviceStateAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.RefreshDeviceStateAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`RemoveDeviceAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.RemoveDeviceAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`RenewDeviceAsync(TimeSpan, CancellationToken)`](#Meshline.Components.DeviceManager.RenewDeviceAsync%28System.TimeSpan%2CSystem.Threading.CancellationToken%29)
 - [`SignAsync(ReadOnlyMemory<byte>, CancellationToken)`](#Meshline.Components.DeviceManager.SignAsync%28System.ReadOnlyMemory_byte_%2CSystem.Threading.CancellationToken%29)
@@ -332,7 +335,7 @@ The [deviceId](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceMa
 
 ## DeviceManager\.GetDeviceStateAsync\(ContactGrant, CancellationToken\) Method
 
-Resolves and verifies account device authorization using the supplied account or contact evidence\.
+Returns verified cached device state, starting a demand\-triggered background refresh when due\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountDeviceState?> GetDeviceStateAsync(Meshline.Models.Protocol.ContactGrant grant, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -403,7 +406,7 @@ An account identifier in the query uses an unsupported namespace\.
 
 ## DeviceManager\.GetDeviceStateAsync\(ContactInvite, CancellationToken\) Method
 
-Resolves and verifies account device authorization using the supplied account or contact evidence\.
+Returns verified cached device state, starting a demand\-triggered background refresh when due\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountDeviceState?> GetDeviceStateAsync(Meshline.Models.Protocol.ContactInvite invite, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -474,7 +477,7 @@ An account identifier in the query uses an unsupported namespace\.
 
 ## DeviceManager\.GetDeviceStateAsync\(string, CancellationToken\) Method
 
-Resolves and verifies account device authorization using the supplied account or contact evidence\.
+Returns verified cached device state, starting a demand\-triggered background refresh when due\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountDeviceState?> GetDeviceStateAsync(string? accountId=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -540,6 +543,11 @@ The target account or relay identifier is invalid, or supplied contact evidence 
 
 [System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
 An account identifier in the query uses an unsupported namespace\.
+
+### Remarks
+Reads trigger refreshes one hour after success or one minute after failure\. Missing or unusable state requires a shared fetch;<br>
+caller cancellation only ends that caller's wait\. State signatures and revisions are verified before caching, and authorization is checked on use\.<br>
+Use [RefreshDeviceStateAsync\(string, CancellationToken\)](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RefreshDeviceStateAsync(string,System.Threading.CancellationToken) 'Meshline\.Components\.DeviceManager\.RefreshDeviceStateAsync\(string, System\.Threading\.CancellationToken\)') to await a refresh\.
 
 <a name='Meshline.Components.DeviceManager.GetOwnDeviceStateAsync(string,System.Threading.CancellationToken)'></a>
 
@@ -697,6 +705,219 @@ The selected device\-state revision is not a newer nonnegative safe integer\. A 
 
 ### Remarks
 A supplied list is the complete authorized device set, not a delta\. With no list, known devices are preserved and the local certificate is refreshed; unavailable prior state or missing local authorization requires explicit recovery\. Staged publication is not yet authoritative\.
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken)'></a>
+
+## DeviceManager\.RefreshDeviceStateAsync\(ContactGrant, CancellationToken\) Method
+
+Awaits device\-state refresh with the supplied grant, bypassing the success interval but retaining the one\-minute failure cooldown\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountDeviceState?> RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant grant, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken).grant'></a>
+
+`grant` [ContactGrant](Meshline.Models.Protocol.ContactGrant.md 'Meshline\.Models\.Protocol\.ContactGrant')
+
+A contact grant authorizing this account to access the grantor's device state\.
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountDeviceState](Meshline.Models.Protocol.AccountDeviceState.md 'Meshline\.Models\.Protocol\.AccountDeviceState')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The verified device state, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when unavailable\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. The home route, local device, or account signer needed to authenticate the query is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component, a required component, or the shared relay pool has been disposed\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery, authentication, or the HTTP request fails at the transport layer\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects the operation with a structured protocol error that is not handled by this method\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Relay evidence or returned state is missing, inconsistent, or fails protocol validation\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Text\.DecoderFallbackException](https://learn.microsoft.com/en-us/dotnet/api/system.text.decoderfallbackexception 'System\.Text\.DecoderFallbackException')<br>
+A relay response contains bytes that are not valid UTF\-8\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\. The grant has no valid signature from a currently authorized device\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The target account or relay identifier is invalid, or supplied contact evidence does not authorize a query for this account\.
+
+[System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
+An account identifier in the query uses an unsupported namespace\.
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactInvite,System.Threading.CancellationToken)'></a>
+
+## DeviceManager\.RefreshDeviceStateAsync\(ContactInvite, CancellationToken\) Method
+
+Awaits device\-state refresh with the supplied invitation, bypassing the success interval but retaining the one\-minute failure cooldown\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountDeviceState?> RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactInvite invite, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactInvite,System.Threading.CancellationToken).invite'></a>
+
+`invite` [ContactInvite](Meshline.Models.Protocol.ContactInvite.md 'Meshline\.Models\.Protocol\.ContactInvite')
+
+The signed invitation authorizing the operation\.
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactInvite,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountDeviceState](Meshline.Models.Protocol.AccountDeviceState.md 'Meshline\.Models\.Protocol\.AccountDeviceState')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The verified device state, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when unavailable\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. The home route, local device, or account signer needed to authenticate the query is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component, a required component, or the shared relay pool has been disposed\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery, authentication, or the HTTP request fails at the transport layer\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects the operation with a structured protocol error that is not handled by this method\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Relay evidence or returned state is missing, inconsistent, or fails protocol validation\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Text\.DecoderFallbackException](https://learn.microsoft.com/en-us/dotnet/api/system.text.decoderfallbackexception 'System\.Text\.DecoderFallbackException')<br>
+A relay response contains bytes that are not valid UTF\-8\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The invitation signature is invalid, a local signing key fails validation, or the cryptographic provider fails signature verification\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The target account or relay identifier is invalid, or supplied contact evidence does not authorize a query for this account\.
+
+[System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
+An account identifier in the query uses an unsupported namespace\.
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(string,System.Threading.CancellationToken)'></a>
+
+## DeviceManager\.RefreshDeviceStateAsync\(string, CancellationToken\) Method
+
+Awaits device\-state refresh, bypassing the success interval but retaining the one\-minute failure cooldown\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountDeviceState?> RefreshDeviceStateAsync(string? accountId=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(string,System.Threading.CancellationToken).accountId'></a>
+
+`accountId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The target account identifier, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') for the current account\.
+
+<a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountDeviceState](Meshline.Models.Protocol.AccountDeviceState.md 'Meshline\.Models\.Protocol\.AccountDeviceState')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The verified device state, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when unavailable\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. The home route, local device, or account signer needed to authenticate the query is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component, a required component, or the shared relay pool has been disposed\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery, authentication, or the HTTP request fails at the transport layer\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects the operation with a structured protocol error that is not handled by this method\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Relay evidence or returned state is missing, inconsistent, or fails protocol validation\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Text\.DecoderFallbackException](https://learn.microsoft.com/en-us/dotnet/api/system.text.decoderfallbackexception 'System\.Text\.DecoderFallbackException')<br>
+A relay response contains bytes that are not valid UTF\-8\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The target account or relay identifier is invalid, or supplied contact evidence does not authorize a query for this account\.
+
+[System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
+An account identifier in the query uses an unsupported namespace\.
 
 <a name='Meshline.Components.DeviceManager.RemoveDeviceAsync(string,System.Threading.CancellationToken)'></a>
 

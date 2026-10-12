@@ -88,8 +88,9 @@ function Get-ApiBaseMemberId([Reflection.MemberInfo]$Member) {
     return $source
 }
 
-function Merge-ApiComments([Xml.XmlElement]$Target, [Xml.XmlElement]$Source) {
-    foreach ($inherited in $Source.ChildNodes) {
+function Merge-ApiComments([Xml.XmlElement]$Target, [Xml.XmlElement]$Source, [string]$Path) {
+    $nodes = if ($Path) { $Source.SelectNodes($Path) } else { $Source.ChildNodes }
+    foreach ($inherited in $nodes) {
         if ($inherited -isnot [Xml.XmlElement] -or $inherited.LocalName -ceq 'inheritdoc') { continue }
         $key = if ($inherited.HasAttribute('name')) { $inherited.GetAttribute('name') } else { $inherited.GetAttribute('cref') }
         $local = @($Target.ChildNodes | Where-Object {
@@ -113,7 +114,7 @@ function Expand-ApiComment([string]$Id, $Comments, $Members, $Visiting) {
     if (!$source -and $Members.ContainsKey($Id)) { $source = Get-ApiBaseMemberId $Members[$Id] }
     if ($source -and $Comments.ContainsKey($source)) {
         Expand-ApiComment $source $Comments $Members $Visiting
-        Merge-ApiComments $element $Comments[$source]
+        Merge-ApiComments $element $Comments[$source] ($inherit.GetAttribute('path'))
     }
     elseif ($Id.Contains('Meshline.Storage.Migrations.', [StringComparison]::Ordinal)) {
         $summary = $element.OwnerDocument.CreateElement('summary')

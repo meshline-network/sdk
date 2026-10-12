@@ -20,8 +20,7 @@ sealed partial class MessageManager
         if (self != (payload is AccountContactSync)) throw new InvalidDataException("The contact payload is not permitted for this message account binding.");
         if (self)
         {
-            var state = await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException("The current account device state is unavailable.");
+            var state = await ReadOwnMessageStateAsync(state => state.ValidateDeviceAuthorization(message.SenderDeviceId, Context) is null, cancellationToken).ConfigureAwait(false);
             if (state.ValidateDeviceAuthorization(message.SenderDeviceId, Context) is { } authorization) throw new InvalidDataException(authorization.Message);
         }
         var effect = payload switch
@@ -33,8 +32,10 @@ sealed partial class MessageManager
             _ => throw new InvalidDataException("The contact payload type does not match its stored type.")
         };
         if (self || payload is ContactConsent) return effect;
-        var own = await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The current account device state is unavailable.");
+        ContactGrant authorizationGrant;
+        await using (var database = new MeshlineDbContext(databaseOptions))
+            authorizationGrant = await ReadContactAuthorizationAsync(database, message.Sender, cancellationToken).ConfigureAwait(false);
+        var own = await ReadOwnMessageStateAsync(state => !FilterGrantSignatures(authorizationGrant, state, Context).Signatures.IsEmpty, cancellationToken).ConfigureAwait(false);
         return async (database, notifications, token) =>
         {
             var grant = await ReadContactAuthorizationAsync(database, message.Sender, token).ConfigureAwait(false);

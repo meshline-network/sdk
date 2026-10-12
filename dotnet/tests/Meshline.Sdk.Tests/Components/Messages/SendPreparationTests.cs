@@ -23,6 +23,7 @@ public sealed class SendPreparationTests
         await fixture.InitializeAsync();
         using var peer = new AccountSigner();
         await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
+        await MakeDeviceStatesColdAsync(fixture);
         var ownEntered = AsyncTest.Signal();
         var peerEntered = AsyncTest.Signal();
         var ownRelease = AsyncTest.Signal();
@@ -70,6 +71,7 @@ public sealed class SendPreparationTests
         await fixture.InitializeAsync();
         using var peer = new AccountSigner();
         await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
+        await MakeDeviceStatesColdAsync(fixture);
         var failingAccount = ownFails ? fixture.Account.AccountId : peer.AccountId;
         var failingEntered = AsyncTest.Signal();
         var otherEntered = AsyncTest.Signal();
@@ -123,67 +125,138 @@ public sealed class SendPreparationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Caller_cancellation_or_disposal_cancels_and_drains_both_queries(bool dispose)
+    public async Task Canceling_send_or_disposing_message_manager_does_not_cancel_shared_device_queries(bool dispose)
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
         await fixture.InitializeAsync();
         using var peer = new AccountSigner();
         await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
+        await MakeDeviceStatesColdAsync(fixture);
         var ownEntered = AsyncTest.Signal();
         var peerEntered = AsyncTest.Signal();
-        var ownCanceled = AsyncTest.Signal();
-        var peerCanceled = AsyncTest.Signal();
         var release = AsyncTest.Signal();
+        var shared = new System.Collections.Concurrent.ConcurrentBag<CancellationToken>();
         fixture.Relay.Handler = async (request, token) =>
         {
             if (request.Method == "device.state.resolve")
             {
-                var own = QueriedAccount(request) == fixture.Account.AccountId;
-                (own ? ownEntered : peerEntered).TrySetResult();
-                await AsyncTest.WaitForCancellationAndCleanupAsync(token, own ? ownCanceled : peerCanceled, release.Task);
+                shared.Add(token);
+                (QueriedAccount(request) == fixture.Account.AccountId ? ownEntered : peerEntered).TrySetResult();
+                await release.Task.WaitAsync(token);
             }
             return fixture.Relay.Respond(request);
         };
         using var caller = CancellationTokenSource.CreateLinkedTokenSource(Token);
         var manager = fixture.Client.MessageManager;
         var sending = manager.SendMessageAsync(peer.AccountId, Draft(), caller.Token);
-        Task disposed = Task.CompletedTask;
         try
         {
-            await Task.WhenAll(ownEntered.Task, peerEntered.Task).WaitAsync(TimeSpan.FromSeconds(10), Token);
+            await Task.WhenAll(ownEntered.Task, peerEntered.Task).WaitAsync(TimeSpan.FromSeconds(5), Token);
             if (dispose)
-                disposed = manager.DisposeAsync().AsTask();
+                await manager.DisposeAsync();
             else
                 caller.Cancel();
-            await Task.WhenAll(ownCanceled.Task, peerCanceled.Task).WaitAsync(TimeSpan.FromSeconds(10), Token);
-            Assert.False(sending.IsCompleted);
-            if (dispose)
-                Assert.False(disposed.IsCompleted);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sending.WaitAsync(TimeSpan.FromSeconds(5), Token));
+            Assert.All(shared, token => Assert.False(token.IsCancellationRequested));
         }
-        finally
-        {
-            caller.Cancel();
-            release.TrySetResult();
-        }
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sending);
-        await disposed.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        finally { release.TrySetResult(); }
         await AssertNoDirectMessagesAsync(fixture);
     }
 
     [Fact]
-    public async Task Self_send_resolves_device_state_only_once()
+    public async Task Repeated_self_and_peer_sends_reuse_verified_device_states()
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
         await fixture.InitializeAsync();
+        using var peer = new AccountSigner();
+        await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
         var queries = fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve");
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.Equal(MessageSendState.Queued, (await fixture.Client.MessageManager.SendMessageAsync(fixture.Account.AccountId, Draft(), Token)).State);
+            Assert.Equal(MessageSendState.Queued, (await fixture.Client.MessageManager.SendMessageAsync(peer.AccountId, Draft(), Token)).State);
+        }
+        Assert.Equal(queries, fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve"));
+    }
 
-        var queued = await fixture.Client.MessageManager.SendMessageAsync(fixture.Account.AccountId, Draft(), Token);
+    [Theory]
+    [InlineData("stale")]
+    [InlineData("missing")]
+    [InlineData("transport")]
+    public async Task Revision_hints_and_failed_refreshes_do_not_block_sends_using_valid_state(string failure)
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        using var peer = new AccountSigner();
+        await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
+        var previous = fixture.Relay.Devices[peer.AccountId];
+        ContactGrant grant;
+        await using (var database = fixture.Database.Open())
+        {
+            var contact = await database.Contacts.SingleAsync(row => row.AccountId == peer.AccountId, Token);
+            grant = ProtocolModel.FromJson<ContactGrant>(contact.GrantFromJson!)!;
+            contact.RequiredDeviceRevision = previous.Revision + 1;
+            await database.SaveChangesAsync(Token);
+        }
+        await fixture.ReopenAsync(); // Persisted state remains usable; refresh timing starts afresh.
+        var manager = fixture.Client.DeviceManager;
+        int Queries() => fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve" && QueriedAccount(request) == peer.AccountId);
+        var count = Queries();
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        fixture.Relay.Handler = async (request, token) =>
+        {
+            if (request.Method == "device.state.resolve" && QueriedAccount(request) == peer.AccountId)
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(token);
+                return failure switch
+                {
+                    "missing" => OfflineRelay.Error("not_found"),
+                    "transport" => throw new HttpRequestException("offline"),
+                    _ => fixture.Relay.Respond(request)
+                };
+            }
+            return fixture.Relay.Respond(request);
+        };
+        try
+        {
+            var sends = Enumerable.Range(0, 3).Select(_ => fixture.Client.MessageManager.SendMessageAsync(peer.AccountId, Draft(), Token));
+            Assert.All(await Task.WhenAll(sends).WaitAsync(TimeSpan.FromSeconds(5), Token), result => Assert.Equal(MessageSendState.Queued, result.State));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            Assert.Equal(count + 1, Queries());
+            var joined = manager.RefreshDeviceStateAsync(grant, Token);
+            fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(30));
+            release.TrySetResult();
+            if (failure == "missing") Assert.Null(await joined);
+            else if (failure == "transport") await Assert.ThrowsAsync<HttpRequestException>(() => joined);
+            else await Assert.ThrowsAsync<InvalidDataException>(() => joined);
+            fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(59));
+            Assert.Equal(previous.Revision, (await manager.GetDeviceStateAsync(grant, Token))!.Revision);
+            Assert.Equal(MessageSendState.Queued, (await fixture.Client.MessageManager.SendMessageAsync(peer.AccountId, Draft(), Token)).State);
+            Assert.Equal(count + 1, Queries());
 
-        Assert.Equal(MessageSendState.Queued, queued.State);
-        Assert.Equal(queries + 1, fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve"));
+            var updated = previous with { Revision = previous.Revision + 1 };
+            fixture.Relay.Devices[peer.AccountId] = updated with { AccountSignature = [.. peer.Sign(updated.GetSigningInput(TestNetwork.Context))] };
+            entered = AsyncTest.Signal();
+            release = AsyncTest.Signal();
+            failure = "success";
+            fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(1));
+            Assert.Equal(count + 1, Queries()); // No timed retry.
+            Assert.Equal(previous.Revision, (await manager.GetDeviceStateAsync(grant, Token))!.Revision);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            joined = manager.RefreshDeviceStateAsync(grant, Token);
+            release.TrySetResult();
+            Assert.Equal(updated.Revision, (await joined)!.Revision);
+            Assert.Equal(count + 2, Queries());
+            for (var i = 0; i < 3; i++)
+                Assert.Equal(updated.Revision, (await manager.GetDeviceStateAsync(grant, Token))!.Revision);
+            Assert.Equal(count + 2, Queries());
+        }
+        finally { release.TrySetResult(); }
     }
 
     [Fact]
@@ -198,6 +271,7 @@ public sealed class SendPreparationTests
         var revoked = previous with { Revision = previous.Revision + 1, Certificates = [] };
         fixture.Relay.Devices[peer.AccountId] = revoked with { AccountSignature = [.. peer.Sign(revoked.GetSigningInput(TestNetwork.Context))] };
 
+        await fixture.Client.DeviceManager.RefreshDeviceStateAsync(peer.AccountId, Token);
         await Assert.ThrowsAsync<CryptographicException>(() => fixture.Client.MessageManager.SendMessageAsync(peer.AccountId, Draft(), Token));
 
         await AssertNoDirectMessagesAsync(fixture);
@@ -214,6 +288,7 @@ public sealed class SendPreparationTests
         var previous = fixture.Relay.Devices[fixture.Account.AccountId];
         var revoked = previous with { Revision = previous.Revision + 1, Certificates = [] };
         fixture.Relay.Devices[fixture.Account.AccountId] = revoked with { AccountSignature = [.. fixture.Account.Sign(revoked.GetSigningInput(TestNetwork.Context))] };
+        await MakeDeviceStatesColdAsync(fixture);
         var peerState = fixture.Relay.Devices[peer.AccountId];
         peerState = peerState with { Revision = peerState.Revision + 1 };
         fixture.Relay.Devices[peer.AccountId] = peerState with { AccountSignature = [.. peer.Sign(peerState.GetSigningInput(TestNetwork.Context))] };
@@ -240,6 +315,13 @@ public sealed class SendPreparationTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => sending);
         Assert.Equal(revoked.Revision, fixture.Client.DeviceState!.Revision);
         await AssertNoDirectMessagesAsync(fixture);
+    }
+
+    static async Task MakeDeviceStatesColdAsync(TestClient fixture)
+    {
+        await using (var database = fixture.Database.Open())
+            await database.DeviceStates.ExecuteDeleteAsync(Token);
+        await fixture.ReopenAsync();
     }
 
     static async Task AssertNoDirectMessagesAsync(TestClient fixture)

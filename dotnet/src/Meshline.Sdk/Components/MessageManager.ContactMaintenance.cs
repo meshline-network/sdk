@@ -10,18 +10,7 @@ sealed partial class MessageManager
 {
     readonly Channel<bool> _refreshRequests = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
     Task _refresh = Task.CompletedTask;
-    Task _poll = Task.CompletedTask;
     int _deviceStateNotificationPending;
-
-    async Task PollContactsAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30), Clock.Provider);
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false)) _refreshRequests.Writer.TryWrite(true);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-    }
 
     void OnDeviceChanged(object? sender, DeviceChangedEventArgs args) => _refreshRequests.Writer.TryWrite(true);
 
@@ -129,23 +118,25 @@ sealed partial class MessageManager
     {
         var own = deviceManager.DeviceState;
         var incoming = ReadUnexpiredGrant(contact.GrantFromJson);
-        AccountDeviceState? refreshed = null;
+        long? refreshedRevision = null;
         if (contact.RequiredDeviceRevision is { } required && incoming is not null)
         {
-            refreshed = await deviceManager.GetDeviceStateAsync(incoming, cancellationToken).ConfigureAwait(false);
-            if (refreshed is null || refreshed.Revision < required) throw new InvalidDataException("The contact device state has not reached its announced revision.");
+            await using var database = new MeshlineDbContext(databaseOptions);
+            refreshedRevision = await database.DeviceStates.AsNoTracking()
+                .Where(state => state.AccountId == contact.AccountId && state.Revision >= required)
+                .Select(state => (long?)state.Revision).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         }
         ContactGrant? supplemented = null;
         if (own is not null && own.ValidateDeviceAuthorization(Certificate.GetDeviceId(Context), Context) is null && ReadUnexpiredGrant(contact.GrantToJson) is { } outgoing)
             supplemented = await AddSignatureAsync(outgoing, cancellationToken).ConfigureAwait(false);
-        if (refreshed is null && (supplemented is null || supplemented.ToJson() == contact.GrantToJson)) return;
+        if (refreshedRevision is null && (supplemented is null || supplemented.ToJson() == contact.GrantToJson)) return;
         if (supplemented is not null && supplemented.ToJson() != contact.GrantToJson && incoming is not null)
             await RefreshSendStateAsync(contact.AccountId, incoming, cancellationToken).ConfigureAwait(false);
         await TransactAsync(async (database, notifications, token) =>
         {
             var current = await database.Contacts.FindAsync([contact.AccountId], token).ConfigureAwait(false);
             if (current is not { State: ContactRelationshipState.Active }) return;
-            if (refreshed is not null && current.RequiredDeviceRevision <= refreshed.Revision)
+            if (refreshedRevision is not null && current.RequiredDeviceRevision <= refreshedRevision)
             {
                 current.RequiredDeviceRevision = null;
                 NotifyContact(notifications, current, ContactChangeKind.Authorization);

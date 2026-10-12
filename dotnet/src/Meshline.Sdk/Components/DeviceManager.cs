@@ -49,7 +49,6 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     RelayClient? _homeRelayClient;
     Channel<bool>? _refreshRequests;
     Task _homeRefresh = Task.CompletedTask;
-    Task _homePolling = Task.CompletedTask;
     readonly ConcurrentDictionary<string, long> _requiredDeviceRevisions = new(StringComparer.Ordinal);
 
     /// <summary>
@@ -225,7 +224,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         using var _ = BeginOperation(ref cancellationToken);
         if (Identifiers.ValidateDeviceId(deviceId) is { } violation)
             throw new ArgumentException(violation.Message, nameof(deviceId));
-        var state = await ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, shareOwnState: false).ConfigureAwait(false)
+        var state = await ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, mode: StateReadMode.RefreshAfterCurrent).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The account has no published device state.");
         var certificates = state.Certificates.Where(certificate => certificate.GetDeviceId(Context) != deviceId).ToArray();
         if (certificates.Length == state.Certificates.Length)
@@ -296,8 +295,13 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     }
 
     /// <summary>
-    /// Resolves and verifies account device authorization using the supplied account or contact evidence.
+    /// Returns verified cached device state, starting a demand-triggered background refresh when due.
     /// </summary>
+    /// <remarks>
+    /// Reads trigger refreshes one hour after success or one minute after failure. Missing or unusable state requires a shared fetch;
+    /// caller cancellation only ends that caller's wait. State signatures and revisions are verified before caching, and authorization is checked on use.
+    /// Use <see cref="RefreshDeviceStateAsync(string, CancellationToken)"/> to await a refresh.
+    /// </remarks>
     /// <param name="accountId">The target account identifier, or <see langword="null"/> for the current account.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The verified device state, or <see langword="null"/> when unavailable.</returns>
@@ -323,7 +327,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     }
 
     /// <summary>
-    /// Resolves and verifies account device authorization using the supplied account or contact evidence.
+    /// Returns verified cached device state, starting a demand-triggered background refresh when due.
     /// </summary>
     /// <param name="grant">A contact grant authorizing this account to access the grantor's device state.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
@@ -352,7 +356,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     }
 
     /// <summary>
-    /// Resolves and verifies account device authorization using the supplied account or contact evidence.
+    /// Returns verified cached device state, starting a demand-triggered background refresh when due.
     /// </summary>
     /// <param name="invite">The signed invitation authorizing the operation.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
@@ -399,7 +403,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <exception cref="ArgumentException">The target account or relay identifier is invalid, or supplied contact evidence does not authorize a query for this account.</exception>
     /// <exception cref="NotSupportedException">An account identifier in the query uses an unsupported namespace.</exception>
     public Task<AccountDeviceState?> GetOwnDeviceStateAsync(string relayId, CancellationToken cancellationToken = default) =>
-        ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, relayId, shareOwnState: false);
+        ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, relayId, mode: StateReadMode.RefreshAfterCurrent);
 
     /// <summary>
     /// Signs and publishes a complete device authorization state and reports acceptance or staging.
@@ -510,7 +514,10 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             }
             DateTimeOffset? stagedUntil = response.StagedUntil is { } seconds ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null;
             if (response.Status == DeviceStatePublishStatus.Accepted)
+            {
                 await SaveDeviceStateAsync(request, cancellationToken).ConfigureAwait(false);
+                CacheDeviceState(request, Clock.UtcNow);
+            }
             else
             {
                 if (stagedUntil <= Clock.UtcNow)
@@ -628,6 +635,13 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
                 ?? throw new InvalidDataException("The stored device state is null.");
         Local = certificate;
         DeviceState = state;
+        foreach (var row in await database.DeviceStates.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var cached = ProtocolModel.FromJson<AccountDeviceState>(row.DocumentJson)!;
+            if (cached.Account != row.AccountId || cached.Revision != row.Revision || cached.Validate(Context) is not null)
+                throw new InvalidDataException("The persisted device state is invalid.");
+            CacheDeviceState(cached);
+        }
     }
 
     /// <inheritdoc/>
@@ -652,27 +666,27 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         if (state.ValidateDeviceAuthorization(certificate.GetDeviceId(Context), Context) is { } violation)
             throw new InvalidOperationException(violation.Message ?? "The local device is not authorized.");
         _refreshRequests = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
-        _requiredDeviceRevisions.Clear();
         var relayId = await GetHomeRelayIdAsync(cancellationToken).ConfigureAwait(false);
         await UseHomeRelayAsync(relayId, cancellationToken).ConfigureAwait(false);
         _homeRefresh = RefreshHomeAsync(RuntimeCancellationToken);
-        _homePolling = PollHomeAsync(RuntimeCancellationToken);
+        accountManager.AccountChanged += OnHomeRouteChanged;
         _refreshRequests.Writer.TryWrite(true);
     }
 
     /// <inheritdoc/>
     protected override async Task OnStopAsync()
     {
-        await Task.WhenAll(_homeRefresh, _homePolling).ConfigureAwait(false);
+        accountManager.AccountChanged -= OnHomeRouteChanged;
+        await Task.WhenAll(_homeRefresh, StopStateQueriesAsync()).ConfigureAwait(false);
         SetHomeRelayClient(null);
         _refreshRequests = null;
-        _requiredDeviceRevisions.Clear();
     }
 
     /// <inheritdoc/>
     /// <exception cref="AggregateException">A cancellation callback throws while dependent component or relay lifetimes are canceled.</exception>
     protected override async ValueTask DisposeAsyncCore()
     {
+        await StopStateQueriesAsync(dispose: true).ConfigureAwait(false);
         if (Local is not null)
             await relayClients.InvalidateDeviceAsync().ConfigureAwait(false);
         ClearCachedKeys();
@@ -782,7 +796,8 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         return route.RelayId;
     }
 
-    async Task<AccountDeviceState?> ResolveDeviceStateAsync(string accountId, TypedProtocolModel? authorization, CancellationToken cancellationToken, string? relayId = null, bool shareOwnState = true)
+    async Task<AccountDeviceState?> ResolveDeviceStateAsync(string accountId, TypedProtocolModel? authorization, CancellationToken cancellationToken,
+        string? relayId = null, StateReadMode mode = StateReadMode.Cached)
     {
         EnsureInitialized();
         using var _ = BeginOperation(ref cancellationToken);
@@ -790,12 +805,14 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             throw new ArgumentException(violation.Message, nameof(accountId));
         if (authorization is not null && accountId == Options.AccountId)
             throw new ArgumentException("A signed device state query cannot target the current account.", nameof(accountId));
+        await LoadStoredStateAsync(accountId, cancellationToken).ConfigureAwait(false);
         relayId ??= await GetHomeRelayIdAsync(cancellationToken).ConfigureAwait(false);
         var useAccount = accountId == Options.AccountId && accountSigner is not null
             && (Local is null || DeviceState?.ValidateDeviceAuthorization(Local.GetDeviceId(Context), Context) is not null || DeviceState is null);
-        if (shareOwnState && accountId == Options.AccountId)
-            return await ResolveSharedOwnStateAsync(relayId, useAccount, cancellationToken).ConfigureAwait(false);
-        return await ResolveDeviceStateCoreAsync(accountId, authorization, relayId, useAccount, cancellationToken).ConfigureAwait(false);
+        if (authorization is ContactGrant grant && (grant.Validate() is not null || grant.Grantor != accountId || grant.Grantee != Options.AccountId)
+            || authorization is ContactInvite invite && (invite.Validate() is not null || invite.Inviter != accountId))
+            throw new ArgumentException("The contact evidence does not authorize this query.", nameof(authorization));
+        return await ReadDeviceStateAsync(accountId, authorization, relayId, useAccount, mode, cancellationToken).ConfigureAwait(false);
     }
 
     async Task<AccountDeviceState?> ResolveDeviceStateCoreAsync(string accountId, TypedProtocolModel? authorization, string relayId, bool useAccount, CancellationToken cancellationToken)
@@ -838,6 +855,14 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         }
         if (state.Account != accountId)
             throw new InvalidDataException("The returned device state belongs to another account.");
+        // A fully validated state is authoritative even when it revokes the supplied proof's signer.
+        await SaveDeviceStateAsync(state, cancellationToken).ConfigureAwait(false);
+        ValidateStateAuthorization(state, authorization);
+        return state;
+    }
+
+    void ValidateStateAuthorization(AccountDeviceState state, TypedProtocolModel? authorization)
+    {
         if (authorization is ContactInvite invite)
         {
             var inviteViolation = invite.Validate();
@@ -855,8 +880,6 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
                 && grant.Signatures.TryGetValue(certificate.GetDeviceId(Context), out var signature) && Ed25519.Verify(signature.AsSpan(), certificate.SigningPublicKey.AsSpan(), input)))
                 throw new CryptographicException("The contact grant has no signature from a currently authorized device.");
         }
-        await SaveDeviceStateAsync(state, cancellationToken).ConfigureAwait(false);
-        return state;
     }
 
     async Task SaveDeviceStateAsync(AccountDeviceState state, CancellationToken cancellationToken)
@@ -886,6 +909,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             }
             await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            CacheDeviceState(state);
             if (state.Account == Options.AccountId)
             {
                 changed = DeviceState?.Revision != state.Revision;
@@ -931,29 +955,18 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             if (_homeRelayClient is { } previous)
             {
                 previous.NotificationReceived -= OnDeviceStateNotification;
-                previous.SocketConnected -= OnHomeSocketConnected;
                 previous.ErrorOccurred -= OnHomeConnectionError;
             }
             _homeRelayClient = relayClient;
             if (relayClient is not null)
             {
                 relayClient.NotificationReceived += OnDeviceStateNotification;
-                relayClient.SocketConnected += OnHomeSocketConnected;
                 relayClient.ErrorOccurred += OnHomeConnectionError;
             }
         }
     }
 
-    async Task PollHomeAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30), Clock.Provider);
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-                _refreshRequests!.Writer.TryWrite(true);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-    }
+    void OnHomeRouteChanged(object? sender, EventArgs args) => _refreshRequests?.Writer.TryWrite(true);
 
     async Task RefreshHomeAsync(CancellationToken cancellationToken)
     {
@@ -968,19 +981,11 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
                 try
                 {
                     var relayId = await GetHomeRelayIdAsync(cancellationToken).ConfigureAwait(false);
-                    var state = await ResolveDeviceStateAsync(Options.AccountId, null, cancellationToken, relayId).ConfigureAwait(false)
-                        ?? throw new InvalidDataException("The home relay has no device state for the account.");
-                    if (state.ValidateDeviceAuthorization(Local!.GetDeviceId(Context), Context) is { } violation)
-                        throw new InvalidOperationException(violation.Message ?? "The local device is no longer authorized.");
-                    if (_requiredDeviceRevisions.TryGetValue(relayId, out var required) && state.Revision < required)
-                        throw new InvalidDataException("The device state has not reached the revision announced by the relay.");
                     await UseHomeRelayAsync(relayId, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                 {
                     ReportBackgroundError(BackgroundOperation.Synchronize, _homeRelayClient?.RelayId, exception);
-                    await Task.Delay(TimeSpan.FromSeconds(5), Clock.Provider, cancellationToken).ConfigureAwait(false);
-                    _refreshRequests.Writer.TryWrite(true);
                 }
             }
         }
@@ -996,15 +1001,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             if (request.Params is null || !request.Params.TryGetValue("revision", out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var revision) || revision < 0)
                 throw new InvalidDataException("A device state notification must contain a nonnegative revision.");
             _requiredDeviceRevisions.AddOrUpdate(relayClient.RelayId, revision, (_, previous) => Math.Max(previous, revision));
-            _refreshRequests!.Writer.TryWrite(true);
         }
-    }
-
-    void OnHomeSocketConnected(object? sender, EventArgs args)
-    {
-        lock (_homeGate)
-            if (_homeRelayClient is not null && ReferenceEquals(sender, _homeRelayClient))
-                _refreshRequests!.Writer.TryWrite(true);
     }
 
     void OnHomeConnectionError(object? sender, Exception error)

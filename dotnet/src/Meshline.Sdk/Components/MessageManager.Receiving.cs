@@ -25,17 +25,19 @@ sealed partial class MessageManager
             {
                 if (envelope.CreatedAt < 0 || envelope.CreatedAt > DateTimeOffset.MaxValue.ToUnixTimeSeconds()) throw new InvalidDataException("The message timestamp is outside the supported range.");
                 var payload = await DecryptAsync(envelope, entry.KeyBox, certificate, cancellationToken).ConfigureAwait(false);
+                ContactGrant? authorization = null;
                 if (envelope.To == Options.AccountId && envelope.From != Options.AccountId && payload is DirectMessage or ContactGrant or DeviceStateChanged)
                 {
                     await using var database = new MeshlineDbContext(databaseOptions);
-                    _ = await ReadContactAuthorizationAsync(database, envelope.From, cancellationToken).ConfigureAwait(false);
+                    authorization = await ReadContactAuthorizationAsync(database, envelope.From, cancellationToken).ConfigureAwait(false);
                 }
                 if (payload is DirectMessage)
                 {
                     if (payload.Validate(Context) is { } violation) throw new InvalidDataException(violation.Message);
                     if (envelope.To == Options.AccountId)
-                        own = await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
-                            ?? throw new InvalidOperationException("The current account device state is unavailable.");
+                        own = await ReadOwnMessageStateAsync(state => envelope.From == Options.AccountId
+                            ? state.ValidateDeviceAuthorization(envelope.FromDeviceId, Context) is null
+                            : !FilterGrantSignatures(authorization!, state, Context).Signatures.IsEmpty, cancellationToken).ConfigureAwait(false);
                 }
                 record = new()
                 {
@@ -60,6 +62,29 @@ sealed partial class MessageManager
             notifications = await CommitReceivedMessageAsync(null, null, null, exception, relayId, entry, hasRetentionGap, messages, cancellationToken).ConfigureAwait(false);
         }
         return notifications;
+    }
+
+    async Task<AccountDeviceState> ReadOwnMessageStateAsync(Func<AccountDeviceState, bool> authorizes, CancellationToken cancellationToken)
+    {
+        var state = await ReadAsync(refresh: false).ConfigureAwait(false);
+        // A snapshot that cannot authorize this message needs a current lookup before rejection.
+        return authorizes(state) ? state : await ReadAsync(refresh: true).ConfigureAwait(false);
+
+        async Task<AccountDeviceState> ReadAsync(bool refresh)
+        {
+            try
+            {
+                return (refresh
+                    ? await deviceManager.RefreshDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
+                    : await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false))
+                    ?? throw new InvalidOperationException("The current account device state is unavailable.");
+            }
+            catch (Exception error) when (error is InvalidDataException or JsonException or DecoderFallbackException)
+            {
+                // Invalid metadata is a failed lookup, not evidence that the message is invalid.
+                throw new InvalidOperationException("Could not obtain device state to authorize the message.", error);
+            }
+        }
     }
 
     Task<List<Action>> CommitReceivedMessageAsync(StoredMessageRecord? record, AccountDeviceState? own, ContactMessageEffect? contactEffect, Exception? rejection, string relayId, MessageTimelineEntry entry, bool hasRetentionGap, List<MessageInfo> messages, CancellationToken cancellationToken) =>

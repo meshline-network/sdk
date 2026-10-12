@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "ab70f25316afc024603c71397e39615f8b0fc5b459e6a62a0a18897cb5e62947",
+  "sourceSha256": "ee218ec63ca38b17f071652023224401297db4fb98c8e4490c53e8998e8cc5fd",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1337,6 +1337,27 @@
     {
       "symbol": "M:Meshline.Components.DeviceManager.PublishDeviceStateAsync(System.String,System.Collections.Generic.IReadOnlyList{Meshline.Models.Protocol.DeviceCertificate},Meshline.Models.Client.DeviceStatePublishOptions,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.PublishDeviceStateAsync(string,System.Collections.Generic.IReadOnlyList_Meshline.Models.Protocol.DeviceCertificate_,Meshline.Models.Client.DeviceStatePublishOptions,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/device.ts",
+      "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+    },
+    {
+      "symbol": "M:Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/device.ts",
+      "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+    },
+    {
+      "symbol": "M:Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactInvite,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactInvite,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/device.ts",
+      "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+    },
+    {
+      "symbol": "M:Meshline.Components.DeviceManager.RefreshDeviceStateAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RefreshDeviceStateAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/device.ts",
       "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."

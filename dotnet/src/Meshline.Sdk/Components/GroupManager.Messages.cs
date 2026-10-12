@@ -57,8 +57,19 @@ sealed partial class GroupManager
         if (payload is not (AccountGroupPrivateStateRequest or AccountGroupPrivateStateSync or AccountGroupHistorySecretSync)) return null;
         if (message.Sender != Options.AccountId || message.Recipient != Options.AccountId) throw new InvalidDataException("Group private state must be synchronized within the current account.");
         if (payload.Validate(Context) is { } violation) throw new InvalidDataException(violation.Message);
-        var own = await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The current account device state is unavailable.");
+        AccountDeviceState own;
+        try
+        {
+            own = await deviceManager.GetDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("The current account device state is unavailable.");
+            if (own.ValidateDeviceAuthorization(message.SenderDeviceId, Context) is not null)
+                own = await deviceManager.RefreshDeviceStateAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException("The current account device state is unavailable.");
+        }
+        catch (Exception error) when (error is InvalidDataException or JsonException or DecoderFallbackException)
+        {
+            throw new InvalidOperationException("Could not obtain device state to authorize the group synchronization message.", error);
+        }
         if (own.ValidateDeviceAuthorization(message.SenderDeviceId, Context) is { } authorization) throw new InvalidDataException(authorization.Message);
         if (payload is AccountGroupPrivateStateRequest request)
         {

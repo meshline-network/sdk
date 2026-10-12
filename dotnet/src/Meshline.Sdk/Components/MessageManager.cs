@@ -87,7 +87,6 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
         deviceManager.DeviceStateChanged += OnOwnDeviceStateChanged;
         OnOwnDeviceStateChanged(this, EventArgs.Empty);
         _refresh = RefreshContactsAsync(RuntimeCancellationToken);
-        _poll = PollContactsAsync(RuntimeCancellationToken);
         _sender = SendLoopAsync(RuntimeCancellationToken);
         _synchronizer = SynchronizeLoopAsync(RuntimeCancellationToken);
         _poller = PollAsync(RuntimeCancellationToken);
@@ -100,7 +99,7 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     {
         deviceManager.DeviceChanged -= OnDeviceChanged;
         deviceManager.DeviceStateChanged -= OnOwnDeviceStateChanged;
-        await Task.WhenAll(_sender, _synchronizer, _poller, _refresh, _poll).ConfigureAwait(false);
+        await Task.WhenAll(_sender, _synchronizer, _poller, _refresh).ConfigureAwait(false);
         DetachRelays();
         _syncStatus.Stop(OnSyncStatusChanged);
     }
