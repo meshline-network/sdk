@@ -10,19 +10,29 @@ Use `AccountManager.GetRouteAsync` to resolve the current or another account's r
 
 For first-time setup, use the [quick-start establishment workflow](quick-start.md). It coordinates device creation, device-state publication, and route publication. Lower-level `PublishRouteAsync` and `PublishDeviceStateAsync` exist for applications managing those operations explicitly and require an account signer.
 
-### Route queries
+### Metadata reads and refreshes
 
-`GetRouteAsync` reuses verified routes for **one hour** after discovery or publication. It then returns an unexpired route immediately while refreshing in the background. `ExpiresAt` remains a hard limit; without a usable route, queries await discovery. Concurrent refreshes for one account share a request; different accounts resolve independently.
+A normal read returns usable cached metadata immediately. Reads trigger background refreshes **one hour after success**, or **one minute after failure or a missing result**, measured from completion. There are no refresh timers. Compatible concurrent requests share a refresh; canceling one caller's wait does not cancel it.
 
-Failures and `not_found` impose a **one-minute** cooldown and preserve unexpired routes. During cooldown, a query without a usable route receives the previous error or null. Background errors raise `BackgroundError`. `RefreshRouteAsync` bypasses freshness and cooldown, awaits any shared discovery, and reports its result. Establishment, recovery and migration use it. Publication immediately updates the cache and takes precedence over older responses; unchanged results do not repeat `AccountChanged`.
+Refresh intervals do not determine validity. Operations still check signed expiry, authorization, revocation and required versions. Missing or unusable data requires an awaited fetch, with the same one-minute failure cooldown. Errors propagate from necessary fetches; background failures preserve usable data. A route, device-state or profile `not_found` response does not revoke an existing valid object.
 
-The cache belongs to one `AccountManager`, isolated by its network, Registry and account. Reopening requires discovery; persisted revisions still prevent rollback. Caller cancellation affects only that wait. Stop and disposal drain refreshes; stop retains verified entries and permits later queries, while disposal clears them.
+| Data and owner | Key and storage | Use and invalidation |
+| --- | --- | --- |
+| Registry directory and entries, optional `CachedRelayRegistry` | Source + network + Registry; directory or relay ID; memory | Validated removal or inactive status prevents relay use. See [provider selection and ownership](integrations.md). |
+| Relay descriptors and limits, `RelayClientPool` | Pool + relay ID; memory, shared across sessions | Signed descriptor expiry and current capability requirements apply. `GetInfoAsync` remains live because it includes server time. |
+| Account routes, `AccountManager` | Target account; memory and `AccountRoutes` | Verified before storage; reload checks binding, revision and expiry without repeating signatures. |
+| Device states and certificates, `DeviceManager` | Target account + relay + signing identity + access proof; `DeviceStates` | State has no TTL; certificate validity and proof authorization still apply. Private queries cannot authorize public discovery. New revisions and revocations apply across query scopes. |
+| Profiles, `ProfileManager` | Target account; memory and `AccountProfiles` with signer evidence | No TTL; timestamp and publication ordering prevent stale replacement. |
+| Channel descriptors, `ChannelManager` | Channel ID + relay; memory and `Channels`/`ChannelDescriptors` | Revision, identity and closure checks apply; timeline history uses the exact descriptor revision. |
+| Contacts and grants, `MessageManager` | Contact account; `Contacts` | Current relationship, grant expiry and signatures are checked when used. |
 
-### Device-state queries
+Components, pools and databases are bound to their network, Registry and local account; use a separate pool and database when switching accounts. Valid stored metadata is reused after restart. Refresh timing stays in memory, so the first read can return stored data and trigger a refresh. Reads and failed refreshes never extend protocol validity.
 
-`GetDeviceStateAsync()` and background synchronization may share an in-flight query for the current account within one `DeviceManager`. Completed results are not cached. New certificates, known revisions or relay notifications prevent reuse of an older query. Other-account queries and explicit `GetOwnDeviceStateAsync(relayId)` calls remain independent; authorization and signature checks still run.
+`RefreshRouteAsync`, `RefreshDeviceStateAsync`, `RefreshProfileAsync` and `RefreshChannelAsync` await refreshes while ordinary cached reads remain available. Only `RefreshRouteAsync` also bypasses the failure cooldown. Administrative operations retain their latest-state checks. Accepted publications update the same caches; older responses cannot replace them, and unchanged results do not repeat change events.
 
-Canceling one waiter preserves the others. The last waiter cancels and drains the request. Stop releases background waiters; disposal drains all queries.
+Device revision notifications alone do not invalidate usable state. A refresh below the announced revision follows the failure cooldown. Reception refreshes state when cached authorization is insufficient; failed lookups preserve the processing cursor, while verified denial rejects the message.
+
+This policy does not change message/timeline synchronization, group management or connection maintenance. Stop and disposal drain component refreshes; pool and Registry wrapper lifetimes are [application-owned](transport-and-di.md).
 
 ## Renew a local device
 

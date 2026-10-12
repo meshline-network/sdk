@@ -50,6 +50,8 @@ public static void RegisterRpcRegistry(
 ```
 <!-- /snippet -->
 
+`CachedRelayRegistry` is optional and follows the [metadata refresh policy](accounts-and-devices.md#metadata-reads-and-refreshes), keeping snapshots and timing in memory. It can be shared across pools. Dispose it after those pools, or asynchronously dispose the DI container that created it; the wrapper drains refreshes without disposing its source.
+
 `RelayClientPool` uses the supplied provider unchanged. Pass a provider backed by locally synchronized blocks directly to read its current view, or a raw `RpcRelayRegistry` for uncached RPC reads. The interface does not require a synchronization-complete signal.
 
 `Nep6AccountSigner` reads a Neo N3 NEP-6 version 1.0 wallet and decrypts its selected NEP-2 key. It defaults to account index 0 in file order, ignoring `isDefault`; pass another index explicitly when needed. It rejects watch-only, deployed, multisignature, mismatched-address, and mismatched-contract accounts without trying a later account. `Parse` accepts JSON already loaded by the application. The wallet is never modified. Supply the password at runtime, keep the signer available while it is in use, and dispose it afterward.
