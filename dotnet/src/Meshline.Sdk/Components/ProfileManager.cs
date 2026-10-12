@@ -25,7 +25,7 @@ namespace Meshline.Components;
 /// <exception cref="ArgumentNullException">The network context in <paramref name="options"/> is null. The <paramref name="options"/> argument is null.</exception>
 /// <exception cref="ArgumentException">The configured account identifier is invalid.</exception>
 /// <exception cref="NotSupportedException">The configured account identifier uses an unsupported account namespace.</exception>
-public sealed class ProfileManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, AccountManager accountManager, IDeviceSigner deviceSigner) : ClientComponent(options)
+public sealed partial class ProfileManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, AccountManager accountManager, IDeviceSigner deviceSigner) : ClientComponent(options)
 {
     /// <summary>
     /// Occurs when the current account's locally known profile changes.
@@ -53,12 +53,11 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
     {
         await using var database = new MeshlineDbContext(databaseOptions);
         await EnsureDatabaseBindingAsync(database, cancellationToken).ConfigureAwait(false);
-        var profile = await database.AccountProfiles.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false);
-        Profile = profile is null ? null : ProtocolModel.FromJson<AccountProfile>(profile.DocumentJson);
+        await LoadProfileCacheAsync(database, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Resolves and verifies an account profile and updates its local cache.
+    /// Reads a verified account profile with demand-triggered background refresh and updates its local cache.
     /// </summary>
     /// <param name="accountId">The target account identifier, or <see langword="null"/> for the current account.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
@@ -84,28 +83,7 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
         accountId ??= AccountId;
         if (AccountAdapter.ValidateAccountId(accountId) is { } violation)
             throw new ArgumentException(violation.Message, nameof(accountId));
-        await _profileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        AccountProfile? profile;
-        bool changed = false;
-        try
-        {
-            var result = await ResolveProfileAsync(accountId, cancellationToken).ConfigureAwait(false);
-            profile = result?.Profile;
-            if (result is not null)
-                await SaveProfileAsync(result, cancellationToken).ConfigureAwait(false);
-            if (accountId == AccountId)
-            {
-                changed = Profile?.ToJson() != profile?.ToJson();
-                Profile = profile;
-            }
-        }
-        finally
-        {
-            _profileGate.Release();
-        }
-        if (changed)
-            ProfileChanged?.Invoke(this, EventArgs.Empty);
-        return profile;
+        return (await ReadProfileAsync(accountId, false, cancellationToken).ConfigureAwait(false))?.Profile;
     }
 
     /// <summary>
@@ -182,7 +160,6 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
             throw new ArgumentException("PublicDiscovery cannot be deleted.", nameof(update));
         await _profileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         AccountProfile request;
-        bool changed;
         try
         {
             var certificate = deviceSigner.Certificate;
@@ -247,16 +224,12 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
                 await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
-            await SaveProfileAsync(new ProfileResolveResult { Profile = request, SignerCertificate = certificate }, cancellationToken).ConfigureAwait(false);
-            changed = Profile?.ToJson() != request.ToJson();
-            Profile = request;
+            await SaveProfileAsync(new ProfileResolveResult { Profile = request, SignerCertificate = certificate }, cancellationToken, published: true).ConfigureAwait(false);
         }
         finally
         {
             _profileGate.Release();
         }
-        if (changed)
-            ProfileChanged?.Invoke(this, EventArgs.Empty);
         return request;
     }
 
@@ -289,7 +262,7 @@ public sealed class ProfileManager(ClientOptions options, DatabaseOptions databa
         return result;
     }
 
-    async Task SaveProfileAsync(ProfileResolveResult result, CancellationToken cancellationToken)
+    async Task StoreProfileAsync(ProfileResolveResult result, CancellationToken cancellationToken)
     {
         var profile = result.Profile;
         var json = profile.ToJson();

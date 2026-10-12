@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "ee218ec63ca38b17f071652023224401297db4fb98c8e4490c53e8998e8cc5fd",
+  "sourceSha256": "f1e0f1b91ad02c15d1b1d40b0dd95a12832207cb2377d66dabb874851a7f3ec0",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1799,6 +1799,13 @@
     {
       "symbol": "M:Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+    },
+    {
+      "symbol": "M:Meshline.Components.ProfileManager.RefreshProfileAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.RefreshProfileAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
       "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."

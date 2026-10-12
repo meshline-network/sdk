@@ -9,6 +9,7 @@
 - [`ProfileManager(ClientOptions, DatabaseOptions, RelayClientPool, AccountManager, IDeviceSigner)`](#Meshline.Components.ProfileManager.ProfileManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Components.AccountManager%2CMeshline.Interactions.IDeviceSigner%29)
 - [`GetProfileAsync(string, CancellationToken)`](#Meshline.Components.ProfileManager.GetProfileAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`PublishProfileAsync(AccountProfile, CancellationToken)`](#Meshline.Components.ProfileManager.PublishProfileAsync%28Meshline.Models.Protocol.AccountProfile%2CSystem.Threading.CancellationToken%29)
+- [`RefreshProfileAsync(string, CancellationToken)`](#Meshline.Components.ProfileManager.RefreshProfileAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`UpdateProfileAsync(ProfileUpdate, CancellationToken)`](#Meshline.Components.ProfileManager.UpdateProfileAsync%28Meshline.Models.Client.ProfileUpdate%2CSystem.Threading.CancellationToken%29)
 - [`AccountId`](#Meshline.Components.ProfileManager.AccountId)
 - [`Profile`](#Meshline.Components.ProfileManager.Profile)
@@ -124,7 +125,7 @@ public Meshline.Models.Protocol.AccountProfile? Profile { get; }
 
 ## ProfileManager\.GetProfileAsync\(string, CancellationToken\) Method
 
-Resolves and verifies an account profile and updates its local cache\.
+Reads a verified account profile with demand\-triggered background refresh and updates its local cache\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountProfile?> GetProfileAsync(string? accountId=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -258,6 +259,77 @@ The local device key cannot be validated against its certificate, or cryptograph
 
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
 The profile belongs to another account, a required public\-discovery field is deleted, or the resulting profile fails validation\.
+
+<a name='Meshline.Components.ProfileManager.RefreshProfileAsync(string,System.Threading.CancellationToken)'></a>
+
+## ProfileManager\.RefreshProfileAsync\(string, CancellationToken\) Method
+
+Awaits profile refresh, bypassing the success interval but retaining the one\-minute failure cooldown\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountProfile?> RefreshProfileAsync(string? accountId=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ProfileManager.RefreshProfileAsync(string,System.Threading.CancellationToken).accountId'></a>
+
+`accountId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The target account identifier, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') for the current account\.
+
+<a name='Meshline.Components.ProfileManager.RefreshProfileAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountProfile](Meshline.Models.Protocol.AccountProfile.md 'Meshline\.Models\.Protocol\.AccountProfile')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The resolved profile, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when no profile is available\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component, a required component, or the shared relay pool has been disposed\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery, authentication, or the HTTP request fails at the transport layer\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects the operation with a structured protocol error that is not handled by this method\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Relay evidence or returned state is missing, inconsistent, or fails protocol validation\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Text\.DecoderFallbackException](https://learn.microsoft.com/en-us/dotnet/api/system.text.decoderfallbackexception 'System\.Text\.DecoderFallbackException')<br>
+A relay response contains bytes that are not valid UTF\-8\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The requested account identifier is invalid\.
+
+[System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
+The requested account uses an unsupported namespace\.
 
 <a name='Meshline.Components.ProfileManager.UpdateProfileAsync(Meshline.Models.Client.ProfileUpdate,System.Threading.CancellationToken)'></a>
 
