@@ -54,6 +54,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     {
         await using var database = new MeshlineDbContext(databaseOptions);
         await EnsureDatabaseBindingAsync(database, cancellationToken).ConfigureAwait(false);
+        await LoadDescriptorsAsync(database, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -113,7 +114,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     }
 
     /// <summary>
-    /// Resolves and verifies the channel descriptor and stores the resulting channel information locally.
+    /// Returns verified channel information, refreshing its descriptor in the background when due.
     /// </summary>
     /// <param name="channel">The channel identifier and hosting relay.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
@@ -135,8 +136,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     {
         EnsureInitialized();
         using var operation = BeginOperation(ref cancellationToken);
-        var relay = await GetHostingRelayAsync(channel.RelayId, cancellationToken).ConfigureAwait(false);
-        await SaveDescriptorAsync(channel, await ResolveDescriptorAsync(relay, channel, null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+        await ReadDescriptorAsync(channel, false, cancellationToken).ConfigureAwait(false);
         return await ReadChannelAsync(channel, cancellationToken).ConfigureAwait(false);
     }
 

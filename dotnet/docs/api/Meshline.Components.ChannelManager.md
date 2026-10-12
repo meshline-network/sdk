@@ -22,6 +22,7 @@
 - [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.ChannelManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`LoadChannelHistoryAsync(ChannelRef, PageRequest, CancellationToken)`](#Meshline.Components.ChannelManager.LoadChannelHistoryAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
 - [`PublishPostAsync(ChannelRef, ChannelPostDraft, CancellationToken)`](#Meshline.Components.ChannelManager.PublishPostAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.ChannelPostDraft%2CSystem.Threading.CancellationToken%29)
+- [`RefreshChannelAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.RefreshChannelAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`ReportPostAsync(ChannelPostRef, string, CancellationToken)`](#Meshline.Components.ChannelManager.ReportPostAsync%28Meshline.Models.Client.ChannelPostRef%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`SynchronizeAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.SynchronizeAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`UnfollowAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.UnfollowAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
@@ -496,7 +497,7 @@ Following is local to this database\. Background subscriptions and synchronizati
 
 ## ChannelManager\.GetChannelAsync\(ChannelRef, CancellationToken\) Method
 
-Resolves and verifies the channel descriptor and stores the resulting channel information locally\.
+Returns verified channel information, refreshing its descriptor in the background when due\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Client.ChannelInfo> GetChannelAsync(Meshline.Models.Client.ChannelRef channel, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -918,6 +919,74 @@ The channel metadata, post content, or field update violates protocol constraint
 
 [System\.UnauthorizedAccessException](https://learn.microsoft.com/en-us/dotnet/api/system.unauthorizedaccessexception 'System\.UnauthorizedAccessException')<br>
 The current account is not permitted to publish or modify this channel resource\.
+
+<a name='Meshline.Components.ChannelManager.RefreshChannelAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)'></a>
+
+## ChannelManager\.RefreshChannelAsync\(ChannelRef, CancellationToken\) Method
+
+Awaits channel descriptor refresh, bypassing the success interval but retaining the one\-minute failure cooldown\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ChannelInfo> RefreshChannelAsync(Meshline.Models.Client.ChannelRef channel, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ChannelManager.RefreshChannelAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken).channel'></a>
+
+`channel` [ChannelRef](Meshline.Models.Client.ChannelRef.md 'Meshline\.Models\.Client\.ChannelRef')
+
+The channel identifier and hosting relay\.
+
+<a name='Meshline.Components.ChannelManager.RefreshChannelAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ChannelInfo](Meshline.Models.Client.ChannelInfo.md 'Meshline\.Models\.Client\.ChannelInfo')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The resolved channel information and local following state\.
+
+#### Exceptions
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller cancels the operation or a component or relay lifetime ends\.
+
+[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
+An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component, a required component, or the shared relay pool has been disposed\.
+
+[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
+Relay discovery, authentication, or the HTTP request fails at the transport layer\.
+
+[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
+The relay rejects the operation with a structured protocol error that is not handled by this method\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+Relay evidence or returned state is missing, inconsistent, or fails protocol validation\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Text\.DecoderFallbackException](https://learn.microsoft.com/en-us/dotnet/api/system.text.decoderfallbackexception 'System\.Text\.DecoderFallbackException')<br>
+A relay response contains bytes that are not valid UTF\-8\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\.
+
+[System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
+The hosting relay does not advertise channel hosting\.
 
 <a name='Meshline.Components.ChannelManager.ReportPostAsync(Meshline.Models.Client.ChannelPostRef,string,System.Threading.CancellationToken)'></a>
 

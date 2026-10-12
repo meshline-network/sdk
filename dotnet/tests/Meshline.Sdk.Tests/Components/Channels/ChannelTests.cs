@@ -13,6 +13,51 @@ public sealed class ChannelTests
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task Channel_metadata_reuses_publication_and_persistence_while_failed_refresh_keeps_valid_state()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        var host = new ChannelRelay(fixture);
+        host.Install();
+        var channel = await fixture.Client.ChannelManager.CreateChannelAsync(fixture.Relay.RelayId, "news", cancellationToken: Token);
+        var count = fixture.Relay.Requests.Count(request => request.Method == "channel.resolve");
+        await fixture.Client.ChannelManager.GetChannelAsync(channel.Ref, Token);
+        await fixture.ReopenAsync();
+        var manager = fixture.Client.ChannelManager;
+        Assert.Equal(count, fixture.Relay.Requests.Count(request => request.Method == "channel.resolve"));
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        var failed = AsyncTest.Signal();
+        manager.BackgroundError += (_, _) => failed.TrySetResult();
+        fixture.Relay.Handler = async (request, token) =>
+        {
+            if (request.Method == "channel.resolve")
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(token);
+                throw new HttpRequestException("offline");
+            }
+            return host.Respond(request);
+        };
+        try
+        {
+            await manager.GetChannelAsync(channel.Ref, Token).WaitAsync(TimeSpan.FromSeconds(5), Token);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            await manager.GetChannelAsync(channel.Ref, Token).WaitAsync(TimeSpan.FromSeconds(5), Token);
+            Assert.Equal(count + 1, fixture.Relay.Requests.Count(request => request.Method == "channel.resolve"));
+        }
+        finally { release.TrySetResult(); }
+        await failed.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(59));
+        await manager.GetChannelAsync(channel.Ref, Token);
+        Assert.Equal(count + 1, fixture.Relay.Requests.Count(request => request.Method == "channel.resolve"));
+        await fixture.ReopenAsync();
+        await fixture.Client.ChannelManager.GetChannelAsync(channel.Ref, Token);
+        await AsyncTest.UntilAsync(() => fixture.Relay.Requests.Count(request => request.Method == "channel.resolve") == count + 2);
+    }
+
+    [Fact]
     public async Task Refollowing_after_an_unacknowledged_clear_restores_the_subscription()
     {
         using var time = Clock.Use(new ManualClock());
@@ -258,13 +303,13 @@ public sealed class ChannelTests
         fixture.Relay.Handler = (request, _) => Task.FromResult(request.Method == "channel.resolve" ? OfflineRelay.Json(result) : relay.Respond(request));
         if (defect == "signature")
         {
-            var error = await Assert.ThrowsAsync<CryptographicException>(() => manager.GetChannelAsync(channel.Ref, Token));
+            var error = await Assert.ThrowsAsync<CryptographicException>(() => manager.RefreshChannelAsync(channel.Ref, Token));
 
             Assert.Equal("The channel descriptor signature is invalid.", error.Message);
         }
         else
         {
-            var error = await Assert.ThrowsAsync<InvalidDataException>(() => manager.GetChannelAsync(channel.Ref, Token));
+            var error = await Assert.ThrowsAsync<InvalidDataException>(() => manager.RefreshChannelAsync(channel.Ref, Token));
 
             Assert.Equal("The channel descriptor or signing certificate belongs to another resource or account.", error.Message);
         }

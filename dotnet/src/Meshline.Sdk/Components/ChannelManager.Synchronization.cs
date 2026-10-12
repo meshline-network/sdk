@@ -36,7 +36,7 @@ sealed partial class ChannelManager
     /// <inheritdoc/>
     protected override async Task OnStopAsync()
     {
-        await Task.WhenAll(_refresh, _poll).ConfigureAwait(false);
+        await Task.WhenAll(_refresh, _poll, StopDescriptorsAsync()).ConfigureAwait(false);
         RelayClient[] relays;
         lock (_subscriptionsGate)
         {
@@ -122,7 +122,7 @@ sealed partial class ChannelManager
             return await _syncStatus.RunAsync(channel.ChannelId, async () =>
             {
                 var relay = await GetHostingRelayAsync(channel.RelayId, cancellationToken).ConfigureAwait(false);
-                await SaveDescriptorAsync(channel, await ResolveDescriptorAsync(relay, channel, null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+                await ReadDescriptorAsync(channel, false, cancellationToken).ConfigureAwait(false);
                 await using var database = new MeshlineDbContext(databaseOptions);
                 var after = await database.Channels.Where(value => value.ChannelId == channel.ChannelId).Select(value => value.SyncSequence).SingleAsync(cancellationToken).ConfigureAwait(false);
                 await SynchronizeAsync(relay, channel, after, true, cancellationToken).ConfigureAwait(false);

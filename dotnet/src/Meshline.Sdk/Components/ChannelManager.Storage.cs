@@ -57,6 +57,7 @@ sealed partial class ChannelManager
             if (completedOperation is not null) await RemoveOperationAsync(database, completedOperation, cancellationToken).ConfigureAwait(false);
             await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            if (result.Descriptor.Revision == record.Revision) CacheDescriptor(channel, result, completedOperation is null ? null : Clock.UtcNow);
         }
         finally { _stateGate.Release(); }
         if (changed is not null) ChannelChanged?.Invoke(this, changed);
@@ -211,6 +212,7 @@ sealed partial class ChannelManager
             if (advance && !page.Events.IsEmpty) channelRecord.SyncSequence = Math.Max(channelRecord.SyncSequence, page.Events[^1].Sequence);
             await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            if (descriptors.TryGetValue(channelRecord.Revision, out var latest)) CacheDescriptor(channel, latest);
         }
         finally { _stateGate.Release(); }
         if (channelChange is not null) ChannelChanged?.Invoke(this, channelChange);

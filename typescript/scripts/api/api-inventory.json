@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "f1e0f1b91ad02c15d1b1d40b0dd95a12832207cb2377d66dabb874851a7f3ec0",
+  "sourceSha256": "8d5825e1ab86ee4781a05716b97ede50b0979dec333e3b5901f79cfcb7796c24",
   "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1162,6 +1162,13 @@
     {
       "symbol": "M:Meshline.Components.ChannelManager.PublishPostAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.ChannelPostDraft,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.PublishPostAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.ChannelPostDraft,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/channel.ts",
+      "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+    },
+    {
+      "symbol": "M:Meshline.Components.ChannelManager.RefreshChannelAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.RefreshChannelAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/channel.ts",
       "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."

@@ -61,10 +61,11 @@ sealed partial class ChannelManager
     }
 
     /// <inheritdoc/>
-    protected override ValueTask DisposeAsyncCore()
+    protected override async ValueTask DisposeAsyncCore()
     {
         _syncStatus.Stop(OnSyncStatusChanged, resetAll: true);
-        return base.DisposeAsyncCore();
+        await StopDescriptorsAsync(dispose: true).ConfigureAwait(false);
+        await base.DisposeAsyncCore().ConfigureAwait(false);
     }
 
     void OnSyncStatusChanged(ResourceSyncStatus status)
