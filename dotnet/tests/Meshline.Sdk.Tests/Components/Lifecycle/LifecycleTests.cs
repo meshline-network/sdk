@@ -31,6 +31,7 @@ public sealed class LifecycleTests
     sealed class Component(AccountSigner account) : ClientComponent(new() { Context = TestNetwork.Context, AccountId = account.AccountId })
     {
         Task background = Task.CompletedTask;
+        CancellationToken backgroundToken;
         public PendingWork Background { get; } = new();
         public PendingWork Foreground { get; } = new();
         public TaskCompletionSource StopEntered { get; } = AsyncTest.Signal();
@@ -48,7 +49,8 @@ public sealed class LifecycleTests
         protected override Task OnStartAsync(CancellationToken cancellationToken)
         {
             Starts++;
-            background = Background.RunAsync(RuntimeCancellationToken, RuntimeError);
+            backgroundToken = RuntimeCancellationToken;
+            background = Background.RunAsync(backgroundToken, RuntimeError);
             if (StartError is not null)
                 throw StartError;
             return Task.CompletedTask;
@@ -60,7 +62,7 @@ public sealed class LifecycleTests
             Stops++;
             StopEntered.TrySetResult();
             try { await background; }
-            catch (OperationCanceledException) when (RuntimeCancellationToken.IsCancellationRequested) { }
+            catch (OperationCanceledException) when (backgroundToken.IsCancellationRequested) { }
             if (error is not null)
                 throw error;
         }
@@ -93,6 +95,62 @@ public sealed class LifecycleTests
     }
 
     [Fact]
+    public async Task Stopping_without_a_runtime_is_safe_and_does_not_repeat_state_notifications()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        ClientComponent[] components = [fixture.Client, fixture.Client.AccountManager, fixture.Client.DeviceManager,
+            fixture.Client.ProfileManager, fixture.Client.MessageManager, fixture.Client.ChannelManager, fixture.Client.GroupManager];
+        var notifications = 0;
+        foreach (var component in components)
+            component.StateChanged += (_, _) => notifications++;
+
+        async Task StopTwiceAsync(ComponentState expected)
+        {
+            var previous = notifications;
+            await fixture.Client.StopAsync(Token);
+            await fixture.Client.StopAsync(Token);
+            Assert.All(components, component => Assert.Equal(expected, component.LifecycleState));
+            Assert.Equal(previous, notifications);
+        }
+
+        await StopTwiceAsync(ComponentState.Uninitialized);
+        await fixture.InitializeAsync();
+        await StopTwiceAsync(ComponentState.Stopped);
+        await fixture.Client.StartAsync(Token);
+        await fixture.Client.StopAsync(Token);
+        await StopTwiceAsync(ComponentState.Stopped);
+    }
+
+    [Fact]
+    public async Task Restart_after_stopped_notification_keeps_all_children_running()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        await fixture.Client.StartAsync(Token);
+        var stopped = AsyncTest.Signal();
+        using var release = new ManualResetEventSlim();
+        fixture.Client.StateChanged += (_, args) =>
+        {
+            if (args.CurrentState != ComponentState.Stopped) return;
+            stopped.TrySetResult();
+            release.Wait(TimeSpan.FromSeconds(10), Token);
+        };
+        var stopping = Task.Run(() => fixture.Client.StopAsync(Token), Token);
+        try
+        {
+            await stopped.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+            await fixture.Client.StartAsync(Token);
+        }
+        finally { release.Set(); }
+        await stopping.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        Assert.All(new ClientComponent[] { fixture.Client, fixture.Client.AccountManager, fixture.Client.DeviceManager,
+            fixture.Client.ProfileManager, fixture.Client.MessageManager, fixture.Client.ChannelManager, fixture.Client.GroupManager },
+            component => Assert.Equal(ComponentState.Running, component.LifecycleState));
+    }
+
+    [Fact]
     public async Task Concurrent_lifecycle_calls_are_idempotent_and_disposal_is_terminal()
     {
         using var signer = new AccountSigner();
@@ -111,14 +169,15 @@ public sealed class LifecycleTests
 
         await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => component.StopAsync()));
 
-        Assert.Equal(1, component.Stops);
+        Assert.Equal(8, component.Stops);
+        Assert.Equal(ComponentState.Stopped, component.LifecycleState);
 
         await component.StartAsync(cancellationToken: Token);
         await component.DisposeAsync();
         await component.DisposeAsync();
 
         Assert.Equal(ComponentState.Disposed, component.LifecycleState);
-        Assert.Equal(2, component.Stops);
+        Assert.Equal(9, component.Stops);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => component.StartAsync(cancellationToken: Token));
     }
 

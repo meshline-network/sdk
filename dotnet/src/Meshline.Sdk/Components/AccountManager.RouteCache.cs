@@ -149,14 +149,6 @@ sealed partial class AccountManager
     }
 
     /// <inheritdoc/>
-    public override async Task StopAsync(CancellationToken cancellationToken = default)
-    {
-        await base.StopAsync(cancellationToken).ConfigureAwait(false);
-        // On-demand lookups also work before StartAsync; stopping must drain those too.
-        await StopRouteRefreshesAsync().ConfigureAwait(false);
-    }
-
-    /// <inheritdoc/>
     protected override Task OnStopAsync() => StopRouteRefreshesAsync();
 
     Task StopRouteRefreshesAsync()

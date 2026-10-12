@@ -215,7 +215,7 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <param name="cancellationToken">A token that can cancel waiting to begin stopping; active shutdown is drained without cancellation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
     /// <remarks>
-    /// The cancellation token controls waiting to enter the lifecycle operation. Once stopping begins, runtime shutdown is drained without that token. The application-owned relay pool remains available to other components.
+    /// The cancellation token controls waiting to enter the lifecycle operation. Once stopping begins, background work is drained without that token, including demand-triggered refreshes created before start or after a previous stop. The application-owned relay pool remains available to other components.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The <paramref name="cancellationToken"/> is canceled while waiting to enter the lifecycle transition.</exception>
     /// <exception cref="ObjectDisposedException">This component, or a dependency stopped by its shutdown hook, has been disposed.</exception>
@@ -228,7 +228,12 @@ public abstract class ClientComponent : IAsyncDisposable
         {
             ObjectDisposedException.ThrowIf(LifecycleState == ComponentState.Disposed, this);
             if (LifecycleState != ComponentState.Running)
+            {
+                // Reads can start owned work before StartAsync. Drain it under the same
+                // lifecycle gate so a concurrent start cannot be stopped by late cleanup.
+                await OnStopAsync().ConfigureAwait(false);
                 return;
+            }
             LifecycleState = ComponentState.Stopping;
             try
             {
@@ -254,8 +259,11 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <returns>A task that completes when the operation finishes.</returns>
     protected virtual Task OnStartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     /// <summary>
-    /// Drains component-specific background work after the runtime token has been canceled.
+    /// Drains component-specific background work and releases subscriptions.
     /// </summary>
+    /// <remarks>
+    /// An active runtime token is canceled before this hook runs. The hook also runs when stopping before initialization or start, and on repeated stops. Implementations must be safe to repeat and must not assume a runtime token exists.
+    /// </remarks>
     /// <returns>A task that completes when the operation finishes.</returns>
     protected virtual Task OnStopAsync() => Task.CompletedTask;
 

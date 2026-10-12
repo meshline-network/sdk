@@ -301,7 +301,7 @@ A task that completes when the operation finishes\.
 
 ## ClientComponent\.OnStopAsync\(\) Method
 
-Drains component\-specific background work after the runtime token has been canceled\.
+Drains component\-specific background work and releases subscriptions\.
 
 ```csharp
 protected virtual System.Threading.Tasks.Task OnStopAsync();
@@ -310,6 +310,9 @@ protected virtual System.Threading.Tasks.Task OnStopAsync();
 #### Returns
 [System\.Threading\.Tasks\.Task](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task 'System\.Threading\.Tasks\.Task')<br>
 A task that completes when the operation finishes\.
+
+### Remarks
+An active runtime token is canceled before this hook runs\. The hook also runs when stopping before initialization or start, and on repeated stops\. Implementations must be safe to repeat and must not assume a runtime token exists\.
 
 <a name='Meshline.Components.ClientComponent.ReportBackgroundError(Meshline.Components.BackgroundOperation,string,System.Exception)'></a>
 
@@ -450,7 +453,7 @@ This component, or a dependency stopped by its shutdown hook, has been disposed\
 A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup\.
 
 ### Remarks
-The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, runtime shutdown is drained without that token\. The application\-owned relay pool remains available to other components\.
+The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, background work is drained without that token, including demand\-triggered refreshes created before start or after a previous stop\. The application\-owned relay pool remains available to other components\.
 ### Events
 
 <a name='Meshline.Components.ClientComponent.BackgroundError'></a>

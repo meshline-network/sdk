@@ -10,7 +10,6 @@
 - [`GetRouteAsync(string, CancellationToken)`](#Meshline.Components.AccountManager.GetRouteAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`PublishRouteAsync(string, TimeSpan, Nullable<long>, bool, CancellationToken)`](#Meshline.Components.AccountManager.PublishRouteAsync%28string%2CSystem.TimeSpan%2CSystem.Nullable_long_%2Cbool%2CSystem.Threading.CancellationToken%29)
 - [`RefreshRouteAsync(string, CancellationToken)`](#Meshline.Components.AccountManager.RefreshRouteAsync%28string%2CSystem.Threading.CancellationToken%29)
-- [`StopAsync(CancellationToken)`](#Meshline.Components.AccountManager.StopAsync%28System.Threading.CancellationToken%29)
 - [`AccountId`](#Meshline.Components.AccountManager.AccountId)
 - [`Route`](#Meshline.Components.AccountManager.Route)
 - [`State`](#Meshline.Components.AccountManager.State)
@@ -358,41 +357,6 @@ The requested account uses an unsupported account namespace\.
 Cancellation stops only this caller's wait\. Stop or disposal cancels and drains shared refreshes\.<br>
 Failures propagate to this caller and leave unexpired cached routes available to ordinary reads\.<br>
 A not\-found result returns null without invalidating an unexpired signed route\. Concurrent newer local publication takes precedence\.
-
-<a name='Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken)'></a>
-
-## AccountManager\.StopAsync\(CancellationToken\) Method
-
-Stops background work and subscriptions while leaving the component available to start again\.
-
-```csharp
-public override System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
-```
-#### Parameters
-
-<a name='Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken).cancellationToken'></a>
-
-`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
-
-A token that can cancel waiting to begin stopping; active shutdown is drained without cancellation\.
-
-#### Returns
-[System\.Threading\.Tasks\.Task](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task 'System\.Threading\.Tasks\.Task')<br>
-A task that completes when the operation finishes\.
-
-#### Exceptions
-
-[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The [cancellationToken](Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.StopAsync(System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.AccountManager\.StopAsync\(System\.Threading\.CancellationToken\)\.cancellationToken') is canceled while waiting to enter the lifecycle transition\.
-
-[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
-This component, or a dependency stopped by its shutdown hook, has been disposed\.
-
-[System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
-A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup\.
-
-### Remarks
-The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, runtime shutdown is drained without that token\. The application\-owned relay pool remains available to other components\.
 ### Events
 
 <a name='Meshline.Components.AccountManager.AccountChanged'></a>

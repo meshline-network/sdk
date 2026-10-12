@@ -10,7 +10,7 @@ Construction performs no I/O. Create the database directory and call `MeshlineDa
 | --- | --- |
 | `InitializeAsync` | Load local state once. A failed initialization leaves the component uninitialized so its cause can be corrected before retrying. |
 | `StartAsync` | Start component background work after authorization checks. Completion does not wait for WebSocket readiness or prove that all history has synchronized. |
-| `StopAsync` | Stop background processing and drain runtime work. It preserves the database for a later session. |
+| `StopAsync` | Stop background processing and drain pending refreshes, including those triggered by reads before start or after a previous stop. It preserves the database for a later session. |
 | `DisposeAsync` | End the component lifetime, release owned resources, and drain active work. A disposed component cannot be reused. |
 
 Observe `LifecycleState` and `StateChanged` for lifecycle changes. Pass cancellation tokens to awaited operations. Shutdown itself must still be awaited when the application's ordinary operation token is canceled; the examples call `StopAsync` without that canceled token.
