@@ -132,9 +132,11 @@ public sealed class RouteCacheTests
             Assert.Same(route, await manager.GetRouteAsync(cancellationToken: Token));
         var refresh = manager.RefreshRouteAsync(cancellationToken: Token);
         Assert.False(refresh.IsCompleted);
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(30));
         release.SetResult();
         await refresh;
 
+        fixture.Relay.Clock.Advance(TimeSpan.FromMinutes(59) + TimeSpan.FromSeconds(59));
         Assert.Equal(queries + 1, Queries(fixture));
         Assert.Equal(newer ? 1 : 0, changes);
         Assert.Equal(resolved.Revision, (await manager.GetRouteAsync(cancellationToken: Token))!.Revision);
@@ -175,6 +177,7 @@ public sealed class RouteCacheTests
 
         fixture.Relay.Handler = null;
         fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(queries, Queries(fixture));
         Assert.Same(original, await manager.GetRouteAsync(cancellationToken: Token));
         await AsyncTest.UntilAsync(() => Queries(fixture) == queries + 1);
         await manager.StopAsync(Token);
@@ -430,19 +433,69 @@ public sealed class RouteCacheTests
         Assert.Equal(previous.ToJson(), (await database.AccountRoutes.SingleAsync(Token)).DocumentJson);
     }
 
-    [Fact]
-    public async Task Reopened_component_revalidates_persisted_route_before_caching()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Reopened_component_reuses_only_unexpired_routes_while_refreshing_on_first_read(bool expired)
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
         await fixture.InitializeAsync();
+        if (expired)
+        {
+            await fixture.Client.AccountManager.PublishRouteAsync(fixture.Relay.RelayId, TimeSpan.FromSeconds(30), cancellationToken: Token);
+            fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(30));
+        }
         var queries = Queries(fixture);
         await fixture.ReopenAsync();
+        Assert.Equal(queries, Queries(fixture));
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        fixture.Relay.Handler = async (request, token) =>
+        {
+            if (request.Method == "account.route.resolve")
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(token);
+                if (expired) return OfflineRelay.Error("not_found");
+            }
+            return fixture.Relay.Respond(request);
+        };
+        try
+        {
+            var reads = Enumerable.Range(0, 10).Select(_ => fixture.Client.AccountManager.GetRouteAsync(cancellationToken: Token)).ToArray();
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            Assert.Equal(queries + 1, Queries(fixture));
+            if (expired)
+            {
+                Assert.All(reads, read => Assert.False(read.IsCompleted));
+                release.TrySetResult();
+                Assert.All(await Task.WhenAll(reads).WaitAsync(TimeSpan.FromSeconds(5), Token), Assert.Null);
+                Assert.Equal(AccountState.Unknown, fixture.Client.AccountManager.State);
+            }
+            else
+                Assert.All(await Task.WhenAll(reads).WaitAsync(TimeSpan.FromSeconds(5), Token), route => Assert.NotNull(route));
+        }
+        finally { release.TrySetResult(); }
+    }
 
-        Assert.NotNull(await fixture.Client.AccountManager.GetRouteAsync(cancellationToken: Token));
-        Assert.NotNull(await fixture.Client.AccountManager.GetRouteAsync(cancellationToken: Token));
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Reopened_component_rejects_inconsistent_stored_account_or_revision(bool account)
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        await using (var database = fixture.Database.Open())
+        {
+            var record = await database.AccountRoutes.SingleAsync(Token);
+            var route = ProtocolModel.FromJson<AccountRoute>(record.DocumentJson)!;
+            record.DocumentJson = (account ? route with { Account = "another-account" } : route with { Revision = route.Revision + 1 }).ToJson();
+            await database.SaveChangesAsync(Token);
+        }
 
-        Assert.Equal(queries + 1, Queries(fixture));
+        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.ReopenAsync());
     }
 
     [Fact]

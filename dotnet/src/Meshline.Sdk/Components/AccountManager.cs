@@ -63,15 +63,25 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
         var route = await database.AccountRoutes.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false);
         Route = route is null ? null : ProtocolModel.FromJson<AccountRoute>(route.DocumentJson);
         State = Route is { } current && current.ExpiresAt > Clock.UtcNow.ToUnixTimeSeconds() ? AccountState.Established : AccountState.Unknown;
+        foreach (var record in await database.AccountRoutes.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false))
+        {
+            // SDK-owned storage contains routes verified before commit. Reload without repeating signatures.
+            var cached = ProtocolModel.FromJson<AccountRoute>(record.DocumentJson)
+                ?? throw new InvalidDataException("The persisted route is null.");
+            if (cached.Account != record.AccountId || cached.Revision != record.Revision)
+                throw new InvalidDataException("The persisted route does not match its account or revision.");
+            if (cached.ExpiresAt <= Clock.UtcNow.ToUnixTimeSeconds()) continue;
+            var entry = GetRouteEntry(cached.Account);
+            CacheRoute(entry, cached);
+        }
     }
 
     /// <summary>
     /// Returns a verified cached route, refreshing it in the background when due, or awaits discovery on a cache miss.
     /// </summary>
     /// <remarks>
-    /// Verified results are fresh for one hour. Later reads return the unexpired route immediately and share a background refresh.
-    /// Failed refreshes retain unexpired routes and defer ordinary retries for one minute. Signed expiration is a hard limit.
-    /// The cache belongs to this component, network and registry; persisted routes are re-resolved before entering it.
+    /// Reads trigger a shared refresh one hour after success or one minute after failure; failures preserve unexpired routes.
+    /// Previously verified routes are reused from this account's trusted storage after checking network binding, revision and signed expiry.
     /// Use <see cref="RefreshRouteAsync"/> when the operation requires a remote lookup.
     /// </remarks>
     /// <param name="accountId">The target account identifier, or <see langword="null"/> for the current account.</param>
@@ -199,6 +209,7 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
                 {
                     var entry = GetRouteEntry(AccountId);
                     entry.Publication++;
+                    entry.RefreshAfter = Clock.UtcNow + RouteFreshness;
                     changed = CacheRoute(entry, result);
                 }
             }

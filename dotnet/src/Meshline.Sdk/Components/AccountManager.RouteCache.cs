@@ -1,6 +1,6 @@
 using Meshline.Identity;
-using Meshline.Models.Client;
 using Meshline.Models.Protocol;
+using Meshline.Storage;
 using System.Runtime.ExceptionServices;
 
 namespace Meshline.Components;
@@ -47,7 +47,7 @@ sealed partial class AccountManager
             var now = Clock.UtcNow;
             if (!forceRefresh && entry.Route is { } cached && cached.ExpiresAt > now.ToUnixTimeSeconds())
             {
-                if (now >= entry.RefreshAfter && now >= entry.RetryAfter && _stoppingRefreshes is null)
+                if (now >= entry.RefreshAfter && _stoppingRefreshes is null)
                     StartRouteRefresh(accountId, entry);
                 return cached;
             }
@@ -60,7 +60,8 @@ sealed partial class AccountManager
         var result = await refresh.WaitAsync(cancellationToken).ConfigureAwait(false);
         result.Failure?.Throw();
         // A route can expire while a caller is waiting to resume, even after verification.
-        return result.Route is { } route && route.ExpiresAt > Clock.UtcNow.ToUnixTimeSeconds() ? route : null;
+        if (result.Route is { } route && route.ExpiresAt <= Clock.UtcNow.ToUnixTimeSeconds()) throw new InvalidDataException("The resolved account route has expired.");
+        return result.Route;
     }
 
     // Called under _routeCacheGate. Only the task registration is synchronous.
@@ -72,6 +73,7 @@ sealed partial class AccountManager
             throw new OperationCanceledException("Account route refreshes are stopping.");
         var token = _routeRefreshLifetime.Token;
         var operation = BeginOperation(ref token);
+        entry.RetryAfter = default;
         return entry.Refresh = RefreshRouteCoreAsync(accountId, entry, entry.Publication, operation, token);
     }
 
@@ -100,11 +102,14 @@ sealed partial class AccountManager
                     lock (_routeCacheGate)
                     {
                         if (route is not null)
+                        {
                             changed = CacheRoute(entry, route);
+                            entry.RefreshAfter = Clock.UtcNow + RouteFreshness;
+                        }
                         else
                         {
                             // Discovery returning not_found is not signed revocation evidence.
-                            entry.RetryAfter = Clock.UtcNow + RefreshFailureDelay;
+                            entry.RefreshAfter = entry.RetryAfter = Clock.UtcNow + RefreshFailureDelay;
                             if (accountId == AccountId && (entry.Route is null || entry.Route.ExpiresAt <= Clock.UtcNow.ToUnixTimeSeconds()))
                             {
                                 changed = State != AccountState.Unknown;
@@ -125,7 +130,7 @@ sealed partial class AccountManager
                     lock (_routeCacheGate)
                     {
                         if (entry.Publication == publication)
-                            entry.RetryAfter = Clock.UtcNow + RefreshFailureDelay;
+                            entry.RefreshAfter = entry.RetryAfter = Clock.UtcNow + RefreshFailureDelay;
                     }
                     ReportBackgroundError(BackgroundOperation.Connect, accountId, exception);
                 }
@@ -138,7 +143,6 @@ sealed partial class AccountManager
     bool CacheRoute(RouteEntry entry, AccountRoute route)
     {
         entry.Route = route;
-        entry.RefreshAfter = Clock.UtcNow + RouteFreshness;
         entry.RetryAfter = default;
         if (route.Account != AccountId)
             return false;

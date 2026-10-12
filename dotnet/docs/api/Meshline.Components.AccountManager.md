@@ -194,9 +194,8 @@ The requested account identifier is invalid\.
 The requested account uses an unsupported account namespace\.
 
 ### Remarks
-Verified results are fresh for one hour\. Later reads return the unexpired route immediately and share a background refresh\.<br>
-Failed refreshes retain unexpired routes and defer ordinary retries for one minute\. Signed expiration is a hard limit\.<br>
-The cache belongs to this component, network and registry; persisted routes are re\-resolved before entering it\.<br>
+Reads trigger a shared refresh one hour after success or one minute after failure; failures preserve unexpired routes\.<br>
+Previously verified routes are reused from this account's trusted storage after checking network binding, revision and signed expiry\.<br>
 Use [RefreshRouteAsync\(string, CancellationToken\)](Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.RefreshRouteAsync(string,System.Threading.CancellationToken) 'Meshline\.Components\.AccountManager\.RefreshRouteAsync\(string, System\.Threading\.CancellationToken\)') when the operation requires a remote lookup\.
 
 <a name='Meshline.Components.AccountManager.PublishRouteAsync(string,System.TimeSpan,System.Nullable_long_,bool,System.Threading.CancellationToken)'></a>
