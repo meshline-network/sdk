@@ -74,7 +74,7 @@ export class MessageManager extends ClientComponent {
         this.#repository = new MessageRepository({ store: this.#store, context: this.context, accountId: this.accountId, deviceId: () => certificateId(this.#device.certificate, this.context), clock: this.clock,
             ...(options.secretProtector ? { secretProtector: options.secretProtector } : {}) });
         this.#contacts = new MessageContacts({ store: this.#store, context: this.context, accountId: this.accountId, device: this.#device, clock: this.clock,
-            getState: (target, signal) => this.#getState(target, signal), prepareSend: (recipient, payload, authorization, devices, signal) => this.#prepareSend(recipient, payload, authorization, devices, signal),
+            getState: (target, signal, refresh) => this.#getState(target, signal, refresh), prepareSend: (recipient, payload, authorization, devices, signal) => this.#prepareSend(recipient, payload, authorization, devices, signal),
             changed: changes => this.#contactChanges(changes) });
         this.#outbox = new MessageOutbox(this.#store, this.clock, {
             getHome: async signal => { const route = await this.#account.getRoute(undefined, signal); if (!route) throw new ProtocolError('route_required', 'The account has no current route.'); return route.relayId; },
@@ -119,8 +119,8 @@ export class MessageManager extends ClientComponent {
             this.#sendPulse?.pulse(); this.#syncPulse?.pulse();
         });
     }
-    async #getState(target: string | ContactAuthorization, signal?: AbortSignal) {
-        const state = await this.#device.getDeviceState(target, signal); if (!state) throw new ProtocolError('device_state_required', 'The requested account has no device state.'); return state;
+    async #getState(target: string | ContactAuthorization, signal?: AbortSignal, refresh = false) {
+        const state = await (refresh ? this.#device.refreshDeviceState(target, signal) : this.#device.getDeviceState(target, signal)); if (!state) throw new ProtocolError('device_state_required', 'The requested account has no device state.'); return state;
     }
     async #prepareSend(recipient: string, payload: JsonObject, explicit: ContactAuthorization | undefined, deviceIds: readonly string[] | undefined, signal?: AbortSignal): Promise<PreparedContactSend> {
         validateAccountId(recipient); const self = recipient === this.accountId;
@@ -129,7 +129,16 @@ export class MessageManager extends ClientComponent {
         const contact = self ? undefined : readContact(before.sets[0]![0]?.value); const incoming = self ? undefined : readContactRequest(before.sets[1]![0]?.value);
         const authorization = explicit ?? (contact?.record.status === 'active' ? contact.record.grantFromContact : undefined) ?? incoming?.consent.grant;
         if (payload['$type'] === 'meshline.message.direct' && !self && (!authorization || !('grantor' in authorization))) throw new ProtocolError('contact_required', 'A direct message requires a contact grant from its recipient.');
-        await this.#getState(this.accountId, signal); if (!self) await this.#getState(authorization ?? recipient, signal);
+        // Drain both reads before a failed or canceled preparation releases its operation.
+        const states = await Promise.allSettled([this.#getState(this.accountId, signal), ...(!self ? [this.#getState(authorization ?? recipient, signal)] : [])]);
+        const failures = states.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+        if (failures.length) throw failures[0]!.reason;
+        if (deviceIds) {
+            const resolved = states[self ? 0 : 1] as PromiseFulfilledResult<Awaited<ReturnType<DeviceManager['getDeviceState']>>>;
+            const now = this.clock.nowSeconds();
+            if (deviceIds.some(id => !resolved.value?.certificates.some(certificate => certificateId(certificate, this.context) === id && certificate.notBefore <= now && now < certificate.expiresAt)))
+                await this.#getState(self ? this.accountId : authorization ?? recipient, signal, true);
+        }
         const queries = [routeKey(this.accountId), cachedDeviceStateKey(this.accountId), ...(self ? [] : [cachedDeviceStateKey(recipient)]), requestKey('device.state.publish')]; const snapshot = await this.#store.read(queries, signal);
         const route = accountRouteCodec.decode(snapshot.sets[0]![0]?.value!); const own = accountDeviceStateCodec.decode(snapshot.sets[1]![0]?.value!);
         const remote = self ? own : accountDeviceStateCodec.decode(snapshot.sets[2]![0]?.value!); const now = this.clock.nowSeconds();
@@ -229,11 +238,10 @@ export class MessageManager extends ClientComponent {
         this.#deviceListeners = [this.#device.on('deviceChanged', () => { this.#maintenancePulse?.pulse(); }), this.#device.on('deviceStateChanged', value => {
             if (value.account === this.accountId) { this.#pendingDeviceRevision = Math.max(value.revision, this.#pendingDeviceRevision ?? -1); this.#maintenancePulse?.pulse(); }
         })];
-        this.#runtimeJobs = [this.#sendLoop(this.runtimeSignal), this.#syncLoop(this.runtimeSignal), this.#poll(this.runtimeSignal), this.#maintainContacts(this.runtimeSignal), this.#pollContacts(this.runtimeSignal)];
+        this.#runtimeJobs = [this.#sendLoop(this.runtimeSignal), this.#syncLoop(this.runtimeSignal), this.#poll(this.runtimeSignal), this.#maintainContacts(this.runtimeSignal)];
         for (const job of this.#runtimeJobs) job.catch(() => undefined); this.#sendPulse.pulse(); this.#syncPulse.pulse(); this.#maintenancePulse.pulse();
     }
     async #poll(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(15_000, signal); this.#sendPulse?.pulse(); this.#syncPulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
-    async #pollContacts(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(30_000, signal); this.#maintenancePulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
     async #maintainContacts(signal: AbortSignal): Promise<void> {
         try { for (;;) {
             await this.#maintenancePulse!.wait(signal); const revision = this.#pendingDeviceRevision; let failed = false;

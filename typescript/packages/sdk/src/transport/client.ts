@@ -7,7 +7,7 @@ import type { RelayDescriptor, RelayInfo } from '../models/relay.js';
 import type { JsonObject, JsonValue } from '../protocol/json.js';
 import { abortScope, awaitWithSignal, systemClock, throwIfAborted, type RuntimeClock } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
-import { RelayDiscovery } from './discovery.js';
+import { RelayDiscovery, bindDiscovery, readDiscovery } from './discovery.js';
 import { HttpRelayTransport, RelayBackoff, type HttpMethod, type RelayFetch } from './http.js';
 import { RelayError } from './relay-error.js';
 import type { RpcNotification } from './rpc.js';
@@ -89,7 +89,7 @@ export class RelayClient {
         this.#random = options.random ?? systemRandom;
         this.#backoff = new RelayBackoff(this.#clock);
         this.#http = new HttpRelayTransport({ ...options, backoff: this.#backoff });
-        this.#discovery = new RelayDiscovery(relayId, registry, this.#http, this.#clock);
+        this.#discovery = new RelayDiscovery(relayId, registry, this.#http, this.#clock); bindDiscovery(this, this.#discovery, this.#lifetime.signal);
         if (authenticator && (authenticator.relayId !== relayId || authenticator.context.toString() !== registry.context.toString()))
             throw new ProtocolError('invalid_identity', 'Authenticator does not match this relay and network.');
         this.#authenticator = authenticator;
@@ -132,8 +132,8 @@ export class RelayClient {
         this.#httpSession = session;
     }
 
-    getDescriptor(signal?: AbortSignal): Promise<RelayDescriptor> { this.#check(signal); return this.#discovery.getDescriptor(signal); }
-    getInfo(signal?: AbortSignal): Promise<RelayInfo> { this.#check(signal); return this.#discovery.getInfo(signal); }
+    getDescriptor(signal?: AbortSignal): Promise<RelayDescriptor> { this.#check(signal); return readDiscovery(this, (discovery, token) => discovery.getDescriptor(token), signal); }
+    getInfo(signal?: AbortSignal): Promise<RelayInfo> { this.#check(signal); return readDiscovery(this, (discovery, token) => discovery.getInfo(token), signal); }
 
     async authenticate(signal?: AbortSignal): Promise<void> {
         this.#check(signal);
@@ -318,9 +318,9 @@ export class RelayClient {
         return this.#disposal ??= (async () => {
             const reason = new DOMException('Relay client was disposed.', 'AbortError');
             this.#lifetime.abort(reason); this.#ready.reject(reason);
-            this.#sessions?.dispose(); this.#discovery.dispose(); this.#http.dispose();
+            this.#sessions?.dispose(); const discovery = this.#discovery.dispose(); this.#http.dispose();
             this.#socket?.controller.abort(reason); this.#socket?.connection.dispose();
-            await Promise.allSettled([this.#opening, this.#notifications, this.#socket?.renewal, ...[...this.#subscriptions.values()].map(value => value.dispose())]);
+            await Promise.allSettled([discovery, this.#opening, this.#notifications, this.#socket?.renewal, ...[...this.#subscriptions.values()].map(value => value.dispose())]);
             this.#connection = 'disconnected';
             this.#stateChanged(); this.#events.clear();
         })();

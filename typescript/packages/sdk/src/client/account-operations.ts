@@ -73,10 +73,10 @@ export class ClientAccountOperations {
     }
     async establish(source: AccountEstablishmentOptions, signal: AbortSignal): Promise<void> {
         const options = settings(source); const { account, device, store } = this.host;
-        const route = await account.getRoute(undefined, signal);
+        const route = await account.refreshRoute(undefined, signal);
         if (route) {
             if (device.local) {
-                const state = await device.getDeviceState(undefined, signal);
+                const state = await device.getOwnDeviceState(route.relayId, signal);
                 if (state && device.getAuthorizationState(certificateId(device.local, this.host.context)) === 'authorized') { await this.#clear([establishmentKey], signal); return; }
             }
             throw new StateConflictError('The account already has a route. Start its authorized local device or explicitly recover the account.');
@@ -101,7 +101,7 @@ export class ClientAccountOperations {
         if (previous) { validateDeviceState(previous, this.host.context); if (previous.account !== this.host.accountId) throw new ProtocolError('invalid_identity', 'Previous device state belongs to another account.'); }
         if (source.deviceStateRevision !== undefined) requireSafeInteger(source.deviceStateRevision, 0); if (source.routeRevision !== undefined) requireSafeInteger(source.routeRevision, 0);
         const { account, device } = this.host; let route: AccountRoute | undefined;
-        try { route = await account.getRoute(undefined, signal); }
+        try { route = await account.refreshRoute(undefined, signal); }
         catch (error) { throwIfAborted(signal); if (!lookupFailure(error)) throw error; this.host.report({ operation: 'resolve_recovery_route', error }); }
         let relayId: string;
         if (options.relayId === undefined && route) {
@@ -119,7 +119,7 @@ export class ClientAccountOperations {
     }
     async #route(signal: AbortSignal): Promise<AccountRoute | undefined> {
         const previous = this.host.account.route;
-        try { return await this.host.account.getRoute(undefined, signal) ?? previous; }
+        try { return await this.host.account.refreshRoute(undefined, signal) ?? previous; }
         catch (error) { throwIfAborted(signal); if (!previous || !unavailable(error)) throw error; this.host.report({ operation: 'resolve_migration_route', resource: previous.relayId, error }); return previous; }
     }
     async #deviceState(source: string, fallback: AccountDeviceState | undefined, signal: AbortSignal): Promise<AccountDeviceState> {

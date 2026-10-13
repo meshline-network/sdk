@@ -6,6 +6,8 @@ import { certificateId } from '../models/identity.js';
 import type { NetworkContext } from '../protocol/context.js';
 import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
+import { RelayDiscovery, bindDiscovery } from './discovery.js';
+import { HttpRelayTransport } from './http.js';
 import { RelayClient, type RelayTransportOptions } from './client.js';
 import { RelayAuthenticator, type AuthenticationIdentity } from './session.js';
 
@@ -16,6 +18,7 @@ interface Entry { client: RelayClient; ready: Promise<void>; mode: 'account' | '
 /** Owns account/device sessions separately; a pool binds to one network, account and device. */
 export class RelayClientPool {
     readonly #events = new EventHub<RelayPoolEvents>();
+    readonly #metadata = new Map<string, RelayDiscovery>();
     readonly #entries = new Map<string, Entry[]>();
     readonly #retirements = new Set<Promise<void>>();
     readonly #lifetime = createAbortController();
@@ -60,6 +63,9 @@ export class RelayClientPool {
         if (!entry) {
             const authenticator = identity === undefined ? undefined : new RelayAuthenticator(relayId, this.context, identity, this.#options.clock);
             const client = new RelayClient(relayId, this.registry, this.#options, authenticator);
+            let discovery = this.#metadata.get(relayId);
+            if (!discovery) { discovery = new RelayDiscovery(relayId, this.registry, new HttpRelayTransport(this.#options), this.#options.clock); this.#metadata.set(relayId, discovery); }
+            bindDiscovery(client, discovery);
             entry = { client, mode: identity?.mode, retired: false, ready: Promise.resolve() };
             if (!entries) { entries = []; this.#entries.set(relayId, entries); }
             entries.push(entry);
@@ -109,7 +115,8 @@ export class RelayClientPool {
         return this.#disposal ??= (async () => {
             this.#lifetime.abort(new DOMException('Relay client pool was disposed.', 'AbortError'));
             for (const entries of [...this.#entries.values()]) for (const entry of [...entries]) this.#retire(entry);
-            try { await this.#finishRetirements(); } finally { this.#events.clear(); }
+            const metadata = [...this.#metadata.values()].map(async discovery => { const draining = discovery.dispose(); discovery.transport.dispose(); await draining; });
+            try { await Promise.all([this.#finishRetirements(), ...metadata]); } finally { this.#metadata.clear(); this.#events.clear(); }
         })();
     }
 }

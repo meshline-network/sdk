@@ -11,7 +11,13 @@ test('client initialization does no network I/O, establishes authorization, owns
     const f = await fixture(); expect(f.network.requests).toEqual([]); expect(children(f.client).every(value => value.lifecycleState === 'stopped')).toBe(true);
     await f.client.establishAccount({ relayId: f.a, certificateValiditySeconds: 7200, routeValiditySeconds: 3600 }); expect(f.client.route!.relayId).toBe(f.a);
     expect(f.client.device!.expiresAt - f.client.device!.notBefore).toBe(7200); expect(f.client.route!.expiresAt - f.client.route!.updatedAt).toBe(3600);
-    expect((await f.store.read([operations])).sets[0]).toEqual([]); await f.client.start(); expect(children(f.client).every(value => value.lifecycleState === 'running')).toBe(true);
+    expect((await f.store.read([operations])).sets[0]).toEqual([]);
+    const discoveries = f.network.requests.filter(value => value.method === 'account.route.resolve').length;
+    const ownState = vi.spyOn(f.client.deviceManager, 'getOwnDeviceState');
+    await f.client.establishAccount({ relayId: f.a });
+    expect(f.network.requests.filter(value => value.method === 'account.route.resolve')).toHaveLength(discoveries + 1);
+    expect(ownState).toHaveBeenCalledWith(f.a, expect.any(AbortSignal)); ownState.mockRestore();
+    await f.client.start(); expect(children(f.client).every(value => value.lifecycleState === 'running')).toBe(true);
     await f.client.stop(); expect(children(f.client).every(value => value.lifecycleState === 'stopped')).toBe(true); await f.client.dispose();
     expect(children(f.client).every(value => value.lifecycleState === 'disposed')).toBe(true); expect((await f.store.read([])).sets).toEqual([]); expect((await (await f.pool.get(f.a)).getDescriptor()).relayId).toBe(f.a);
 });
@@ -117,7 +123,7 @@ test('cached complete authorization and profile permit source outage migration w
 
 test('cleanup continues through a failing child and reports failure without abandoning remaining components', async () => {
     const f = await fixture(); await f.client.establishAccount(); await f.client.start(); const actual = f.client.groupManager.stop.bind(f.client.groupManager);
-    vi.spyOn(f.client.groupManager, 'stop').mockImplementation(async () => { await actual(); throw new Error('Cleanup failed'); });
+    vi.spyOn(f.client.groupManager, 'stop').mockImplementationOnce(async () => { await actual(); throw new Error('Cleanup failed'); });
     await expect(f.client.stop()).rejects.toThrow('failed to stop'); expect(children(f.client).every(value => value.lifecycleState === 'stopped')).toBe(true); await f.client.dispose(); expect(children(f.client).every(value => value.lifecycleState === 'disposed')).toBe(true);
 });
 

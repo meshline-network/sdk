@@ -19,7 +19,7 @@ for (const [type, destination] of definitions) {
         const name = symbol.slice(prefix.length).split('(')[0];
         if (name === '#ctor' || type.endsWith('.ClientComponent') && !lifecycle.has(name)) continue;
         const plain = name.replace(/Async$/, ''); const method = aliases[`${type}.${name}`] ?? plain[0].toLowerCase() + plain.slice(1);
-        const present = new RegExp(`^    (?:async )?${method}\\(`, 'm').test(source);
+        const present = new RegExp(`^    (?:override )?(?:async )?${method}\\(`, 'm').test(source);
         methods.push({ symbol, destination: `packages/sdk/src/${destination}`, method, present,
             note: name === 'GetDeviceStateAsync' || name === 'AddContactAsync' || name === 'GetGroupAsync' ? 'Overloads map to a union argument.' : name === 'CreateInviteAsync' && type.endsWith('.GroupManager') ? 'Targeted and shareable overloads map to an options object.' : undefined });
     }

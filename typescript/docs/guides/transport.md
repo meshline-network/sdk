@@ -70,4 +70,10 @@ Relay and pool subscriptions do not await callbacks. Callback errors use
 A callback failure does not retire a healthy connection or change an acknowledged
 request into failure. Actual transport failures keep their recovery behavior.
 
+Relay descriptors and operational limits are shared within a pool across session
+replacement. Their refresh follows the demand policy described in
+[metadata caching](accounts-and-devices.md#metadata-caching), with signed descriptor
+expiry and Registry registration checked separately. `getInfo` remains a live read
+because its server time is time-sensitive; internal capacity checks reuse only limits.
+
 [All guides](../README.md)

@@ -5,6 +5,7 @@ import { contentReferenceCodec, type ContentReference } from '../models/content.
 import { deviceCertificateCodec } from '../models/identity.js';
 import { accountProfileCodec, profileInput, profileResolveResultCodec, validateProfile, validateProfileResult, type AccountProfile, type ProfileResolveResult } from '../models/profile.js';
 import { canonicalJson, type JsonObject } from '../protocol/json.js';
+import { MetadataCache } from '../runtime/metadata-cache.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
 import { finishSignedRequest, putSignedRequest, readSignedRequest, requestKey, type SignedRequest } from '../storage/signed-request.js';
@@ -46,6 +47,9 @@ export class ProfileManager extends ClientComponent {
     readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #account: AccountManager; readonly #signer: DeviceSigner;
     readonly #gate = new AsyncGate(); readonly #events = new EventHub<ProfileEvents>();
     #profile: AccountProfile | undefined;
+    #readsStopping = false;
+    readonly #reads = new Map<string, MetadataCache<ProfileResolveResult>>();
+    readonly #saveGate = new AsyncGate();
     constructor(options: ProfileManagerOptions) {
         super(options);
         for (const dependency of [options.relayClients, options.accountManager])
@@ -58,23 +62,37 @@ export class ProfileManager extends ClientComponent {
     protected override async onInitialize(signal: AbortSignal): Promise<void> {
         this.#account.ensureInitialized();
         await this.#store.initialize({ context: this.context.toString(), accountId: this.accountId }, signal);
-        const saved = (await this.#store.read([profileKey(this.accountId)], signal)).sets[0]![0]?.value;
-        if (saved) { const result = profileResolveResultCodec.decode(saved); validateProfileResult(result, this.context, this.accountId); this.#profile = result.profile; }
+        for (const row of (await this.#store.read([{ collection: 'profiles' }], signal)).sets[0]!) {
+            const result = profileResolveResultCodec.decode(row.value); validateProfileResult(result, this.context, row.key);
+            this.#reads.set(row.key, new MetadataCache(this.clock, result));
+            if (row.key === this.accountId) this.#profile = result.profile;
+        }
     }
     #accept(profile: AccountProfile | undefined): boolean {
         const changed = (profile && accountProfileCodec.stringify(profile)) !== (this.#profile && accountProfileCodec.stringify(this.#profile));
         this.#profile = profile && clone(profile); return changed;
     }
     #changed(): void { this.#events.notify('profileChanged', this.profile, error => this.notifyBackgroundError({ operation: 'observer', resource: 'profileChanged', error })); }
-    async getProfile(accountId = this.accountId, signal?: AbortSignal): Promise<AccountProfile | undefined> {
-        validateAccountId(accountId); let changed = false;
-        const profile = await this.runOperation(scope => this.#gate.run(async () => {
-            const result = await this.#resolve(accountId, await this.#home(scope), scope);
-            if (result) await this.#save(result, scope);
-            if (accountId === this.accountId) changed = this.#accept(result?.profile);
-            return result?.profile;
-        }, scope), signal);
-        if (changed) this.#changed(); return profile && clone(profile);
+    async getProfile(accountId = this.accountId, signal?: AbortSignal): Promise<AccountProfile | undefined> { return this.#read(accountId, signal); }
+    async refreshProfile(accountId = this.accountId, signal?: AbortSignal): Promise<AccountProfile | undefined> { return this.#read(accountId, signal, true); }
+    async #read(accountId: string, signal?: AbortSignal, force = false): Promise<AccountProfile | undefined> {
+        validateAccountId(accountId);
+        return this.runOperation(async scope => {
+            if (this.#readsStopping) throw new DOMException('Profile refreshes are stopping.', 'AbortError');
+            let cache = this.#reads.get(accountId);
+            if (!cache) { cache = new MetadataCache(this.clock); this.#reads.set(accountId, cache); }
+            const selected = cache;
+            const result = await cache.read(() => true, token => this.runOperation(async querySignal => {
+                const previous = selected.value;
+                const resolved = await this.#resolve(accountId, await this.#home(querySignal), querySignal);
+                if (!resolved) return undefined;
+                return this.#saveGate.run(async () => {
+                    if (selected.value !== previous && selected.value && selected.value.profile.updatedAt >= resolved.profile.updatedAt) return selected.value;
+                    await this.#save(resolved, querySignal); return resolved;
+                }, querySignal);
+            }, token), error => this.notifyBackgroundError({ operation: 'synchronize', resource: accountId, error }), scope, force);
+            return result && clone(result.profile);
+        }, signal);
     }
     async updateProfile(update: ProfileUpdate, signal?: AbortSignal): Promise<AccountProfile> {
         const copied = copyUpdate(update); let changed = false;
@@ -159,7 +177,10 @@ export class ProfileManager extends ClientComponent {
             }
             throw error;
         }
-        await this.#save({ profile: request, signerCertificate: certificate }, signal); return request;
+        await this.#saveGate.run(async () => {
+            await this.#save({ profile: request, signerCertificate: certificate }, signal);
+            this.#reads.get(this.accountId)!.recordSuccess(this.clock.monotonicMilliseconds());
+        }, signal); return request;
     }
     async #save(result: ProfileResolveResult, signal: AbortSignal): Promise<void> {
         const profile = result.profile;
@@ -174,6 +195,11 @@ export class ProfileManager extends ClientComponent {
                 mutations.push(putSignedRequest(method, { ...signed, pending: false }));
             return { mutations, result: undefined };
         }, signal);
+        let cache = this.#reads.get(profile.account);
+        if (!cache) { cache = new MetadataCache(this.clock); this.#reads.set(profile.account, cache); }
+        cache.publish(result);
+        if (profile.account === this.accountId && this.#accept(profile)) this.#changed();
     }
-    protected override async onDispose(): Promise<void> { this.#events.clear(); }
+    protected override async onStop(): Promise<void> { this.#readsStopping = true; try { await Promise.all([...this.#reads.values()].map(cache => cache.stop())); } finally { this.#readsStopping = false; } }
+    protected override async onDispose(): Promise<void> { await Promise.all([...this.#reads.values()].map(cache => cache.stop(true))); this.#reads.clear(); this.#events.clear(); }
 }

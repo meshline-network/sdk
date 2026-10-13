@@ -7,16 +7,21 @@ const networks: MessagingNetwork[] = [];
 afterEach(async () => { for (const network of networks.splice(0)) await network.dispose(); });
 async function fixture() { const network = new MessagingNetwork(); networks.push(network); const a = await network.client(21); const b = await network.client(22); return { network, a, b }; }
 async function all<T>(reader: Promise<QueryReader<T>>): Promise<readonly T[]> { const query = await reader; try { return await query.readNext(100); } finally { await query.dispose(); } }
+function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 async function connect(f: Awaited<ReturnType<typeof fixture>>) {
     const { network, a, b } = f; await a.messages.start(); await b.messages.start();
-    await a.messages.addContact(b.accountId, '你好');
-    await network.until(async () => (await all(b.messages.getContactRequests({ direction: 'incoming' }))).length === 1);
+    const request = await a.messages.addContact(b.accountId, '你好');
+    // Wait for acceptance and sync explicitly; advancing the clock here repeatedly rewrites guarded outbox records.
+    await vi.waitFor(async () => expect((await a.store.read([{ collection: 'message_outbox', key: request.messageId }])).sets[0]![0]!.value.acceptedAt).toBeDefined(), { timeout: 5000 });
+    await b.messages.synchronize(network.descriptor.relayId);
     await b.messages.acceptContactRequest(a.accountId);
-    await network.until(async () => Boolean(await a.messages.getContact(b.accountId)));
+    await vi.waitFor(() => expect(network.submissions.some(value => value.envelope.from === b.accountId && value.envelope.to === a.accountId)).toBe(true), { timeout: 5000 });
+    await a.messages.synchronize(network.descriptor.relayId);
 }
 
 test('MessageManager establishes contacts, exchanges encrypted direct messages and queries stable history', async () => {
     const f = await fixture(); await connect(f); const { network, a, b } = f;
+    const requests = [...a.pool.clients, ...b.pool.clients].map(client => vi.spyOn(client, 'requestHttp'));
     expect(await a.messages.getContact(b.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
     expect(await b.messages.getContact(a.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
     const sent = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: '完整 SDK 工作流 😀' } }); expect(sent.state).toBe('queued');
@@ -26,16 +31,75 @@ test('MessageManager establishes contacts, exchanges encrypted direct messages a
     expect(await all(a.messages.getMessageHistory(b.accountId))).toHaveLength(1); expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(0);
     expect(await all(a.messages.getContactRequests())).toEqual([]); expect(await all(b.messages.getContactRequests())).toEqual([]);
     expect(a.messages.lastBackgroundError).toBeUndefined(); expect(b.messages.lastBackgroundError).toBeUndefined();
+    for (let index = 0; index < 2; index++) {
+        const next = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'cached ' + index } });
+        await vi.waitFor(() => expect(network.submissions.some(request => request.envelope.messageId === next.messageId)).toBe(true), { timeout: 5000 });
+        await b.messages.synchronize(network.descriptor.relayId);
+        expect(await b.messages.getMessage({ sender: a.accountId, messageId: next.messageId })).toBeDefined();
+    }
+    const calls = requests.flatMap(request => request.mock.calls);
+    expect(calls.filter(([, method]) => method === 'account.route.resolve')).toHaveLength(0);
+    expect(calls.filter(([, method]) => method === 'device.state.resolve')).toHaveLength(0);
 });
 
 test('ungranted direct sends are rejected; self messages persist locally and queued cancellation prevents transmission', async () => {
     const { a, b, network } = await fixture();
     await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'not authorized' } })).rejects.toThrow('grant');
+    const states = vi.spyOn(a.device, 'getDeviceState');
     const sent = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'self message' } });
+    expect(states).toHaveBeenCalledTimes(1); states.mockRestore();
     expect(await a.messages.cancelMessage(sent.messageId)).toBe(true); expect(await a.messages.cancelMessage(sent.messageId)).toBe(false);
     await a.messages.start(); await network.until(async () => network.submissions.length > 0);
     expect(network.submissions.some(request => request.envelope.messageId === sent.messageId)).toBe(false);
     expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(1); expect((await a.messages.getSendStatus(sent.messageId))!.state).toBe('canceled');
+});
+
+test('send preparation reuses both states during a blocked refresh and still rejects revoked authorization', async () => {
+    const f = await fixture(); await connect(f); const { a, b, network } = f; await a.messages.stop(); await b.messages.stop();
+    const client = await a.pool.get(network.descriptor.relayId, { mode: 'device', signer: a.device });
+    const request = client.requestHttp.bind(client); const gate = deferred();
+    const spy = vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+        if (args[1] === 'device.state.resolve') await gate.promise;
+        return request(...args);
+    });
+    const refresh = a.device.refreshDeviceState();
+    try {
+        await vi.waitFor(() => expect(spy.mock.calls.some(([, method]) => method === 'device.state.resolve')).toBe(true));
+        expect((await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'cached preparation' } })).state).toBe('queued');
+    } finally { gate.resolve(); }
+    await refresh; spy.mockRestore();
+    await a.device.publishDeviceState(network.descriptor.relayId, { certificates: [] });
+    const before = await a.store.read([{ collection: 'message_outbox' }]);
+    await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'revoked sender' } })).rejects.toThrow();
+    expect((await a.store.read([{ collection: 'message_outbox' }])).sets).toEqual(before.sets);
+});
+
+test.each(['own failure', 'peer failure', 'cancel', 'dispose'])('send preparation drains both queries without enqueueing on %s', async action => {
+    const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
+    const before = await a.store.read([{ collection: 'message_outbox' }]); const cleanup = deferred(); const caller = new AbortController();
+    const signals: AbortSignal[] = []; let complete = false; let settled = 0;
+    const state = a.device.getDeviceState.bind(a.device);
+    const spy = vi.spyOn(a.device, 'getDeviceState').mockImplementation(async (target, signal) => {
+        signals.push(signal!);
+        try {
+            if (action === (target === a.accountId ? 'own failure' : 'peer failure')) throw new Error(action);
+            await cleanup.promise; signal!.throwIfAborted(); return await state(target, signal);
+        } finally { settled++; }
+    });
+    const sending = a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'must not enqueue' } }, caller.signal)
+        .catch(error => error).then(result => { complete = true; return result; });
+    let disposal: Promise<void> | undefined;
+    try {
+        await vi.waitFor(() => expect(signals).toHaveLength(2));
+        if (action === 'cancel') caller.abort();
+        if (action === 'dispose') disposal = a.messages.dispose();
+        if (action === 'cancel' || action === 'dispose') expect(signals.every(signal => signal.aborted)).toBe(true);
+        else expect(settled).toBe(1);
+        expect(complete).toBe(false);
+    } finally { cleanup.resolve(); }
+    const error = await sending; await disposal; spy.mockRestore(); expect(settled).toBe(2);
+    expect(error).toMatchObject(action.endsWith('failure') ? { message: action } : { name: 'AbortError' });
+    expect((await a.store.read([{ collection: 'message_outbox' }])).sets).toEqual(before.sets);
 });
 
 test('contact invitation, duplicate outgoing request, dismissal and queued request cancellation retain clear local state', async () => {

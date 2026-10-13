@@ -88,7 +88,7 @@ export abstract class ClientComponent {
         try {
             await this.#gate.run(async () => {
                 this.#check();
-                if (this.#state !== 'running') return;
+                if (this.#state !== 'running') { await this.onStop(); return; }
                 this.#state = 'stopping';
                 try { await this.#endRuntime(); }
                 finally { this.#state = 'stopped'; changed = true; }
@@ -98,8 +98,7 @@ export abstract class ClientComponent {
         }
     }
     async #endRuntime(): Promise<void> {
-        if (!this.#runtime) return;
-        this.#runtime.abort(new DOMException('Component runtime stopped.', 'AbortError'));
+        this.#runtime?.abort(new DOMException('Component runtime stopped.', 'AbortError'));
         try { await this.onStop(); } finally { this.#runtime = undefined; }
     }
     /** Derived public operations use this scope; emit observer events after it releases. */

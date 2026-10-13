@@ -1,3 +1,4 @@
+import { relayLimits } from '../transport/discovery.js';
 import { encryptGroupMessage, groupClientSecretCommitment, GroupKeyAccessError, sealGroupClientSecret } from '../crypto/groups.js';
 import { requireLength, systemRandom, verifyDevice, type RandomSource } from '../crypto/primitives.js';
 import { ProtocolError, StateConflictError } from '../errors.js';
@@ -255,7 +256,7 @@ export class GroupManager extends ClientComponent {
     createGroup(relayId: string, options: GroupCreateOptions, signal?: AbortSignal): Promise<GroupInfo> {
         validateRelayId(relayId); const copy = { ...options };
         return this.runOperation(scope => this.#writes.run(async () => {
-            const relay = await this.#hosting(relayId, scope); const limit = (await relay.getInfo(scope)).limits.maxGroupMembers!;
+            const relay = await this.#hosting(relayId, scope); const limit = (await relayLimits(relay, scope)).maxGroupMembers!;
             if (copy.memberCapacity > limit) throw new ProtocolError('invalid_capacity', 'Group capacity exceeds the hosting relay limit.');
             const nonce = this.#random.bytes(16); requireLength(nonce, 16, 'Group nonce'); const group = { relayId, groupId: deriveResourceId('group', this.accountId, relayId, nonce, this.context) };
             const privateKey = this.#random.bytes(32); let secret: Uint8Array | undefined;
@@ -306,7 +307,7 @@ export class GroupManager extends ClientComponent {
             await this.#operations.ensureAvailable(group, 'group.invite.create', scope); const relay = await this.#hosting(group.relayId, scope); await this.#synchronize(relay, group, scope, false);
             const state = await this.#writable(group, scope); const role = state.members.find(member => member.account === this.accountId)!.role;
             if (role === 'member' && (state.state.invitePolicy === 'administrators' || copy.invitee === undefined && state.state.invitePolicy !== 'members_shareable')) throw new ProtocolError('forbidden', 'Current membership cannot issue this group invitation.');
-            const now = this.clock.nowSeconds(); const limits = (await relay.getInfo(scope)).limits;
+            const now = this.clock.nowSeconds(); const limits = (await relayLimits(relay, scope));
             if (copy.expiresAt - now > limits.maxGroupInviteTtl!) throw new ProtocolError('invalid_expiry', 'Invitation lifetime exceeds the hosting relay limit.');
             let invite: GroupInvite = { ...copy, groupId: group.groupId, inviteId: createIdentifier('invite', this.#random), inviter: this.accountId, createdAt: now, deviceSignature: new Uint8Array(64) }; validateGroupInvite(invite, now);
             const certificate = this.#device.certificate; const id = certificateId(certificate, this.context); invite = { ...invite, deviceSignature: await this.#device.sign(groupInviteInput(invite, this.context), scope) };
@@ -542,7 +543,7 @@ export class GroupManager extends ClientComponent {
     async #poll(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(30000, signal); this.#pulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
     async #subscribe(client: RelayClient, groups: readonly string[], signal: AbortSignal): Promise<void> {
         if (!(await client.getDescriptor(signal)).endpoints.some(value => value.startsWith('wss://'))) return;
-        const selected = groups.slice(0, (await client.getInfo(signal)).limits.maxGroupSubscriptions ?? 0); let observed = this.#subscriptions.get(client.relayId);
+        const selected = groups.slice(0, (await relayLimits(client, signal)).maxGroupSubscriptions ?? 0); let observed = this.#subscriptions.get(client.relayId);
         if (observed?.client !== client) {
             if (observed) { for (const detach of observed.detach) detach(); await observed.subscription.dispose(); }
             const subscription = client.createSubscription('group.subscribe', { group_ids: [] }, { signal, onSubscribed: () => { this.#pulse?.pulse(); }, onError: error => this.notifyBackgroundError({ operation: 'subscribe_group', resource: client.relayId, error }) });

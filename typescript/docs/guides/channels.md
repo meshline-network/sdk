@@ -61,4 +61,10 @@ than causing a new publication. Keep pending state across restarts.
 
 For foreground refreshes and completion status, see [synchronization](synchronization.md).
 
+`getChannel` and followed-channel synchronization reuse persisted verified descriptors.
+The next read after one hour triggers background refresh; failures retain the descriptor
+and defer demand retries for one minute. `refreshChannel` awaits an update. Descriptor
+closure and revision checks remain enforced; writes and historical event validation
+still obtain the exact state they require. Timeline polling itself is unchanged.
+
 [All guides](../README.md)

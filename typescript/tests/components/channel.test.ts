@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { ChannelManager, channelPostCodec, type QueryReader } from '@meshline/sdk';
 import { ChannelNetwork } from '../support/channel-network.js';
 const networks: ChannelNetwork[] = []; afterEach(async () => { for (const network of networks.splice(0)) await network.dispose(); });
@@ -67,4 +67,27 @@ test('an incorrect publication sequence stays pending with a visible failure and
     expect((await owner.store.read([{ collection: 'channel_operations' }])).sets[0]![0]!.value.acceptedSequence).toBe(101);
     await owner.channels.start(); await network.network.until(async () => owner.channels.lastBackgroundError !== undefined); await owner.channels.stop();
     expect(network.requests.filter(request => request.method === 'channel.post')).toHaveLength(1); expect((await owner.store.read([{ collection: 'channel_operations' }])).sets[0]!).toHaveLength(1);
+});
+
+function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
+test('channel cache survives delayed old responses, local closure and restart', async () => {
+    const { network, owner, relayId } = await fixture(); const channel = await owner.channels.createChannel(relayId, 'cached');
+    const client = await owner.pool.get(relayId, { mode: 'device', signer: owner.device }); const request = client.requestHttp.bind(client), gate = deferred();
+    let held = false; const reads = vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+        const result = await request(...args);
+        if (args[1] === 'channel.resolve' && !held) { held = true; await gate.promise; }
+        return result;
+    });
+    for (let i = 0; i < 3; i++) expect((await owner.channels.getChannel(channel.ref)).descriptor!.name).toBe('cached');
+    expect(reads).not.toHaveBeenCalled(); const refresh = owner.channels.refreshChannel(channel.ref);
+    try {
+        await vi.waitFor(() => expect(held).toBe(true)); expect((await owner.channels.getChannel(channel.ref)).descriptor!.status).toBe('active');
+        await owner.channels.closeChannel(channel.ref);
+    } finally { gate.resolve(); }
+    expect((await refresh).descriptor!.status).toBe('closed'); reads.mockRestore(); await owner.dispose();
+    const resumed = await network.client(31, owner.path); const resumedClient = await resumed.pool.get(relayId, { mode: 'device', signer: resumed.device });
+    const blocked = deferred(); const raw = resumedClient.requestHttp.bind(resumedClient);
+    const resumedReads = vi.spyOn(resumedClient, 'requestHttp').mockImplementation(async (...args) => { if (args[1] === 'channel.resolve') await blocked.promise; return raw(...args); });
+    try { expect((await resumed.channels.getChannel(channel.ref)).descriptor!.status).toBe('closed'); }
+    finally { blocked.resolve(); await resumed.channels.refreshChannel(channel.ref); resumedReads.mockRestore(); }
 });

@@ -78,8 +78,15 @@ export class GroupAccountSync {
         if (!types.has(String(message.payload['$type']))) return undefined;
         const { accountId, device, context, secrets } = this.options;
         if (message.sender !== accountId || message.recipient !== accountId) throw new AccountGroupRejection('invalid_binding', 'Private group synchronization must stay within the current account.');
-        const own = await device.getDeviceState(undefined, signal); if (!own) throw new ProtocolError('device_state_required', 'Current account authorization is unavailable.');
-        input(() => authorizedDevice(own, message.senderDeviceId, context, this.options.clock.nowSeconds()));
+        let own = await device.getDeviceState(undefined, signal); if (!own) throw new ProtocolError('device_state_required', 'Current account authorization is unavailable.');
+        try { authorizedDevice(own, message.senderDeviceId, context, this.options.clock.nowSeconds()); }
+        catch (error) {
+            if (!(error instanceof ProtocolError)) throw error;
+            own = await device.refreshDeviceState(undefined, signal);
+            if (!own) throw new ProtocolError('device_state_required', 'Current account authorization is unavailable.');
+        }
+        const authorized = own;
+        input(() => authorizedDevice(authorized, message.senderDeviceId, context, this.options.clock.nowSeconds()));
         let effect: GroupSecretEffect | undefined;
         if (message.payload['$type'] === 'meshline.account.group.state.request') {
             const request = input(() => { const value = accountGroupPrivateStateRequestCodec.decode(message.payload); validateAccountGroupPrivateStateRequest(value); return value; });

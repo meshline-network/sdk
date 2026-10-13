@@ -5,7 +5,8 @@ import { accountRouteCodec, compareRoutes, routeAccountInput, routeRelayInput, v
 import { nextRevision } from '../protocol/context.js';
 import { canonicalJson, requireSafeInteger, type JsonObject } from '../protocol/json.js';
 import { AsyncGate } from '../runtime/async-gate.js';
-import { throwIfAborted } from '../runtime/clock.js';
+import { createAbortController } from '../runtime/abort.js';
+import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
 import type { MeshlineStore, RecordKey, StoreMutation } from '../storage/store.js';
 import { finishSignedRequest, putSignedRequest, readSignedRequest, requestKey, type SignedRequest } from '../storage/signed-request.js';
@@ -23,13 +24,29 @@ const method = 'account.route.publish';
 const routeKey = (account: string): RecordKey => ({ collection: 'account_routes', key: account });
 const clone = (route: AccountRoute): AccountRoute => accountRouteCodec.decode(accountRouteCodec.encode(route));
 const fingerprint = (value: JsonObject | undefined): string => canonicalJson(value ?? null);
+const routeFreshness = 3_600_000;
+const refreshFailureDelay = 60_000;
+type RouteResult = { readonly route: AccountRoute | undefined } | { readonly error: unknown };
+interface RouteEntry {
+    route: AccountRoute | undefined;
+    refreshAfter: number;
+    retryAfter: number;
+    publication: number;
+    refresh: Promise<RouteResult> | undefined;
+}
 
 /** Signed route discovery and durable, explicit publication retries. */
 export class AccountManager extends ClientComponent {
     readonly #store: MeshlineStore;
     readonly #pool: RelayClientPool;
     readonly #signer: AccountSigner | undefined;
-    readonly #gate = new AsyncGate();
+    readonly #publicationGate = new AsyncGate();
+    // Only local commits share this gate; discovery never holds it over network I/O.
+    readonly #saveGate = new AsyncGate();
+    readonly #routes = new Map<string, RouteEntry>();
+    readonly #refreshes = new Set<Promise<RouteResult>>();
+    #refreshLifetime = createAbortController();
+    #stoppingRefreshes: Promise<void> | undefined;
     readonly #events = new EventHub<AccountEvents>();
     #state: AccountState = 'unknown';
     #route: AccountRoute | undefined;
@@ -52,32 +69,95 @@ export class AccountManager extends ClientComponent {
             if (route.account !== this.accountId) throw new ProtocolError('invalid_storage', 'Stored route belongs to another account.');
         }
         this.#route = route; this.#state = route && route.expiresAt > this.clock.nowSeconds() ? 'established' : 'unknown';
+        for (const row of (await this.#store.read([{ collection: 'account_routes' }], signal)).sets[0]!) {
+            const cached = accountRouteCodec.decode(row.value);
+            if (cached.account !== row.key) throw new ProtocolError('invalid_storage', 'Stored route account does not match its key.');
+            validateAccountId(cached.account);
+            if (this.#usable(cached)) this.#cache(this.#entry(cached.account), cached);
+        }
     }
     #accept(route: AccountRoute | undefined): boolean {
         const state = route ? 'established' : 'unknown';
-        const changed = this.#state !== state || route !== undefined && accountRouteCodec.stringify(route) !== (this.#route && accountRouteCodec.stringify(this.#route));
+        const changed = this.#state !== state || route !== undefined && (!this.#route || compareRoutes(route, this.#route) !== 'equivalent');
         this.#state = state;
         if (route) this.#route = clone(route);
         return changed;
     }
     #changed(): void { this.#events.notify('accountChanged', { state: this.state, route: this.route }, error => this.notifyBackgroundError({ operation: 'observer', resource: 'accountChanged', error })); }
-    async getRoute(accountId = this.accountId, signal?: AbortSignal): Promise<AccountRoute | undefined> {
+    /** Reuses verified routes for one hour, then returns an unexpired route while refreshing in the background. */
+    getRoute(accountId = this.accountId, signal?: AbortSignal): Promise<AccountRoute | undefined> {
+        return this.#readRoute(accountId, false, signal);
+    }
+    /** Bypasses freshness and failure cooldown, sharing any in-flight discovery. Caller cancellation only ends its own wait. */
+    refreshRoute(accountId = this.accountId, signal?: AbortSignal): Promise<AccountRoute | undefined> {
+        return this.#readRoute(accountId, true, signal);
+    }
+    #entry(accountId: string): RouteEntry {
+        let entry = this.#routes.get(accountId);
+        if (!entry) { entry = { route: undefined, refreshAfter: 0, retryAfter: 0, publication: 0, refresh: undefined }; this.#routes.set(accountId, entry); }
+        return entry;
+    }
+    #usable(route: AccountRoute | undefined): route is AccountRoute { return route !== undefined && route.expiresAt > this.clock.nowSeconds(); }
+    async #readRoute(accountId: string, force: boolean, signal?: AbortSignal): Promise<AccountRoute | undefined> {
         validateAccountId(accountId);
+        return this.runOperation(async scope => {
+            const entry = this.#entry(accountId); const now = this.clock.monotonicMilliseconds();
+            if (!force && this.#usable(entry.route)) {
+                if (now >= entry.refreshAfter && !this.#stoppingRefreshes) this.#startRefresh(accountId, entry);
+                return clone(entry.route);
+            }
+            const refresh = !force && now < entry.retryAfter && entry.refresh ? entry.refresh : this.#startRefresh(accountId, entry);
+            const result = await awaitWithSignal(refresh, scope);
+            if ('error' in result) throw result.error;
+            if (result.route && !this.#usable(result.route)) throw new ProtocolError('expired_route', 'Resolved account route has expired.');
+            return result.route && clone(result.route);
+        }, signal);
+    }
+    #startRefresh(accountId: string, entry: RouteEntry): Promise<RouteResult> {
+        if (entry.refresh && this.#refreshes.has(entry.refresh)) return entry.refresh;
+        if (this.#stoppingRefreshes) throw new DOMException('Account route refreshes are stopping.', 'AbortError');
+        const publication = entry.publication;
+        // The shared request is tracked independently of every foreground wait, including cache-hit refreshes.
+        const refresh = this.runOperation(scope => this.#refresh(accountId, entry, publication, scope), this.#refreshLifetime.signal)
+            .catch((error: unknown): RouteResult => ({ error }));
+        entry.refresh = refresh; entry.retryAfter = 0; this.#refreshes.add(refresh);
+        void refresh.then(() => { this.#refreshes.delete(refresh); });
+        return refresh;
+    }
+    #cache(entry: RouteEntry, route: AccountRoute): boolean {
+        entry.route = route; entry.retryAfter = 0;
+        return route.account === this.accountId && this.#accept(route);
+    }
+    async #refresh(accountId: string, entry: RouteEntry, publication: number, signal: AbortSignal): Promise<RouteResult> {
         const failures: BackgroundFailure[] = [];
         let changed = false;
-        let route: AccountRoute | undefined;
-        let operationError: unknown; let failed = false;
         try {
-            route = await this.runOperation(scope => this.#gate.run(async () => {
-                const resolved = await this.#resolve(accountId, failures, scope);
-                if (accountId === this.accountId) changed = this.#accept(resolved);
-                return resolved;
-            }, scope), signal);
-        } catch (error) { failed = true; operationError = error; }
-        for (const failure of failures) this.notifyBackgroundError(failure);
-        if (changed) this.#changed();
-        if (failed) throw operationError;
-        return route && clone(route);
+            const route = await this.#resolve(accountId, failures, signal);
+            const result = await this.#saveGate.run(async (): Promise<RouteResult> => {
+                // An older lookup cannot undo a newer publication or shorten its freshness window.
+                if (entry.publication !== publication && entry.route && (!route || ['older', 'equivalent'].includes(compareRoutes(route, entry.route))))
+                    return { route: entry.route };
+                if (route) { await this.#save(route, signal); changed = this.#cache(entry, route); entry.refreshAfter = this.clock.monotonicMilliseconds() + routeFreshness; }
+                else {
+                    // Discovery's not_found is not signed revocation evidence.
+                    entry.refreshAfter = entry.retryAfter = this.clock.monotonicMilliseconds() + refreshFailureDelay;
+                    if (accountId === this.accountId && !this.#usable(entry.route)) changed = this.#accept(undefined);
+                }
+                return { route };
+            }, signal);
+            if (changed) this.#changed();
+            return result;
+        } catch (error) {
+            if (!signal.aborted) {
+                if (entry.publication === publication) entry.refreshAfter = entry.retryAfter = this.clock.monotonicMilliseconds() + refreshFailureDelay;
+                const reported = failures.length > 0 && error instanceof AggregateError && error.errors.length === failures.length
+                    && error.errors.every((cause, index) => cause === failures[index]!.error);
+                if (!reported) failures.push({ operation: 'connect', resource: accountId, error });
+            }
+            return { error };
+        } finally {
+            if (!signal.aborted) for (const failure of failures) this.notifyBackgroundError(failure);
+        }
     }
     async #resolve(accountId: string, failures: BackgroundFailure[], signal: AbortSignal): Promise<AccountRoute | undefined> {
         const previous = (await this.#store.read([routeKey(accountId)], signal)).sets[0]![0]?.value;
@@ -104,7 +184,7 @@ export class AccountManager extends ClientComponent {
                 } else if (!(error instanceof Error)) throw error;
                 failures.push({ operation: 'connect', resource: entry.relayId, error }); continue;
             }
-            await this.#save(route, signal); return route;
+            return route;
         }
         if (failures.length) throw new AggregateError(failures.map(value => value.error), 'Account route discovery failed through the available relays.');
         if (!attempted) throw new ProtocolError('no_active_relay', 'No active relay is available for route discovery.');
@@ -118,7 +198,7 @@ export class AccountManager extends ClientComponent {
         const signer = this.#signer;
         if (!signer) throw new ProtocolError('signer_required', 'An account signer is required to publish a route.');
         let changed = false;
-        const result = await this.runOperation(signal => this.#gate.run(async () => {
+        const result = await this.runOperation(signal => this.#publicationGate.run(async () => {
             const signed = await this.#prepare(relayId, options, signer, signal);
             const request = accountRouteCodec.decode(signed.document);
             const client = await this.#pool.get(relayId, { mode: 'account', signer }, signal);
@@ -135,8 +215,14 @@ export class AccountManager extends ClientComponent {
             const route = accountRouteCodec.decode(response);
             const acknowledged = accountRouteCodec.encode(route); delete acknowledged.relay_signature;
             if (canonicalJson(acknowledged) !== accountRouteCodec.stringify(request)) throw new ProtocolError('invalid_response', 'Relay modified the submitted route.');
-            await this.#verifyRelay(route, signal); await this.#save(route, signal);
-            changed = this.#accept(route); return route;
+            await this.#verifyRelay(route, signal);
+            await this.#saveGate.run(async () => {
+                await this.#save(route, signal);
+                const entry = this.#entry(this.accountId); entry.publication++;
+                entry.refreshAfter = this.clock.monotonicMilliseconds() + routeFreshness;
+                changed = this.#cache(entry, route);
+            }, signal);
+            return route;
         }, signal), options.signal);
         if (changed) this.#changed();
         return clone(result);
@@ -202,5 +288,15 @@ export class AccountManager extends ClientComponent {
             return { mutations, result: undefined };
         }, signal);
     }
-    protected override async onDispose(): Promise<void> { this.#events.clear(); }
+    protected override onStop(): Promise<void> { return this.#stopRefreshes(); }
+    #stopRefreshes(): Promise<void> {
+        return this.#stoppingRefreshes ??= Promise.resolve().then(async () => {
+            const pending = [...this.#refreshes];
+            this.#refreshLifetime.abort(new DOMException('Account route refreshes stopped.', 'AbortError'));
+            await Promise.all(pending);
+        }).finally(() => { this.#refreshLifetime = createAbortController(); this.#stoppingRefreshes = undefined; });
+    }
+    protected override async onDispose(): Promise<void> {
+        await this.#stopRefreshes(); this.#routes.clear(); this.#events.clear();
+    }
 }

@@ -21,7 +21,7 @@ export * from './transport/session.js';
 export * from './transport/rpc.js';
 export * from './transport/socket.js';
 export * from './models/relay.js';
-export * from './transport/discovery.js';
+export { RelayDiscovery } from './transport/discovery.js';
 export * from './runtime/events.js';
 export * from './transport/client.js';
 export type { RelaySubscription, RelaySubscriptionOptions, SubscriptionMethod } from './transport/subscription.js';
@@ -54,3 +54,5 @@ export type { ContactInfo, ContactGrantState, ContactRequestInfo, ContactRequest
 export * from './components/group.js';
 export type { GroupMessageInfo } from './groups/messages.js';
 export * from './client.js';
+
+export * from './integrations/cached-relay-registry.js';

@@ -30,7 +30,7 @@ export interface StoredContactRequest extends ContactRequestInfo { readonly cons
 export interface PreparedContactSend { readonly outbox: OutboxRecord; readonly guards: readonly RecordGuard[] }
 export interface ContactHost {
     readonly store: MeshlineStore; readonly context: NetworkContext; readonly accountId: string; readonly device: DeviceSigner; readonly clock: RuntimeClock;
-    getState(target: string | ContactAuthorization, signal?: AbortSignal): Promise<AccountDeviceState>;
+    getState(target: string | ContactAuthorization, signal?: AbortSignal, refresh?: boolean): Promise<AccountDeviceState>;
     prepareSend(recipient: string, payload: JsonObject, authorization: ContactAuthorization | undefined, recipientDevices: readonly string[] | undefined, signal?: AbortSignal): Promise<PreparedContactSend>;
     changed(changes: ContactChanges): void;
 }
@@ -234,7 +234,7 @@ export class MessageContacts {
         if (envelope.from === this.host.accountId && !self) return undefined;
         if (['meshline.account.group.state.request', 'meshline.account.group.state.sync', 'meshline.account.group.history_secret.sync'].includes(type as string)) {
             if (!self || envelope.from !== this.host.accountId) reject('invalid_binding', 'Account group synchronization requires self-delivery.');
-            await this.host.getState(this.host.accountId, signal); return this.#authorize(entry);
+            await this.#ownReceptionState(entry, signal); return this.#authorize(entry);
         }
         if (type === 'meshline.contact.consent') {
             if (self) reject('invalid_binding', 'Contact consent cannot be self-delivered.');
@@ -245,7 +245,7 @@ export class MessageContacts {
         if (contacts.includes(type as string) && self !== (type === 'meshline.account.contacts.sync')) reject('invalid_binding', 'Contact payload has invalid sender/recipient account binding.');
         if (type === 'meshline.account.contacts.sync') return this.#receiveSync(entry, pureValidation(() => { const value = accountContactSyncCodec.decode(payload); validateAccountContactSync(value, this.host.clock.nowSeconds(), this.host.accountId); return value; }), signal);
         if (type !== 'meshline.message.direct' && type !== 'meshline.contact.grant' && type !== 'meshline.device.state.changed') return undefined;
-        await this.host.getState(this.host.accountId, signal);
+        await this.#ownReceptionState(entry, signal);
         if (type === 'meshline.contact.grant') {
             const grant = pureValidation(() => contactGrantCodec.decode(payload));
             if (grant.grantor !== envelope.from || grant.grantee !== envelope.to) reject('invalid_binding', 'Contact grant differs from envelope participants.');
@@ -268,6 +268,18 @@ export class MessageContacts {
             } });
         }
         return this.#authorize(entry);
+    }
+    async #ownReceptionState(entry: MessageTimelineEntry, signal?: AbortSignal): Promise<AccountDeviceState> {
+        const own = await this.host.getState(this.host.accountId, signal);
+        const self = entry.envelope.from === entry.envelope.to;
+        const contact = self ? undefined : readContact((await this.host.store.read([contactKey(entry.envelope.from)], signal)).sets[0]![0]?.value);
+        try {
+            if (self) authorizedDevice(own, entry.envelope.fromDeviceId, this.host.context, this.host.clock.nowSeconds());
+            else if (contact?.record.grantToContact) verifyContactGrant(contact.record.grantToContact, own, this.host.context, this.host.clock.nowSeconds());
+            return own;
+        } catch (error) { if (!(error instanceof ProtocolError)) throw error; }
+        // Lookup failures remain transient; only verified authorization failures reject a message.
+        return this.host.getState(this.host.accountId, signal, true);
     }
     #authorize(entry: MessageTimelineEntry, effect?: MessageEffects): MessageEffects {
         const self = entry.envelope.from === entry.envelope.to; const account = entry.envelope.from;
@@ -308,7 +320,7 @@ export class MessageContacts {
         mutations.push(put(contactRequestKey(account, 'incoming'), encodeContactRequest(request))); return this.#effect(guards, mutations);
     }
     async #receiveSync(entry: MessageTimelineEntry, sync: AccountContactSync, signal?: AbortSignal): Promise<MessageEffects> {
-        const own = await this.host.getState(this.host.accountId, signal); pureValidation(() => authorizedDevice(own, entry.envelope.fromDeviceId, this.host.context, this.host.clock.nowSeconds()));
+        const own = await this.#ownReceptionState(entry, signal); pureValidation(() => authorizedDevice(own, entry.envelope.fromDeviceId, this.host.context, this.host.clock.nowSeconds()));
         const guards = await this.#snapshot((sync.records ?? []).map(value => contactKey(value.account)), signal); const mutations: StoreMutation[] = []; const prepared: PreparedContactSend[] = [];
         for (let index = 0; index < (sync.records?.length ?? 0); index++) {
             const source = sync.records![index]!; const previous = readContact(guards[index]!.value);
@@ -360,8 +372,8 @@ export class MessageContacts {
         const incoming = saved.record.grantFromContact && (saved.record.grantFromContact.expiresAt ?? Infinity) > now ? saved.record.grantFromContact : undefined;
         let revisionResolved = false;
         if (saved.requiredDeviceRevision !== undefined && incoming) {
-            const remote = await this.host.getState(incoming, signal);
-            if (remote.revision < saved.requiredDeviceRevision) throw new ProtocolError('stale_device_state', 'Contact device state has not reached its announced revision.'); revisionResolved = true;
+            const remote = state((await this.host.store.read([cachedDeviceStateKey(account)], signal)).sets[0]![0]?.value);
+            revisionResolved = remote !== undefined && remote.revision >= saved.requiredDeviceRevision;
         }
         const issued = saved.record.grantToContact; let supplemented: ContactGrant | undefined;
         if (issued && (issued.expiresAt ?? Infinity) > now) supplemented = await this.#signGrant(filterContactGrantSignatures(issued, own, this.host.context, now), signal);

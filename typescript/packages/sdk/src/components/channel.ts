@@ -1,3 +1,4 @@
+import { relayLimits } from '../transport/discovery.js';
 import { systemRandom, verifyDevice, type RandomSource } from '../crypto/primitives.js';
 import { ProtocolError, StateConflictError } from '../errors.js';
 import { createIdentifier, deriveResourceId, validateIdentifier } from '../identity/identifiers.js';
@@ -17,6 +18,7 @@ import { canonicalJson, requireObject, requireSafeInteger } from '../protocol/js
 import type { ResourceSyncStatus } from '../models/resource-sync.js';
 import { historyArguments, historySelection, type HistoryRange } from '../models/history.js';
 import { ResourceSyncTracker } from '../runtime/resource-sync.js';
+import { MetadataCache } from '../runtime/metadata-cache.js';
 import { AsyncGate } from '../runtime/async-gate.js';
 import { AsyncPulse } from '../runtime/async-pulse.js';
 import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
@@ -58,6 +60,8 @@ export class ChannelManager extends ClientComponent {
     }
     readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #device: DeviceManager; readonly #random: RandomSource;
     readonly #repository: ChannelRepository; readonly #writes = new AsyncGate(); readonly #events = new EventHub<ChannelEvents>();
+    #readsStopping = false;
+    readonly #descriptors = new Map<string, MetadataCache<ChannelDescriptor>>();
     readonly #subscriptions = new Map<string, Subscription>(); #pulse: AsyncPulse | undefined; #jobs: Promise<void>[] = [];
     constructor(options: ChannelManagerOptions) {
         super(options); for (const dependency of [options.relayClients, options.deviceManager]) if (dependency.accountId !== this.accountId || dependency.context.toString() !== this.context.toString()) throw new ProtocolError('invalid_context', 'Channel dependencies belong to another network or account.');
@@ -112,10 +116,10 @@ export class ChannelManager extends ClientComponent {
             throw new StateConflictError('Channel revision is occupied by a different descriptor.');
         }
         if (!accepted) { await this.#send(relay, operation, recovering, signal); accepted = { descriptor, signerCertificate: this.#device.certificate }; }
-        const changed = await this.#repository.saveDescriptor(operation.channel, accepted, operation); if (changed) this.#notify('channelChanged', changed); this.#pulse?.pulse();
+        const changed = await this.#repository.saveDescriptor(operation.channel, accepted, operation); await this.#loadDescriptor(operation.channel, signal, this.clock.monotonicMilliseconds()); if (changed) this.#notify('channelChanged', changed); this.#pulse?.pulse();
     }
     async #synchronize(relay: RelayClient, channel: ChannelRef, after: number, advance: boolean, signal: AbortSignal): Promise<void> {
-        for (;;) { const result = await this.#repository.readPage(channel, { channelId: channel.channelId, after }, this.#reader(relay, channel, signal), advance, signal); this.#changed(channel, result.changes);
+        for (;;) { const result = await this.#repository.readPage(channel, { channelId: channel.channelId, after }, this.#reader(relay, channel, signal), advance, signal); if (result.changes.channel) await this.#loadDescriptor(channel, signal, this.clock.monotonicMilliseconds()); this.#changed(channel, result.changes);
             if (!result.page.hasMore) return; after = result.page.events.at(-1)!.sequence; }
     }
     async #publishPost(relay: RelayClient, operation: ChannelOperation, recovering: boolean, signal: AbortSignal): Promise<ChannelPostRef> {
@@ -142,10 +146,37 @@ export class ChannelManager extends ClientComponent {
         }, scope), options.signal);
     }
     async #info(channel: ChannelRef, signal: AbortSignal): Promise<ChannelInfo> { const record = await this.#repository.get(channel, signal); return { ref: channel, isFollowed: record.isFollowed, ...(record.descriptor ? { descriptor: record.descriptor } : {}) }; }
-    getChannel(channel: ChannelRef, signal?: AbortSignal): Promise<ChannelInfo> {
+    getChannel(channel: ChannelRef, signal?: AbortSignal): Promise<ChannelInfo> { return this.#readChannel(channel, signal); }
+    refreshChannel(channel: ChannelRef, signal?: AbortSignal): Promise<ChannelInfo> { return this.#readChannel(channel, signal, true); }
+    async #loadDescriptor(channel: ChannelRef, signal?: AbortSignal, completed?: number): Promise<MetadataCache<ChannelDescriptor>> {
+        if (this.#readsStopping) throw new DOMException('Channel refreshes are stopping.', 'AbortError');
+        let cache = this.#descriptors.get(channel.channelId);
+        if (!cache) { cache = new MetadataCache(this.clock); this.#descriptors.set(channel.channelId, cache); }
+        const current = (await this.#repository.get(channel, signal)).descriptor;
+        if (current && (!cache.value || current.revision > cache.value.revision)) {
+            const row = (await this.#store.read([{ collection: 'channel_descriptors', key: channel.channelId + '|' + String(current.revision).padStart(16, '0') }], signal)).sets[0]![0];
+            if (!row) throw new ProtocolError('invalid_storage', 'Channel descriptor lacks verification evidence.');
+            const evidence = channelResolveResultCodec.decode(row.value); verifyChannelDescriptor(evidence, this.context, channel);
+            if (channelDescriptorCodec.stringify(evidence.descriptor) !== channelDescriptorCodec.stringify(current)) throw new ProtocolError('invalid_storage', 'Channel descriptor differs from its evidence.');
+            if (!cache.value || current.revision > cache.value.revision) cache.publish(current, completed);
+        }
+        if (completed !== undefined) cache.recordSuccess(completed);
+        return cache;
+    }
+    #readChannel(channel: ChannelRef, signal?: AbortSignal, force = false): Promise<ChannelInfo> {
         channel = { ...channel }; validateChannelRef(channel);
-        return this.runOperation(async scope => { const relay = await this.#hosting(channel.relayId, scope); const changed = await this.#repository.saveDescriptor(channel, await this.#resolve(relay, channel, undefined, scope), undefined, scope);
-            if (changed) this.#notify('channelChanged', changed); return this.#info(channel, scope); }, signal);
+        return this.runOperation(async scope => {
+            const cache = await this.#loadDescriptor(channel, scope);
+            await cache.read(() => true, token => this.runOperation(async querySignal => {
+                const relay = await this.#hosting(channel.relayId, querySignal);
+                const result = await this.#resolve(relay, channel, undefined, querySignal);
+                const changed = await this.#repository.saveDescriptor(channel, result, undefined, querySignal);
+                await this.#loadDescriptor(channel, querySignal);
+                if (changed) this.#notify('channelChanged', changed);
+                return cache.value;
+            }, token), error => this.notifyBackgroundError({ operation: 'synchronize_channel', resource: channel.channelId, error }), scope, force);
+            return this.#info(channel, scope);
+        }, signal);
     }
     updateChannel(channel: ChannelRef, update: ChannelUpdate, signal?: AbortSignal): Promise<ChannelInfo> {
         channel = { ...channel }; validateChannelRef(channel); const copy = { ...update, ...(Array.isArray(update.moderators) ? { moderators: [...update.moderators] } : {}) };
@@ -237,7 +268,7 @@ export class ChannelManager extends ClientComponent {
     }
     async #subscribe(client: RelayClient, channelIds: readonly string[], signal: AbortSignal): Promise<void> {
         if (!(await client.getDescriptor(signal)).endpoints.some(endpoint => endpoint.startsWith('wss://'))) return;
-        const limit = (await client.getInfo(signal)).limits.maxChannelSubscriptions ?? 0; const selected = channelIds.slice(0, limit);
+        const limit = (await relayLimits(client, signal)).maxChannelSubscriptions ?? 0; const selected = channelIds.slice(0, limit);
         let observed = this.#subscriptions.get(client.relayId);
         if (observed?.client !== client) {
             if (observed) { for (const detach of observed.detach) detach(); await observed.subscription.dispose(); }
@@ -270,14 +301,14 @@ export class ChannelManager extends ClientComponent {
     #synchronizeChannel(channel: ChannelRef, signal: AbortSignal, manual = false): Promise<ResourceSyncStatus> {
         return this.#writes.run(() => this.#syncStatus.run(channel.channelId, async () => {
             const client = await this.#hosting(channel.relayId, signal);
-            const changed = await this.#repository.saveDescriptor(channel, await this.#resolve(client, channel, undefined, signal), undefined, signal);
-            if (changed) this.#notify('channelChanged', changed);
+            await this.getChannel(channel, signal);
             await this.#synchronize(client, channel, (await this.#repository.get(channel, signal)).syncSequence, true, signal);
             return undefined;
         }, signal, manual), signal);
     }
     protected override async onStop(): Promise<void> {
-        try { await Promise.all(this.#jobs); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop(); }
+        this.#readsStopping = true;
+        try { await Promise.all([...this.#jobs, ...[...this.#descriptors.values()].map(cache => cache.stop())]); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop(); this.#readsStopping = false; }
     }
-    protected override async onDispose(): Promise<void> { this.#syncStatus.stop(true); this.#events.clear(); }
+    protected override async onDispose(): Promise<void> { await Promise.all([...this.#descriptors.values()].map(cache => cache.stop(true))); this.#descriptors.clear(); this.#syncStatus.stop(true); this.#events.clear(); }
 }

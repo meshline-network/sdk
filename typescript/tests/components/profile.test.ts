@@ -1,7 +1,7 @@
 import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import {
     AccountManager, ProfileManager, RelayClientPool, accountProfileCodec, accountRouteCodec, certificateAccountInput, certificateDeviceInput,
     devicePublicKey, encryptionPublicKey, accountPublicKey, getAccountId, profileInput, profileResolveResultCodec, relayDescriptorCodec,
@@ -85,7 +85,7 @@ test('resolved latest profile clears a matching pending write, while a same-time
     const f = await fixture(); f.loseResponse = true;
     await expect(f.manager.updateProfile({ nickname: 'Alice' })).rejects.toThrow(); const accepted = f.result;
     f.result = f.signedProfile({ nickname: 'different' }); await f.manager.getProfile(); expect((await f.pending())!.pending).toBe(true);
-    f.result = accepted; await f.manager.getProfile(); expect((await f.pending())!.pending).toBe(false);
+    f.result = accepted; await f.manager.refreshProfile(); expect((await f.pending())!.pending).toBe(false);
 });
 test('current profile remains readable with a historically valid certificate after expiry', async () => {
     const f = await fixture(); f.result = f.signedProfile({ nickname: 'historic', updatedAt: 1730000000 });
@@ -100,14 +100,14 @@ test('profile signature and certificate account signatures are both required; ol
     const valid = f.signedProfile({ updatedAt: f.clock.wall + 101 });
     for (const value of [f.signedProfile({ updatedAt: f.clock.wall }), { ...valid, profile: { ...valid.profile, deviceSignature: new Uint8Array(64) } },
         { ...valid, signerCertificate: { ...valid.signerCertificate, accountSignature: new Uint8Array(64) } }]) {
-        f.result = value; await expect(f.manager.getProfile()).rejects.toThrow(); expect(f.manager.profile).toEqual(known);
+        f.clock.elapsed += 60_000; f.result = value; await expect(f.manager.refreshProfile()).rejects.toThrow(); expect(f.manager.profile).toEqual(known);
     }
 });
-test('definitive rejection permits a new update and not_found clears only the in-memory current profile', async () => {
+test('definitive rejection permits a new update and not_found retains the last valid profile', async () => {
     const f = await fixture(); f.reject = true;
     await expect(f.manager.updateProfile({ bio: 'rejected' })).rejects.toMatchObject({ code: 'forbidden' }); expect((await f.pending())!.pending).toBe(false);
     f.reject = false; await f.manager.updateProfile({ bio: 'accepted' }); f.result = undefined;
-    expect(await f.manager.getProfile()).toBeUndefined(); expect(f.manager.profile).toBeUndefined();
+    expect(await f.manager.refreshProfile()).toBeUndefined(); expect((await f.manager.getProfile())!.bio).toBe('accepted'); expect(f.manager.profile!.bio).toBe('accepted');
     expect((await f.manager.publishProfile())!.bio).toBe('accepted');
 });
 test('invalid updates fail before network publication and cannot delete publicDiscovery', async () => {
@@ -115,4 +115,31 @@ test('invalid updates fail before network publication and cannot delete publicDi
     await expect(f.manager.updateProfile({ publicDiscovery: null } as unknown as { publicDiscovery: boolean })).rejects.toThrow();
     await expect(f.manager.updateProfile({ nickname: '\u0085' })).rejects.toThrow();
     expect(f.requests).toEqual([]); expect(await f.pending()).toBeUndefined();
+});
+
+function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
+test('profile reads reuse stored results, stay nonblocking and preserve a same-time local publication', async () => {
+    const f = await fixture(); f.result = f.signedProfile({ nickname: 'old' }); await f.manager.getProfile();
+    const client = f.pool.clients.find(value => value.sessionMode === 'device')!, request = client.requestHttp.bind(client), gate = deferred();
+    let held = false;
+    const reads = vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+        const result = await request(...args);
+        if (args[1] === 'profile.resolve' && !held) { held = true; await gate.promise; }
+        return result;
+    });
+    expect((await f.manager.getProfile())!.nickname).toBe('old'); expect(reads).not.toHaveBeenCalled();
+    f.clock.elapsed += 3_600_000; expect(reads).not.toHaveBeenCalled();
+    const changed = vi.fn(); f.manager.on('profileChanged', changed);
+    try {
+        expect((await f.manager.getProfile())!.nickname).toBe('old'); await vi.waitFor(() => expect(held).toBe(true));
+        expect((await f.manager.getProfile())!.nickname).toBe('old');
+        await f.manager.updateProfile({ nickname: 'new' }); expect(changed).toHaveBeenCalledTimes(1);
+    } finally { gate.resolve(); }
+    await f.manager.refreshProfile(); expect((await f.manager.getProfile())!.nickname).toBe('new'); expect(changed).toHaveBeenCalledTimes(1);
+    reads.mockRestore();
+    await f.manager.dispose();
+    const resumed = new ProfileManager({ context, accountId, store: f.store, relayClients: f.pool, accountManager: f.account, deviceSigner: { certificate: f.cert, sign: async input => signDevice(input, deviceKey) }, clock: f.clock }); resources.push(resumed); await resumed.initialize();
+    const blocked = deferred(); const reader = vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => { if (args[1] === 'profile.resolve') await blocked.promise; return request(...args); });
+    try { expect((await resumed.getProfile())!.nickname).toBe('new'); }
+    finally { blocked.resolve(); await resumed.refreshProfile(); reader.mockRestore(); }
 });

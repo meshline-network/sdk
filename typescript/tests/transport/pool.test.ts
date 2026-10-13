@@ -5,6 +5,7 @@ import {
     verifyAccount, verifyDevice, rpcErrorCodes, type AuthenticationIdentity, type JsonObject, type RelayFetch,
 } from '@meshline/sdk';
 import { createNodeRelayFetch, createNodeSocketFactory } from '../../packages/transport-node/src/index.js';
+import { relayLimits } from '../../packages/sdk/dist/transport/discovery.js';
 import { AdvancingClock } from '../support/clock.js';
 import { context, signedDescriptor, TestRegistry } from '../support/relay-fixture.js';
 import { vector } from '../support/vectors.js';
@@ -346,4 +347,50 @@ test('real WSS pool renews one device session without reconnecting or losing imm
         expect(peer.upgrades).toHaveLength(1); expect(errors).toEqual([]);
         expect(client.state.authentication).toBe('device');
     } finally { await pool.dispose(); await peer.close(); }
+});
+
+test('pool sessions share descriptors and limits while public relay info stays live', async () => {
+    const relay = fakeRelay(); let infos = 0;
+    const fetch: RelayFetch = async (url, init) => url.endsWith('/relay/info') ? result({ relay_id: relay.descriptor.relayId, name: 'Relay', server_time: ++infos,
+        limits: { message_retention: 100, channel_timeline_retention: 100, group_message_retention: 100, max_group_members: 16, max_group_invite_ttl: 100, max_channel_subscriptions: 10, max_group_subscriptions: 10 } }) : relay.fetch(url, init);
+    const pool = new RelayClientPool({ context, accountId, fetch, clock: relay.clock }, relay.registry);
+    try {
+        const account = await pool.get(relay.descriptor.relayId, accountIdentity), device = await pool.get(relay.descriptor.relayId, deviceIdentity);
+        await relayLimits(account); await relayLimits(device); expect(infos).toBe(1);
+        await pool.invalidateDevice(); const next = await pool.get(relay.descriptor.relayId, deviceIdentity); await relayLimits(next);
+        expect(infos).toBe(1); expect(relay.methods.filter(method => method === 'relay.descriptor')).toHaveLength(1);
+        const info = await account.getInfo(); expect(info.serverTime).toBe(2);
+        (info.limits as { maxGroupMembers: number }).maxGroupMembers = 999;
+        expect((await relayLimits(next)).maxGroupMembers).toBe(16); expect(infos).toBe(2);
+        expect((await account.getInfo()).serverTime).toBe(3);
+        relay.registry.entry = { ...relay.registry.entry!, status: 'disabled' };
+        await expect(account.getDescriptor()).rejects.toMatchObject({ code: 'inactive_relay' });
+    } finally { await pool.dispose(); }
+});
+
+test.each(['descriptor', 'info', 'limits'] as const)('disposing a pooled client cancels its %s wait without canceling another client', async kind => {
+    const relay = fakeRelay(); let block = false; let requests = 0; let shared: AbortSignal | undefined;
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+    const fetch: RelayFetch = async (url, init) => {
+        if (block && url.endsWith(kind === 'descriptor' ? '/relay/descriptor' : '/relay/info')) {
+            requests++; shared ??= init.signal; entered(); await gate; init.signal.throwIfAborted();
+            return result(kind === 'descriptor' ? relayDescriptorCodec.encode(signedDescriptor({ expiresAt: relay.clock.wall + 1000 }))
+                : { relay_id: relay.descriptor.relayId, name: 'Relay', server_time: relay.clock.wall,
+                    limits: { message_retention: 100, channel_timeline_retention: 100, group_message_retention: 100, max_group_members: 16, max_group_invite_ttl: 100, max_channel_subscriptions: 10, max_group_subscriptions: 10 } });
+        }
+        return relay.fetch(url, init);
+    };
+    const pool = new RelayClientPool({ context, accountId, fetch, clock: relay.clock }, relay.registry);
+    try {
+        const account = await pool.get(relay.descriptor.relayId, accountIdentity), device = await pool.get(relay.descriptor.relayId, deviceIdentity);
+        block = true; if (kind === 'descriptor') relay.clock.wall = relay.descriptor.expiresAt;
+        const read = (client: RelayClient) => kind === 'descriptor' ? client.getDescriptor() : kind === 'info' ? client.getInfo() : relayLimits(client);
+        const abandoned = read(device).catch((error: unknown) => error); await started;
+        const retained = read(account);
+        await pool.invalidateDevice();
+        expect(await abandoned).toMatchObject({ name: 'AbortError' });
+        expect(shared!.aborted).toBe(kind === 'info');
+        release(); expect(await retained).toBeDefined(); expect(requests).toBe(kind === 'info' ? 2 : 1);
+    } finally { release(); await pool.dispose(); }
 });

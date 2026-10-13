@@ -14,6 +14,7 @@ import { context, relayPrivateKey, signedDescriptor, TestRegistry } from '../sup
 import { AdvancingClock } from '../support/clock.js';
 import { removeTestDirectory } from '../support/temp.js';
 import { vector } from '../support/vectors.js';
+import { awaitWithSignal } from '../../packages/sdk/dist/runtime/clock.js';
 
 const accountKey = new Uint8Array(32).fill(3); const accountId = getAccountId('neo:860833102', accountPublicKey(accountKey));
 const resources: { dispose(): Promise<void> }[] = []; const directories: string[] = [];
@@ -32,6 +33,7 @@ class Protector implements SecretProtector {
     }
 }
 function response(body: unknown, status = 200): Response { return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }); }
+function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 class RuntimeSocket implements RelaySocket {
     readyState = 0; bufferedAmount = 0; authenticated = false;
     readonly listeners = new Map<string, Set<(value: never) => void>>();
@@ -66,6 +68,7 @@ async function fixture(path?: string, protector = new Protector(), random: Rando
     const descriptor = signedDescriptor(); const clock = new AdvancingClock(); const requests: string[] = []; const sockets: RuntimeSocket[] = [];
     let state: AccountDeviceState | undefined; let behavior: 'accepted' | 'staged' | 'lost' | 'bad-staging' | 'reject' = 'accepted'; let deviceDenied = false;
     const modes: string[] = [];
+    let resolveHook: ((signal: AbortSignal) => Promise<void>) | undefined;
     let route: AccountRoute = { account: accountId, accountPublicKey: accountPublicKey(accountKey), revision: 0, relayId: descriptor.relayId,
         updatedAt: clock.wall, expiresAt: clock.wall + 315360000, accountSignature: new Uint8Array(64) };
     route = { ...route, accountSignature: signAccount(routeAccountInput(route, context), accountKey) };
@@ -79,8 +82,9 @@ async function fixture(path?: string, protector = new Protector(), random: Rando
         if (name === 'device.state.resolve') {
             if (init.method === 'POST') validateDeviceStateQuery(signedDeviceStateQueryCodec.parse(init.body!), context, clock.wall);
             const mode = init.headers['X-Meshline-Session']!; modes.push(mode);
+            const resolved = state; await resolveHook?.(init.signal);
             if (mode === 'device' && deviceDenied) return response({ code: 'device_unknown', message: 'Revoked' }, 403);
-            return state ? response(accountDeviceStateCodec.encode(state)) : response({ code: 'not_found', message: 'No state' }, 404);
+            return resolved ? response(accountDeviceStateCodec.encode(resolved)) : response({ code: 'not_found', message: 'No state' }, 404);
         }
         if (name !== 'device.state.publish') throw new Error(`Unexpected method ${name}`);
         requests.push(init.body!); expect(init.headers['X-Meshline-Session']).toBe('account');
@@ -96,6 +100,7 @@ async function fixture(path?: string, protector = new Protector(), random: Rando
     const account = new AccountManager({ context, accountId, store, relayClients: pool, accountSigner: signer, clock }); resources.push(account); await account.initialize();
     const manager = new DeviceManager({ context, accountId, store, relayClients: pool, accountManager: account, accountSigner: signer, secretProtector: protector, random, clock }); resources.push(manager);
     return { store, pool, account, manager, protector, clock, descriptor, requests, modes, sockets,
+        set resolveHook(value: typeof resolveHook) { resolveHook = value; },
         set behavior(value: typeof behavior) { behavior = value; }, set deviceDenied(value: boolean) { deviceDenied = value; },
         set state(value: AccountDeviceState | undefined) { state = value; }, get state() { return state; },
         async pending() { return (await store.read([{ collection: 'signed_requests', key: 'device.state.publish' }])).sets[0]![0]?.value; },
@@ -206,30 +211,125 @@ test('resolved older/conflicting/forged states cannot overwrite accepted authori
     }
 });
 
-test('runtime coalesces notifications, reports lagging state, polls and allows stop from a state observer', async () => {
-    const f = await fixture(); const time = controlDelays(f.clock); await f.manager.initialize(); const local = await f.manager.createDevice(3600);
-    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] }); await f.manager.start();
-    await vi.waitFor(() => expect(f.sockets[0]?.authenticated).toBe(true));
-    f.sockets[0]!.notify(5); f.sockets[0]!.notify(3);
-    await vi.waitFor(() => expect(f.manager.lastBackgroundError?.error).toMatchObject({ code: 'stale_device_state' }));
-    f.state = f.signState({ ...f.state!, revision: 5 });
-    time.advance(5000); await vi.waitFor(() => expect(f.manager.deviceState?.revision).toBe(5));
-    f.manager.on('deviceStateChanged', async state => { if (state.revision === 6) await f.manager.stop(); });
-    f.state = f.signState({ ...f.state!, revision: 6 });
-    await vi.waitFor(() => expect([...time.waits].some(wait => wait.milliseconds === 30000)).toBe(true)); time.advance(30000);
-    await vi.waitFor(() => expect(f.manager.lifecycleState).toBe('stopped'));
-    expect(f.manager.deviceState!.revision).toBe(6); expect(f.pool.clients.every(client => !client.isDisposed)).toBe(true);
-    await f.manager.start(); expect(f.manager.lifecycleState).toBe('running'); await f.manager.stop();
+test('published device state is reused, cloned and does not repeat change events', async () => {
+    const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(7200);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    const changed = vi.fn(); f.manager.on('deviceStateChanged', changed);
+    const states = await Promise.all(Array.from({ length: 8 }, () => f.manager.getDeviceState()));
+    states[0]!.accountSignature.fill(0); expect(states[1]!.accountSignature).toEqual(f.state!.accountSignature);
+    expect(f.modes).toEqual([]); expect(changed).not.toHaveBeenCalled();
+    const gate = deferred(); f.resolveHook = signal => awaitWithSignal(gate.promise, signal); f.clock.elapsed += 3_600_000;
+    try {
+        expect(await f.manager.getDeviceState()).toEqual(f.state);
+        await vi.waitFor(() => expect(f.modes).toHaveLength(1));
+        expect(await f.manager.getDeviceState()).toEqual(f.state); expect(changed).not.toHaveBeenCalled();
+    } finally { gate.resolve(); }
+    await f.manager.refreshDeviceState(); expect(changed).not.toHaveBeenCalled();
+    await f.manager.getDeviceState(); expect(f.modes).toHaveLength(1);
 });
 
-test('background error observers can stop runtime, and observer failures retain visible diagnostics', async () => {
-    const f = await fixture(); controlDelays(f.clock); await f.manager.initialize(); const local = await f.manager.createDevice(3600);
+test('cold device queries coalesce and caller cancellation never cancels the shared request', async () => {
+    const f = await fixture(); await f.manager.initialize(); const gate = deferred(); let transport!: AbortSignal;
+    f.resolveHook = signal => { transport = signal; return awaitWithSignal(gate.promise, signal); };
+    const caller = new AbortController(); const first = f.manager.getDeviceState(undefined, caller.signal).catch(error => error);
+    await vi.waitFor(() => expect(f.modes).toHaveLength(1)); caller.abort();
+    expect(await first).toMatchObject({ name: 'AbortError' }); expect(transport.aborted).toBe(false);
+    const other = f.manager.getDeviceState(); gate.resolve(); expect(await other).toBeUndefined(); expect(f.modes).toHaveLength(1);
+});
+
+test.each(['stop', 'dispose'] as const)('%s cancels shared device refreshes and drains transport cleanup', async action => {
+    const f = await fixture(); await f.manager.initialize(); const entered = deferred(), cleanup = deferred(); let transport!: AbortSignal;
+    f.resolveHook = async signal => { transport = signal; entered.resolve(); await cleanup.promise; signal.throwIfAborted(); };
+    const read = f.manager.getDeviceState().catch(error => error); await entered.promise;
+    let stopped = false; const stopping = f.manager[action]().then(() => { stopped = true; });
+    try { await vi.waitFor(() => expect(transport.aborted).toBe(true)); expect(stopped).toBe(false); }
+    finally { cleanup.resolve(); }
+    await stopping; expect(await read).toMatchObject({ name: 'AbortError' });
+});
+
+test.each(['not_found', 'failure'] as const)('cold %s is shared and retried only on demand after one minute', async outcome => {
+    const f = await fixture(); await f.manager.initialize(); f.resolveHook = async () => { if (outcome === 'failure') throw new TypeError('offline'); };
+    const results = await Promise.allSettled([f.manager.getDeviceState(), f.manager.getDeviceState()]);
+    expect(results.map(value => value.status)).toEqual([outcome === 'failure' ? 'rejected' : 'fulfilled', outcome === 'failure' ? 'rejected' : 'fulfilled']);
+    await f.manager.getDeviceState().catch(() => undefined); expect(f.modes).toHaveLength(1);
+    f.clock.elapsed += 60_000; expect(f.modes).toHaveLength(1);
+    f.resolveHook = undefined; expect(await f.manager.getDeviceState()).toBeUndefined(); expect(f.modes).toHaveLength(2);
+});
+
+test('failed background refresh retains usable state and observes the one-minute cooldown', async () => {
+    const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(7200);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    f.resolveHook = async () => { throw new TypeError('offline'); }; f.clock.elapsed += 3_600_000;
+    expect(await f.manager.getDeviceState()).toEqual(f.state);
+    await vi.waitFor(() => expect(f.manager.lastBackgroundError?.error).toMatchObject({ message: 'offline' }));
+    await f.manager.getDeviceState(); expect(f.modes).toHaveLength(1);
+    f.clock.elapsed += 59_999; await f.manager.getDeviceState(); expect(f.modes).toHaveLength(1);
+    f.clock.elapsed++; f.resolveHook = undefined; await f.manager.getDeviceState();
+    await f.manager.refreshDeviceState(); expect(f.modes).toHaveLength(2);
+});
+
+test('an old refresh cannot overwrite a newly published device state or shorten its freshness', async () => {
+    const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(7200);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    const gate = deferred(); f.resolveHook = signal => awaitWithSignal(gate.promise, signal);
+    const old = f.manager.refreshDeviceState().catch(error => error); await vi.waitFor(() => expect(f.modes).toHaveLength(1));
+    try {
+        await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local], revision: 10 });
+        expect((await f.manager.getDeviceState())!.revision).toBe(10);
+    } finally { gate.resolve(); }
+    expect(await old).toMatchObject({ code: 'stale_device_state' });
+    expect((await f.manager.getDeviceState())!.revision).toBe(10); expect(f.modes).toHaveLength(1);
+});
+
+test('different signing certificates do not share forced device queries', async () => {
+    const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(7200);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    const gate = deferred(); f.resolveHook = signal => awaitWithSignal(gate.promise, signal);
+    const old = f.manager.refreshDeviceState(); await vi.waitFor(() => expect(f.modes).toHaveLength(1));
+    await f.manager.renewDevice(10800); const fresh = f.manager.refreshDeviceState();
+    try { await vi.waitFor(() => expect(f.modes).toHaveLength(2)); } finally { gate.resolve(); }
+    await Promise.all([old, fresh]);
+});
+
+test('component instances isolate queries and restart reuses persisted verified states', async () => {
+    const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(7200);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    const other = await fixture(); await other.manager.initialize(); expect(await other.manager.getDeviceState()).toBeUndefined();
+    await f.manager.dispose(); await f.account.dispose(); await f.pool.dispose(); await f.store.dispose();
+    const resumed = await fixture(f.store.path); await resumed.manager.initialize();
+    const gate = deferred(); resumed.resolveHook = signal => awaitWithSignal(gate.promise, signal);
+    try { expect((await resumed.manager.getDeviceState())!.revision).toBe(f.state!.revision); }
+    finally { gate.resolve(); }
+});
+
+test('notifications are version hints, with no device polling or timed retry', async () => {
+    const f = await fixture(); controlDelays(f.clock); await f.manager.initialize(); const local = await f.manager.createDevice(7200);
     await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] }); await f.manager.start();
     await vi.waitFor(() => expect(f.sockets[0]?.authenticated).toBe(true));
-    f.manager.onLifecycle('backgroundError', async () => { await f.manager.stop(); throw new Error('observer failed after stop'); });
-    f.sockets[0]!.notify(10);
-    await vi.waitFor(() => expect(f.manager.lifecycleState).toBe('stopped'));
-    await vi.waitFor(() => expect(f.manager.lastBackgroundError?.error).toBeInstanceOf(AggregateError));
+    const notified = vi.fn(); for (const client of f.pool.clients) client.on('notificationReceived', notified);
+    f.sockets[0]!.notify(10); await vi.waitFor(() => expect(notified).toHaveBeenCalled());
+    f.clock.elapsed += 3_600_000; await new Promise(resolve => setTimeout(resolve, 20)); expect(f.modes).toEqual([]);
+    expect((await f.manager.getDeviceState())!.revision).toBe(0);
+    await vi.waitFor(() => expect(f.manager.lastBackgroundError?.error).toMatchObject({ code: 'stale_device_state' }));
+    f.state = f.signState({ ...f.state!, revision: 10 }); await f.manager.getDeviceState(); expect(f.modes).toHaveLength(1);
+    f.clock.elapsed += 60_000; await f.manager.getDeviceState(); await f.manager.refreshDeviceState();
+    expect(f.manager.deviceState!.revision).toBe(10); await f.manager.stop();
+});
+
+test('replacement clients restore device notifications without polling and detach on stop', async () => {
+    const f = await fixture(); controlDelays(f.clock); await f.manager.initialize(); const local = await f.manager.createDevice(14400);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] }); await f.manager.start();
+    await vi.waitFor(() => expect(f.sockets[0]?.authenticated).toBe(true));
+    await f.pool.invalidateDevice();
+    const replacement = await f.pool.get(f.descriptor.relayId, { mode: 'device', signer: f.manager });
+    await vi.waitFor(() => expect(f.sockets[1]?.authenticated).toBe(true));
+    const notified = vi.fn(); replacement.on('notificationReceived', notified);
+    f.sockets[1]!.notify(10); await vi.waitFor(() => expect(notified).toHaveBeenCalled());
+    expect((await f.manager.getDeviceState())!.revision).toBe(0); expect(f.modes).toEqual([]);
+    await expect(f.manager.refreshDeviceState()).rejects.toMatchObject({ code: 'stale_device_state' });
+    await f.manager.stop(); await f.pool.invalidateDevice();
+    await f.pool.get(f.descriptor.relayId, { mode: 'device', signer: f.manager });
+    expect(f.sockets).toHaveLength(2);
 });
 
 test('contact-authorized device queries sign the complete proof and verify current inviter/grant signatures before caching', async () => {
@@ -241,7 +341,10 @@ test('contact-authorized device queries sign the complete proof and verify curre
     f.state = { ...remoteState, accountSignature: signAccount(deviceStateInput(remoteState, context), decodeBase64Url(accountFixture.private_key)) };
     const inviteBody = { inviter: remote.account, signerDeviceId: certificateId(remote, context), expiresAt: f.clock.wall + 3600, deviceSignature: new Uint8Array(64) };
     const invite = { ...inviteBody, deviceSignature: signDevice(contactInviteInput(inviteBody, context), remoteKey) };
-    expect((await f.manager.getDeviceState(invite))!.account).toBe(remote.account);
+    const gate = deferred(); f.resolveHook = signal => awaitWithSignal(gate.promise, signal);
+    const invited = Promise.all([f.manager.getDeviceState(invite), f.manager.getDeviceState(invite)]);
+    await vi.waitFor(() => expect(f.modes).toHaveLength(1)); gate.resolve();
+    expect((await invited).every(state => state?.account === remote.account)).toBe(true);
     const grantBody = { grantor: remote.account, grantee: accountId, signatures: {} };
     const grant = { ...grantBody, signatures: { [certificateId(remote, context)]: signDevice(contactGrantInput(grantBody, context), remoteKey) } };
     expect((await f.manager.getDeviceState(grant))!.revision).toBe(10);
@@ -250,5 +353,5 @@ test('contact-authorized device queries sign the complete proof and verify curre
     expect((await f.store.read([{ collection: 'device_states', key: remote.account }])).sets).toEqual(current.sets);
     await expect(f.manager.getDeviceState({ ...grant, grantee: remote.account })).rejects.toThrow('authorize this account');
     const before = f.modes.length; f.deviceDenied = true;
-    await expect(f.manager.getDeviceState(invite)).rejects.toMatchObject({ code: 'device_unknown' }); expect(f.modes).toHaveLength(before + 1);
+    await expect(f.manager.refreshDeviceState(invite)).rejects.toMatchObject({ code: 'device_unknown' }); expect(f.modes).toHaveLength(before + 1);
 });

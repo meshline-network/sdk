@@ -107,4 +107,15 @@ Attachment upload, content retrieval, rendering, and user consent belong to the
 application. The SDK handles content references and messaging protocol data;
 it does not supply a file hosting service or render received content.
 
+### Optional Registry cache
+
+Wrap a remote provider with `new CachedRelayRegistry(source)` and pass that instance
+to `MeshlineClient` or `RelayClientPool`. The pool uses the supplied Registry directly;
+a provider backed by synchronized local blocks can be passed without a wrapper.
+The wrapper never tries to infer whether synchronization is complete. It isolates
+data to its source/network, validates complete directory snapshots before replacing
+them, and checks registrations when relay metadata is used. Reads trigger refreshes
+after one hour from success or one minute from failure; no timer runs without demand.
+Dispose the wrapper after its consumers. The source remains caller-owned.
+
 [All guides](../README.md)

@@ -1,5 +1,10 @@
 [
   {
+    "type": "Meshline.Interactions.CachedRelayRegistry",
+    "path": "packages/sdk/src/integrations/cached-relay-registry.ts",
+    "notes": "Optional caller-owned registry wrapper; demand refresh, one-hour success interval and one-minute failure cooldown."
+  },
+  {
     "type": "Meshline.Interactions.RpcRelayRegistry",
     "path": "packages/sdk/src/integrations/rpc-relay-registry.ts",
     "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
@@ -167,7 +172,7 @@
   {
     "type": "Meshline.Components.AccountManager",
     "path": "packages/sdk/src/components/account.ts",
-    "notes": "getRoute and publishRoute implemented with durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient coordinates establishment, explicit recovery and durable home migration. The .NET route cache, RefreshRouteAsync and refresh draining in StopAsync are not yet implemented in TypeScript."
+    "notes": "getRoute and refreshRoute share verified discovery with one-hour freshness, one-minute failure cooldown and stop/disposal draining. Publication retains durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient forces discovery for establishment, recovery and migration."
   },
   {
     "type": "Meshline.Components.DeviceManager",
