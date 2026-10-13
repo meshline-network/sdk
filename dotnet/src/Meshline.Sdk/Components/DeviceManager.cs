@@ -670,6 +670,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         await UseHomeRelayAsync(relayId, cancellationToken).ConfigureAwait(false);
         _homeRefresh = RefreshHomeAsync(RuntimeCancellationToken);
         accountManager.AccountChanged += OnHomeRouteChanged;
+        relayClients.RelayChanged += OnHomeRelayChanged;
         _refreshRequests.Writer.TryWrite(true);
     }
 
@@ -677,6 +678,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     protected override async Task OnStopAsync()
     {
         accountManager.AccountChanged -= OnHomeRouteChanged;
+        relayClients.RelayChanged -= OnHomeRelayChanged;
         await Task.WhenAll(_homeRefresh, StopStateQueriesAsync()).ConfigureAwait(false);
         SetHomeRelayClient(null);
         _refreshRequests = null;
@@ -967,6 +969,14 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     }
 
     void OnHomeRouteChanged(object? sender, EventArgs args) => _refreshRequests?.Writer.TryWrite(true);
+
+    void OnHomeRelayChanged(object? sender, RelayClient relayClient)
+    {
+        lock (_homeGate)
+            if (_homeRelayClient is { } current && !ReferenceEquals(current, relayClient) && current.RelayId == relayClient.RelayId
+                && relayClient.SessionMode == SessionMode.Device && relayClient.AuthenticationState == RelayAuthenticationState.Device)
+                _refreshRequests?.Writer.TryWrite(true);
+    }
 
     async Task RefreshHomeAsync(CancellationToken cancellationToken)
     {

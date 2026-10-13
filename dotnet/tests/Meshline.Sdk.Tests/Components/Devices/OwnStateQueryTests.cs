@@ -412,6 +412,34 @@ public sealed class OwnStateQueryTests
     }
 
     [Fact]
+    public async Task Replacement_client_restores_device_notifications_without_polling()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        var manager = fixture.Client.DeviceManager;
+        await manager.StartAsync(Token);
+        await AsyncTest.UntilAsync(() => fixture.Relay.Sockets.Any(socket => socket.Requests.Any(request => request.Method == "auth.device.verify")));
+        var count = Queries(fixture);
+        await fixture.Pool.InvalidateDeviceAsync();
+        var replacement = await fixture.Pool.GetAsync(fixture.Relay.RelayId, manager, Token);
+        // The manager must attach to the replacement and start its notification connection itself.
+        await AsyncTest.UntilAsync(() => fixture.Relay.Sockets.Count == 2 && fixture.Relay.Sockets.Last().Requests.Any(request => request.Method == "auth.device.verify"));
+        var observed = AsyncTest.Signal();
+        replacement.NotificationReceived += (_, request) => { if (request.Method == "device.state.changed") observed.TrySetResult(); };
+        fixture.Relay.Sockets.Last().Push(JsonSerializer.Serialize(new { jsonrpc = "2.0", method = "device.state.changed", @params = new { revision = manager.DeviceState!.Revision + 1 } }));
+        await observed.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+        Assert.NotNull(await manager.GetDeviceStateAsync(cancellationToken: Token));
+        Assert.Equal(count, Queries(fixture));
+        await Assert.ThrowsAsync<InvalidDataException>(() => manager.RefreshDeviceStateAsync(cancellationToken: Token));
+
+        await manager.StopAsync(Token);
+        await fixture.Pool.InvalidateDeviceAsync();
+        await fixture.Pool.GetAsync(fixture.Relay.RelayId, manager, Token);
+        Assert.Equal(2, fixture.Relay.Sockets.Count);
+    }
+
+    [Fact]
     public async Task Version_notification_keeps_snapshot_reads_available_and_explicit_refresh_checks_the_revision()
     {
         using var time = Clock.Use(new ManualClock());
