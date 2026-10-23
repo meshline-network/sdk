@@ -7,6 +7,61 @@ public sealed class LifecycleTests
 {
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
+    sealed class PausedLifecycleComponent(AccountSigner account, bool pauseInitialization)
+        : ClientComponent(new() { Context = TestNetwork.Context, AccountId = account.AccountId })
+    {
+        public PendingWork Hook { get; } = new();
+        public int Disposals;
+        public bool CleanupBeforeDrain;
+        protected override Task OnInitializeAsync(CancellationToken cancellationToken) =>
+            pauseInitialization ? Hook.RunAsync(cancellationToken) : Task.CompletedTask;
+        protected override Task OnStartAsync(CancellationToken cancellationToken) => Hook.RunAsync(cancellationToken);
+        protected override ValueTask DisposeAsyncCore()
+        {
+            CleanupBeforeDrain = !Hook.Completed;
+            Disposals++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Disposal_cancels_a_lifecycle_hook_before_waiting_for_its_gate(bool initializing)
+    {
+        using var account = new AccountSigner();
+        await using var component = new PausedLifecycleComponent(account, initializing);
+        if (!initializing) await component.InitializeAsync(Token);
+        using var fallback = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var transition = initializing ? component.InitializeAsync(fallback.Token) : component.StartAsync(fallback.Token);
+        Task? first = null;
+        Task? second = null;
+        try
+        {
+            await component.Hook.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            first = component.DisposeAsync().AsTask();
+            second = component.DisposeAsync().AsTask();
+            await component.Hook.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            Assert.False(first.IsCompleted);
+            Assert.False(second.IsCompleted);
+            Assert.Equal(0, component.Disposals);
+        }
+        finally
+        {
+            component.Hook.Release.TrySetResult();
+            fallback.Cancel();
+            await Record.ExceptionAsync(() => transition.WaitAsync(TimeSpan.FromSeconds(5), Token));
+            if (first is not null) await first.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            if (second is not null) await second.WaitAsync(TimeSpan.FromSeconds(5), Token);
+        }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transition);
+        Assert.False(component.CleanupBeforeDrain);
+        Assert.Equal(1, component.Disposals);
+        Assert.Equal(ComponentState.Disposed, component.LifecycleState);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => component.InitializeAsync(Token));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => component.StartAsync(Token));
+    }
+
     sealed class PendingWork
     {
         public TaskCompletionSource Entered { get; } = AsyncTest.Signal();
@@ -242,6 +297,11 @@ public sealed class LifecycleTests
         await component.InitializeAsync(Token);
         await component.StartAsync(Token);
         var previousToken = component.RuntimeToken;
+        var notifications = 0;
+        component.StateChanged += (_, change) =>
+        {
+            if (change.CurrentState == ComponentState.Stopped) notifications++;
+        };
         var stopped = component.StopAsync(Token);
         try
         {
@@ -259,6 +319,7 @@ public sealed class LifecycleTests
         component.StopError = null;
         Assert.True(component.Background.Completed);
         Assert.Equal(ComponentState.Stopped, component.LifecycleState);
+        Assert.Equal(1, notifications);
         Assert.Throws<InvalidOperationException>(() => component.RuntimeToken);
 
         await component.StartAsync(Token);

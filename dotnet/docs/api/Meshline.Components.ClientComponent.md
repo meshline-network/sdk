@@ -449,11 +449,18 @@ The [cancellationToken](Meshline.Components.ClientComponent.md#Meshline.Componen
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, or a dependency stopped by its shutdown hook, has been disposed\.
 
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+A stopped background operation fails to access SQLite while preserving pending work\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+A stopped background operation cannot save its pending local state\.
+
 [System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
 A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup\.
 
 ### Remarks
-The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, background work is drained without that token, including demand\-triggered refreshes created before start or after a previous stop\. The application\-owned relay pool remains available to other components\.
+The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, background work is drained without that token, including demand\-triggered refreshes created before start or after a previous stop\. The application\-owned relay pool remains available to other components\.<br>
+A completed running\-to\-stopped transition raises StateChanged even when cleanup reports an error\. Cleanup errors remain observable to the caller\.
 ### Events
 
 <a name='Meshline.Components.ClientComponent.BackgroundError'></a>

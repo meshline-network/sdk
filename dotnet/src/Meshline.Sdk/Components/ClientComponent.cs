@@ -32,9 +32,10 @@ public abstract class ClientComponent : IAsyncDisposable
     readonly CancellationTokenSource _lifetime = new();
     readonly Lock _operationGate = new();
     CancellationTokenSource? _runtime;
+    Task? _lifetimeCancellation;
     TaskCompletionSource? _drained;
     int _operations;
-    bool _disposing;
+    volatile bool _disposing;
 
     /// <summary>
     /// The network and account options supplied when this component was constructed.
@@ -88,12 +89,14 @@ public abstract class ClientComponent : IAsyncDisposable
         await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(LifecycleState == ComponentState.Disposed, this);
+            ObjectDisposedException.ThrowIf(_disposing, this);
             cancellationToken.ThrowIfCancellationRequested();
             if (LifecycleState != ComponentState.Uninitialized)
                 return;
 
-            await OnInitializeAsync(cancellationToken).ConfigureAwait(false);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+            await OnInitializeAsync(linked.Token).ConfigureAwait(false);
+            linked.Token.ThrowIfCancellationRequested();
             change = new(LifecycleState, ComponentState.Stopped);
             LifecycleState = ComponentState.Stopped;
         }
@@ -147,7 +150,7 @@ public abstract class ClientComponent : IAsyncDisposable
 
     internal void EnsureInitialized()
     {
-        ObjectDisposedException.ThrowIf(LifecycleState == ComponentState.Disposed, this);
+        ObjectDisposedException.ThrowIf(_disposing, this);
         if (LifecycleState == ComponentState.Uninitialized)
             throw new InvalidOperationException("InitializeAsync must complete before using the component.");
     }
@@ -216,13 +219,17 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <returns>A task that completes when the operation finishes.</returns>
     /// <remarks>
     /// The cancellation token controls waiting to enter the lifecycle operation. Once stopping begins, background work is drained without that token, including demand-triggered refreshes created before start or after a previous stop. The application-owned relay pool remains available to other components.
+    /// A completed running-to-stopped transition raises StateChanged even when cleanup reports an error. Cleanup errors remain observable to the caller.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The <paramref name="cancellationToken"/> is canceled while waiting to enter the lifecycle transition.</exception>
     /// <exception cref="ObjectDisposedException">This component, or a dependency stopped by its shutdown hook, has been disposed.</exception>
+    /// <exception cref="SqliteException">A stopped background operation fails to access SQLite while preserving pending work.</exception>
+    /// <exception cref="DbUpdateException">A stopped background operation cannot save its pending local state.</exception>
     /// <exception cref="AggregateException">A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup.</exception>
     public virtual async Task StopAsync(CancellationToken cancellationToken = default)
     {
         ComponentStateChangedEventArgs change;
+        List<Exception> failures = [];
         await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -239,6 +246,7 @@ public abstract class ClientComponent : IAsyncDisposable
             {
                 await EndRuntimeAsync().ConfigureAwait(false);
             }
+            catch (Exception error) { failures.Add(error); }
             finally
             {
                 LifecycleState = ComponentState.Stopped;
@@ -249,7 +257,9 @@ public abstract class ClientComponent : IAsyncDisposable
         {
             _lifecycleGate.Release();
         }
-        StateChanged?.Invoke(this, change);
+        try { StateChanged?.Invoke(this, change); }
+        catch (Exception error) { failures.Add(error); }
+        ThrowCleanupFailures(failures);
     }
 
     /// <summary>
@@ -320,6 +330,15 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <exception cref="AggregateException">A lifetime cancellation callback fails, or multiple cleanup failures are reported after the remaining cleanup steps have been attempted.</exception>
     public async ValueTask DisposeAsync()
     {
+        Task drained;
+        lock (_operationGate)
+        {
+            _disposing = true;
+            drained = _operations == 0 ? Task.CompletedTask : (_drained ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+            // Startup can be waiting for a tracked operation while holding the lifecycle
+            // gate. Cancel both before waiting for that gate; callbacks run asynchronously.
+            _lifetimeCancellation ??= _lifetime.CancelAsync();
+        }
         ComponentStateChangedEventArgs change;
         await _lifecycleGate.WaitAsync().ConfigureAwait(false);
         try
@@ -327,15 +346,11 @@ public abstract class ClientComponent : IAsyncDisposable
             if (LifecycleState == ComponentState.Disposed)
                 return;
 
-            Task drained;
-            lock (_operationGate)
-            {
-                _disposing = true;
-                drained = _operations == 0 ? Task.CompletedTask : (_drained ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
-            }
             List<Exception> failures = [];
-            try { await _lifetime.CancelAsync().ConfigureAwait(false); }
+            try { await _lifetimeCancellation.ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
+            // Report cancellation errors once, even when resource cleanup is retried.
+            lock (_operationGate) _lifetimeCancellation = Task.CompletedTask;
             try { await EndRuntimeAsync().ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
             await drained.ConfigureAwait(false);
