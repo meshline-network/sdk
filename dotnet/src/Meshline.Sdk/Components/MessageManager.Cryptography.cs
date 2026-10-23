@@ -14,9 +14,8 @@ sealed partial class MessageManager
     static readonly byte[] KeyBoxSalt = SHA256.HashData("Meshline/keybox-salt/v1"u8);
     static readonly UTF8Encoding Utf8 = new(false, true);
 
-    async Task<MessageSendRequest> EncryptAsync(string messageId, long createdAt, string recipient, TypedProtocolModel payload, IReadOnlyList<DeviceCertificate> recipientDevices, IReadOnlyList<DeviceCertificate> senderDevices, TypedProtocolModel? authorization, CancellationToken cancellationToken)
+    async Task<MessageSendRequest> EncryptAsync(DeviceCertificate certificate, string messageId, long createdAt, string recipient, TypedProtocolModel payload, IReadOnlyList<DeviceCertificate> recipientDevices, IReadOnlyList<DeviceCertificate> senderDevices, TypedProtocolModel? authorization, CancellationToken cancellationToken)
     {
-        var certificate = deviceManager.Local ?? throw new InvalidOperationException("No local device has been created.");
         var plaintext = Utf8.GetBytes(payload.ToJson());
         var contentKey = RandomNumberGenerator.GetBytes(32);
         try
@@ -36,6 +35,11 @@ sealed partial class MessageManager
                 cipher.Encrypt(envelope.Payload.Nonce.AsSpan(), plaintext, ciphertext.AsSpan(0, plaintext.Length), ciphertext.AsSpan(plaintext.Length), MessageAad.Create(envelope).GetSigningInput(Options.Context));
             envelope = envelope with { Payload = envelope.Payload with { Ciphertext = [.. ciphertext] } };
             envelope = envelope with { DeviceSignature = [.. await deviceManager.SignAsync(envelope.GetSigningInput(Options.Context), cancellationToken).ConfigureAwait(false)] };
+            // Use the identity already checked by EnqueueAsync. Activation can
+            // commit just before this writer starts, then install its cached keys
+            // while we read authorization. Reject the whole transaction on a switch.
+            if (!ReferenceEquals(certificate, deviceManager.Local) && deviceManager.Local?.GetDeviceId(Context) != envelope.FromDeviceId)
+                throw new InvalidOperationException("The local device changed while encrypting the message. Prepare it again before retrying.");
             if (envelope.Validate(Options.Context) is { } violation) throw new ArgumentException(violation.Message, nameof(payload));
             var recipients = SealKeys(envelope, recipient, recipientDevices, contentKey, Options.Context);
             var senders = recipient == Options.AccountId ? (ImmutableArray<MessageKeyBox>?)null : SealKeys(envelope, Options.AccountId, senderDevices, contentKey, Options.Context);

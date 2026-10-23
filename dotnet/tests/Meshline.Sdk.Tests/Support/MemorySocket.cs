@@ -20,6 +20,8 @@ internal sealed class MemorySocket : IDisposable, IAsyncDisposable
     readonly Func<RpcRequest, MemorySocket, Task> onRequest;
     int disposed;
     public ConcurrentQueue<RpcRequest> Requests { get; } = new();
+    readonly TaskCompletionSource authenticationReplied = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public Task AuthenticationReplied => authenticationReplied.Task;
     public Task Completion { get; }
     public bool ClientStreamDisposed => clientStream.IsDisposed;
 
@@ -100,6 +102,7 @@ internal sealed class MemorySocket : IDisposable, IAsyncDisposable
                 message.SetLength(0);
                 Requests.Enqueue(request);
                 await onRequest(request, this).ConfigureAwait(false);
+                if (request.Method == "auth.device.verify") authenticationReplied.TrySetResult();
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)

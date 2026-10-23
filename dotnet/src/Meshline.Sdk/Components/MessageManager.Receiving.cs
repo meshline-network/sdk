@@ -120,5 +120,5 @@ sealed partial class MessageManager
             progress.HasRetentionGap |= hasRetentionGap;
             progress.LastSynchronizedAt = Clock.UtcNow;
             if (rejection is not null) notifications.Add(() => ReportBackgroundError(BackgroundOperation.Synchronize, entry.Envelope.MessageId, rejection));
-        }, cancellationToken);
+        }, cancellationToken, contactAuthorization: contactEffect is not null);
 }

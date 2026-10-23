@@ -106,6 +106,57 @@ public sealed class ContactTests
         await Assert.ThrowsAsync<ArgumentException>(() => manager.AddContactAsync(fixture.Account.AccountId, cancellationToken: Token));
     }
 
+    [Theory]
+    [InlineData(MessageSendState.RelayAccepted)]
+    [InlineData(MessageSendState.Failed)]
+    [InlineData(MessageSendState.TargetAccepted)]
+    public async Task Incoming_consent_only_confirms_an_outgoing_grant_after_target_acceptance(MessageSendState state)
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var sender = new TestClient();
+        await sender.InitializeAsync();
+        await using var receiver = new TestClient();
+        await receiver.InitializeAsync();
+        sender.Relay.Devices[receiver.Account.AccountId] = receiver.Client.DeviceState!;
+        receiver.Relay.Devices[sender.Account.AccountId] = sender.Client.DeviceState!;
+        var outgoing = await receiver.Client.MessageManager.AddContactAsync(sender.Account.AccountId, cancellationToken: Token);
+        await using (var database = receiver.Database.Open())
+        {
+            var request = await database.ContactRequests.SingleAsync(Token);
+            request.SendState = state;
+            var delivery = await database.MessageOutbox.SingleAsync(value => value.MessageId == outgoing.MessageId, Token);
+            delivery.State = state;
+            delivery.AcceptedAt = Clock.UtcNow;
+            await database.SaveChangesAsync(Token);
+        }
+        var incoming = await sender.Client.MessageManager.AddContactAsync(receiver.Account.AccountId, cancellationToken: Token);
+        MessageSendRequest sent;
+        await using (var database = sender.Database.Open())
+            sent = ProtocolModel.FromJson<MessageSendRequest>((await database.MessageOutbox.SingleAsync(value => value.MessageId == incoming.MessageId, Token)).RequestJson)!;
+        receiver.Relay.Handler = (request, _) => Task.FromResult(request.Method == "message.timeline.sync"
+            ? OfflineRelay.Json(new MessageTimelinePage
+            {
+                Items = long.Parse(RequestQuery.Parse(request)["after"]) < 0 ? [new MessageTimelineEntry
+                {
+                    Sequence = 0,
+                    Envelope = sent.Envelope,
+                    KeyBox = sent.RecipientBoxes[0],
+                    AcceptedAt = Clock.UtcNow.ToUnixTimeSeconds()
+                }] : [],
+                Certificates = [sender.Client.Device!],
+                HasMore = false
+            }) : receiver.Relay.Respond(request));
+
+        await receiver.Client.MessageManager.SynchronizeAsync(receiver.Relay.RelayId, Token);
+        await receiver.ReopenAsync();
+
+        await using var verify = receiver.Database.Open();
+        var contact = await verify.Contacts.SingleAsync(Token);
+        Assert.Equal(ContactRelationshipState.Active, contact.State);
+        Assert.Equal(state == MessageSendState.TargetAccepted ? contact.GrantToJson : null, contact.ConfirmedGrantToJson);
+        Assert.Empty(await verify.ContactRequests.ToListAsync(Token));
+    }
+
     [Fact]
     public async Task Accepted_contact_supports_alias_queries_expiry_and_removal()
     {

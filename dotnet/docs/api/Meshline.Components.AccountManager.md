@@ -7,6 +7,7 @@
 
 - [`AccountChanged`](#Meshline.Components.AccountManager.AccountChanged)
 - [`AccountManager(ClientOptions, DatabaseOptions, RelayClientPool, IAccountSigner)`](#Meshline.Components.AccountManager.AccountManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Interactions.IAccountSigner%29)
+- [`EnsureRouteAsync(string, TimeSpan, CancellationToken)`](#Meshline.Components.AccountManager.EnsureRouteAsync%28string%2CSystem.TimeSpan%2CSystem.Threading.CancellationToken%29)
 - [`GetRouteAsync(string, CancellationToken)`](#Meshline.Components.AccountManager.GetRouteAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`PublishRouteAsync(string, TimeSpan, Nullable<long>, bool, CancellationToken)`](#Meshline.Components.AccountManager.PublishRouteAsync%28string%2CSystem.TimeSpan%2CSystem.Nullable_long_%2Cbool%2CSystem.Threading.CancellationToken%29)
 - [`RefreshRouteAsync(string, CancellationToken)`](#Meshline.Components.AccountManager.RefreshRouteAsync%28string%2CSystem.Threading.CancellationToken%29)
@@ -127,6 +128,70 @@ public Meshline.Components.AccountState State { get; }
 #### Property Value
 [AccountState](Meshline.Components.AccountState.md 'Meshline\.Components\.AccountState')
 ### Methods
+
+<a name='Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken)'></a>
+
+## AccountManager\.EnsureRouteAsync\(string, TimeSpan, CancellationToken\) Method
+
+Ensures a valid route to the same home relay, reconciling unfinished publications before reporting success\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountRoute> EnsureRouteAsync(string relayId, System.TimeSpan validity, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken).relayId'></a>
+
+`relayId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The original or initial home relay's canonical identifier; this operation never selects another relay\.
+
+<a name='Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken).validity'></a>
+
+`validity` [System\.TimeSpan](https://learn.microsoft.com/en-us/dotnet/api/system.timespan 'System\.TimeSpan')
+
+The lifetime of a newly published route, from one second through 3650 days\. Existing valid routes are retained; unfinished requests require their original lifetime\.
+
+<a name='Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that cancels waiting or publication\. Cancellation does not undo an accepted request; repeat the operation to reconcile it\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountRoute](Meshline.Models.Protocol.AccountRoute.md 'Meshline\.Models\.Protocol\.AccountRoute')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The verified, unexpired route after any unfinished publication has been reconciled\.
+
+#### Exceptions
+
+[AccountRouteException](Meshline.Components.AccountRouteException.md 'Meshline\.Components\.AccountRouteException')<br>
+Route authorization could not complete\. The reason distinguishes signing, relay, parameter, state and unknown\-submission failures\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The relay identifier is invalid\.
+
+[System\.ArgumentOutOfRangeException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentoutofrangeexception 'System\.ArgumentOutOfRangeException')<br>
+The validity is outside the supported range or the route revision cannot be incremented\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller cancels or the component is disposed\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The component or a dependency has been disposed\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+Initialization is incomplete or no active relay is available\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Local publication state cannot be committed\.
+
+### Remarks
+An unexpired verified route with no unresolved publication is reused without network I/O or signing\.<br>
+Before publication, discovery must complete successfully\. A missing response does not invalidate an unexpired retained route\.<br>
+Unexpired unfinished submissions retain their original signed document\. After discovery, an expired request can be superseded only with a retained verified route to the same relay; an initial request alone does not establish that relay's authority\.<br>
+First publication requires authoritative or unexpired staged device state at the relay; use MeshlineClient\.EstablishAccountAsync for complete setup\.<br>
+This operation does not authorize a device, initialize a profile, migrate relays, or start synchronization\.<br>
+Use one account manager per local account session; explicit publications and ensure calls share its publication gate\.
 
 <a name='Meshline.Components.AccountManager.GetRouteAsync(string,System.Threading.CancellationToken)'></a>
 

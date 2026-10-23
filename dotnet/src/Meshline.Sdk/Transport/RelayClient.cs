@@ -361,6 +361,10 @@ public sealed partial class RelayClient
         catch (Exception exception)
         {
             ReportFailure(exception);
+            // HTTP session renewal must report loss of the device identity too;
+            // a request-level device_unknown may instead describe its recipient.
+            if (identity.Mode == Models.Protocol.SessionMode.Device && exception is RelayException { Error.Code: "device_unknown" })
+                ErrorOccurred?.Invoke(this, exception);
             throw;
         }
     }

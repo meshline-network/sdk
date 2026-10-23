@@ -7,6 +7,7 @@ sealed class MeshlineDbContext : DbContext
 {
     public DbSet<DatabaseBinding> Bindings { get; set; }
     public DbSet<LocalDeviceRecord> LocalDevices { get; set; }
+    public DbSet<DevicePreparationRecord> DevicePreparations { get; set; }
     public DbSet<DeviceStateRecord> DeviceStates { get; set; }
     public DbSet<AccountRouteRecord> AccountRoutes { get; set; }
     public DbSet<AccountProfileRecord> AccountProfiles { get; set; }

@@ -4,6 +4,7 @@ using Meshline.Storage;
 using Meshline.Transport;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading.Channels;
 
@@ -36,7 +37,10 @@ sealed partial class ChannelManager
     /// <inheritdoc/>
     protected override async Task OnStopAsync()
     {
-        await Task.WhenAll(_refresh, _poll, StopDescriptorsAsync()).ConfigureAwait(false);
+        List<Exception> failures = [];
+        try { await Task.WhenAll(_refresh, _poll, StopDescriptorsAsync()).ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        _refresh = _poll = Task.CompletedTask;
         RelayClient[] relays;
         lock (_subscriptionsGate)
         {
@@ -46,9 +50,13 @@ sealed partial class ChannelManager
             _refreshRequests = null;
         }
         foreach (var relay in relays) DetachRelay(relay);
-        if (_subscriptionWorker is not null) await _subscriptionWorker.DisposeAsync().ConfigureAwait(false);
+        try { if (_subscriptionWorker is not null) await _subscriptionWorker.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
         _subscriptionWorker = null;
-        _syncStatus.Stop(OnSyncStatusChanged);
+        try { _syncStatus.Stop(OnSyncStatusChanged); }
+        catch (Exception error) { failures.Add(error); }
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 
     void QueueRefresh()

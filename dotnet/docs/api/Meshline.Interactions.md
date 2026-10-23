@@ -14,6 +14,7 @@ Application\-supplied interfaces for signing, relay discovery, and local secret 
 | [Nep6AccountSigner](Meshline.Interactions.Nep6AccountSigner.md 'Meshline\.Interactions\.Nep6AccountSigner') | Signs Meshline account input with a Neo N3 single\-signature account from a NEP\-6 wallet\. |
 | [RpcRelayRegistry](Meshline.Interactions.RpcRelayRegistry.md 'Meshline\.Interactions\.RpcRelayRegistry') | Read\-only implementation of the protocol Registry ABI over Neo N3 JSON\-RPC\. |
 | [RpcRelayRegistryOptions](Meshline.Interactions.RpcRelayRegistryOptions.md 'Meshline\.Interactions\.RpcRelayRegistryOptions') | Explicit configuration for read\-only Neo N3 Registry RPC access\. |
+| [SecretAccessException](Meshline.Interactions.SecretAccessException.md 'Meshline\.Interactions\.SecretAccessException') | Lets a secret provider distinguish temporary failure from positively established key loss\. |
 
 | Interfaces | |
 | :--- | :--- |
@@ -21,3 +22,7 @@ Application\-supplied interfaces for signing, relay discovery, and local secret 
 | [IDeviceSigner](Meshline.Interactions.IDeviceSigner.md 'Meshline\.Interactions\.IDeviceSigner') | Supplies a device certificate and signs protocol input using its device signing key\. |
 | [IRelayRegistry](Meshline.Interactions.IRelayRegistry.md 'Meshline\.Interactions\.IRelayRegistry') | Provides network identity and relay discovery from the application's registry integration\. |
 | [ISecretProtector](Meshline.Interactions.ISecretProtector.md 'Meshline\.Interactions\.ISecretProtector') | Protects and restores locally stored secrets using an application\-defined protection mechanism\. |
+
+| Enums | |
+| :--- | :--- |
+| [SecretAccessFailure](Meshline.Interactions.SecretAccessFailure.md 'Meshline\.Interactions\.SecretAccessFailure') | A secret provider's diagnosis of a failed local key read\. |

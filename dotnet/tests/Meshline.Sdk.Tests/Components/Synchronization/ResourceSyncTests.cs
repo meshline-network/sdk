@@ -54,15 +54,19 @@ public sealed class ResourceSyncTests
         fixture.Relay.Handler = (request, _) => Task.FromResult(request.Method != "message.timeline.sync" ? fixture.Relay.Respond(request)
             : fail ? OfflineRelay.Error("forbidden") : OfflineRelay.Json(new MessageTimelinePage { Items = [], Certificates = [], HasMore = false }));
         await manager.StartAsync(Token);
-        await AsyncTest.UntilAsync(async () => (await manager.GetSyncStatusAsync(fixture.Relay.RelayId, Token)).State == ResourceSyncState.Blocked);
-        var blocked = await manager.GetSyncStatusAsync(fixture.Relay.RelayId, Token);
+        ResourceSyncStatus? blocked = null;
+        // Assert the snapshot that satisfied the wait; another background pass can
+        // enter Synchronizing and clear the transient block before a second read.
+        await AsyncTest.UntilAsync(async () => (blocked = await manager.GetSyncStatusAsync(fixture.Relay.RelayId, Token)).State == ResourceSyncState.Blocked);
+        Assert.NotNull(blocked);
         Assert.Equal(ResourceSyncBlockReason.Permission, blocked.BlockReason);
         Assert.NotNull(blocked.Error);
         Assert.Null(blocked.LastSynchronizedAt);
         fail = false;
         fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(30));
-        await AsyncTest.UntilAsync(async () => (await manager.GetSyncStatusAsync(fixture.Relay.RelayId, Token)).State == ResourceSyncState.CaughtUp);
-        var recovered = await manager.GetSyncStatusAsync(fixture.Relay.RelayId, Token);
+        ResourceSyncStatus? recovered = null;
+        await AsyncTest.UntilAsync(async () => (recovered = await manager.GetSyncStatusAsync(fixture.Relay.RelayId, Token)).State == ResourceSyncState.CaughtUp);
+        Assert.NotNull(recovered);
         Assert.Null(recovered.BlockReason);
         Assert.Null(recovered.Error);
     }

@@ -54,7 +54,9 @@ public sealed class AccountTests
             return Task.FromResult(relay.Respond(request));
         };
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.Client.EstablishAccountAsync(new() { RelayId = relay.RelayId }, Token));
+        var failure = await Assert.ThrowsAsync<AccountEstablishmentException>(() => fixture.Client.EstablishAccountAsync(new() { RelayId = relay.RelayId }, Token));
+        Assert.Equal(AccountEstablishmentReason.SubmissionOutcomeUnknown, failure.Reason);
+        Assert.IsType<HttpRequestException>(failure.InnerException);
 
         var original = relay.Requests.Single(r => r.Method == "account.route.publish").Body;
 

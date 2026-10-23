@@ -32,6 +32,8 @@ sealed class SignedRequestRecord
     [MaxLength(42)]
     public required string RelayId { get; set; }
     public required string DocumentJson { get; set; }
+    [MaxLength(64)]
+    public string? OperationKey { get; set; }
     [ConcurrencyCheck]
     public long Revision { get; set; }
     public bool Pending { get; set; }

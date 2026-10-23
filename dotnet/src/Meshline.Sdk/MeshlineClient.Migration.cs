@@ -73,11 +73,8 @@ sealed partial class MeshlineClient
             {
                 var state = ProtocolModel.FromJson<AccountDeviceState>(migration.DeviceStateJson)!;
                 state = await ReadMigrationDeviceStateAsync(migration.SourceRelayId, state, cancellationToken).ConfigureAwait(false);
-                var certificate = Device!;
-                if (certificate.NotBefore > Clock.UtcNow.ToUnixTimeSeconds())
-                    throw new InvalidOperationException("The local device certificate is not yet valid.");
-                await PrepareLocalDeviceAsync(TimeSpan.FromSeconds(certificate.ExpiresAt - certificate.NotBefore), cancellationToken).ConfigureAwait(false);
-                var publication = await DeviceManager.PublishDeviceStateAsync(relayId, options: new() { PreviousState = state }, cancellationToken: cancellationToken).ConfigureAwait(false);
+                var publication = await DeviceManager.PublishDeviceStateAsync(relayId,
+                    new() { PreviousState = state }, certificateValidity: null, cancellationToken).ConfigureAwait(false);
                 if (publication.Status == DeviceStatePublishStatus.Staged)
                 {
                     if (publication.StagedUntil!.Value - Clock.UtcNow < TimeSpan.FromMinutes(1))
@@ -87,7 +84,9 @@ sealed partial class MeshlineClient
                 using var window = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
                 await AccountManager.PublishRouteAsync(relayId, TimeSpan.FromSeconds(migration.RouteValiditySeconds), cancellationToken: window.Token).ConfigureAwait(false);
             }
-            await ConfirmLocalAuthorizationAsync(relayId, cancellationToken).ConfigureAwait(false);
+            await DeviceManager.ConfirmAuthorizationAsync(relayId, cancellationToken).ConfigureAwait(false);
+            // The explicitly confirmed migration supersedes any unfinished setup intent.
+            await database.AccountEstablishments.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
             var restoredProfile = migration.ProfileJson is null ? null : ProtocolModel.FromJson<AccountProfile>(migration.ProfileJson);
             await ProfileManager.PublishProfileAsync(restoredProfile, cancellationToken).ConfigureAwait(false);
             database.HomeRelayMigrations.Remove(migration);

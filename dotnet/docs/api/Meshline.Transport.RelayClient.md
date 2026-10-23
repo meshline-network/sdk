@@ -563,7 +563,7 @@ Account and device sessions can send requests\. Device sessions also start notif
 
 ## RelayClient\.ErrorOccurred Event
 
-Occurs when the notification dispatcher reports an error or connection invalidation\.
+Occurs when the notification dispatcher reports an error or connection invalidation, metadata refresh fails, or device authentication is rejected with device\_unknown\.
 
 ```csharp
 public event EventHandler<Exception>? ErrorOccurred;

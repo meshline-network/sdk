@@ -77,7 +77,9 @@ sealed partial class DeviceManager
             using var operation = BeginOperation(ref token);
             try
             {
-                var state = await ResolveDeviceStateCoreAsync(accountId, authorization, relayId, useAccount, token).ConfigureAwait(false);
+                // Ordinary reads never escalate device access into wallet authorization.
+                // Explicit account setup uses its own account-capable read path.
+                var state = await ResolveDeviceStateCoreAsync(accountId, authorization, relayId, useAccount, token, allowAccountFallback: false).ConfigureAwait(false);
                 if (state is not null)
                 {
                     await ValidateRefreshedRevisionAsync(state, relayId, token).ConfigureAwait(false);
@@ -145,16 +147,28 @@ sealed partial class DeviceManager
 
     /// <summary>Awaits device-state refresh, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
     /// <inheritdoc cref="GetDeviceStateAsync(string, CancellationToken)" path="param|returns|exception"/>
-    public Task<AccountDeviceState?> RefreshDeviceStateAsync(string? accountId = null, CancellationToken cancellationToken = default) =>
-        ResolveDeviceStateAsync(accountId ?? Options.AccountId, null, cancellationToken, mode: StateReadMode.Refresh);
+    public async Task<AccountDeviceState?> RefreshDeviceStateAsync(string? accountId = null, CancellationToken cancellationToken = default)
+    {
+        EnsureInitialized();
+        using var operation = BeginOperation(ref cancellationToken);
+        return await ResolveDeviceStateAsync(accountId ?? Options.AccountId, null, cancellationToken, mode: StateReadMode.Refresh).ConfigureAwait(false);
+    }
 
     /// <summary>Awaits device-state refresh with the supplied grant, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
     /// <inheritdoc cref="GetDeviceStateAsync(ContactGrant, CancellationToken)" path="param|returns|exception"/>
-    public Task<AccountDeviceState?> RefreshDeviceStateAsync(ContactGrant grant, CancellationToken cancellationToken = default) =>
-        ResolveDeviceStateAsync(grant.Grantor, grant, cancellationToken, mode: StateReadMode.Refresh);
+    public async Task<AccountDeviceState?> RefreshDeviceStateAsync(ContactGrant grant, CancellationToken cancellationToken = default)
+    {
+        EnsureInitialized();
+        using var operation = BeginOperation(ref cancellationToken);
+        return await ResolveDeviceStateAsync(grant.Grantor, grant, cancellationToken, mode: StateReadMode.Refresh).ConfigureAwait(false);
+    }
 
     /// <summary>Awaits device-state refresh with the supplied invitation, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
     /// <inheritdoc cref="GetDeviceStateAsync(ContactInvite, CancellationToken)" path="param|returns|exception"/>
-    public Task<AccountDeviceState?> RefreshDeviceStateAsync(ContactInvite invite, CancellationToken cancellationToken = default) =>
-        ResolveDeviceStateAsync(invite.Inviter, invite, cancellationToken, mode: StateReadMode.Refresh);
+    public async Task<AccountDeviceState?> RefreshDeviceStateAsync(ContactInvite invite, CancellationToken cancellationToken = default)
+    {
+        EnsureInitialized();
+        using var operation = BeginOperation(ref cancellationToken);
+        return await ResolveDeviceStateAsync(invite.Inviter, invite, cancellationToken, mode: StateReadMode.Refresh).ConfigureAwait(false);
+    }
 }

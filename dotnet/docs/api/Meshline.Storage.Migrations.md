@@ -13,3 +13,4 @@ Entity Framework Core migrations for the SDK's SQLite database; applications use
 | Classes | |
 | :--- | :--- |
 | [InitialCreate](Meshline.Storage.Migrations.InitialCreate.md 'Meshline\.Storage\.Migrations\.InitialCreate') | Entity Framework Core migration infrastructure\. Applications apply the schema through MeshlineDatabase\.MigrateAsync; do not invoke migration operations directly\. |
+| [ResumableAccountEstablishment](Meshline.Storage.Migrations.ResumableAccountEstablishment.md 'Meshline\.Storage\.Migrations\.ResumableAccountEstablishment') | Entity Framework Core migration infrastructure\. Applications apply the schema through MeshlineDatabase\.MigrateAsync; do not invoke migration operations directly\. |

@@ -56,6 +56,62 @@ Split independent contracts into separately initialized cases, even when they sh
 
 For outgoing messages, `MessageSendingTests` owns submission and retries, `SendHistoryTests` owns bounded retention and restart persistence, and `SendStatusWaitingTests` owns waiting milestones, cancellation, disposal and observer failures. The retention test also checks an active waiter across rollback and immediate terminal eviction; that is an intentional boundary regression, not duplicate happy-path coverage.
 
+Account establishment tests are grouped by contract rather than by the repair that
+introduced a case. Keep interruption sequences intact: the failure, retained state,
+restart and successful retry together prove resumability.
+
+| Contract | Test owners |
+| --- | --- |
+| Public setup scenarios, options, retained/new installation, selection and failure details | `Accounts/AccountEstablishmentTests` |
+| Durable steps and replay after failed checkpoints | `Accounts/AccountEstablishmentStepTests` |
+| Validity through profile publication and workflow cleanup | `Accounts/AccountEstablishmentCompletionTests` |
+| Profile preservation, stale reads, publication outcomes and owner disposal | `Accounts/AccountProfileInitializationTests` |
+| Signing versus submission failure classification | `Accounts/AccountPublicationFailureTests` |
+| Startup reservation, cancellation and disposal | `Accounts/AccountEstablishmentLifecycleTests` |
+| Draft keys, activation receipts and failed secret access | `Accounts/AccountDevicePreparationTests`, `Accounts/LocalDataIntegrityTests`, `Accounts/DeviceKeyAccessTests` |
+| Device publication reconciliation and certificate renewal | `Accounts/DeviceAuthorizationRetryTests`, `Devices/DeviceStatePublicationTests` |
+| Handoff between standalone device operations and account setup | `Devices/DeviceAuthorizationIntegrationTests` |
+| Replacement proposals, interrupted choice checkpoints and revocation | `Accounts/DeviceReplacementTests` |
+| Route bootstrap, renewal, conflict discovery and expired-request evidence | `Accounts/AccountRouteAuthorizationTests`, `Accounts/AccountRouteRetryTests`, `Accounts/EnsureRouteTests`, `Accounts/ExpiredRouteRecoveryTests` |
+| Explicit recovery and migration | `Accounts/MigrationTests`, `Accounts/DevicePublicationBoundaryTests` |
+| Device activation and renewal through the shared pool | `Accounts/DeviceSessionBindingTests` |
+| Pool reuse, certificate binding and session retirement | `Transport/RelayClientPoolTests` |
+| Session expiry, reauthentication and cancellation | `Transport/RelayAuthenticationTests` |
+| Runtime suspension, socket drainage and shutdown failures | `Accounts/RevokedDeviceRuntimeTests`, `Lifecycle/LifecycleTests` |
+| Contact continuity and atomic publication | `Contacts/ContactAuthorizationContinuityTests`, `Contacts/ContactContinuityBoundaryTests`, `Contacts/ContactPublicationTransactionTests` |
+| Background grant supplementation and delivery | `Contacts/BackgroundContactAuthorizationTests` |
+| Standalone mutation serialization and signing without holding the database writer | `Devices/DeviceMutationConcurrencyTests` |
+| Fresh schema and direct upgrade from `InitialCreate` | `Storage/DatabaseTests` |
+
+Preserve these boundary assertions when reorganizing cases:
+
+- Retained or entirely absent local data are the supported cases. Unknown, temporary
+  and permanent key-access failures preserve keys, drafts, workflow and signed
+  requests; restored access reuses them. Intermediate development schemas have no
+  compatibility tests.
+- A checkpoint is not relay confirmation. Interrupt after staging, acceptance,
+  activation, progress saves and cleanup; verify exact request/key reuse after
+  reopening. Unknown outcomes, definitive rejection and pre-submission signing
+  failures must remain distinguishable.
+- Replacement keeps the full device list, original identity and accepted/proposed
+  choices through interruption. A different choice cannot replace an unresolved
+  request. Remote conflicts reread current state; same-client device mutation runs
+  before or after establishment, never during it.
+- Route tests distinguish retained original-route evidence from an expired initial
+  request, preserve successor revision floors and reject unsafe bootstrap. The
+  scripted relay requires a valid route for device-state reads and validates signed
+  requests independently of the SDK.
+- Healthy-account tests assert request, signature and protected-key read counts.
+  Renewal and removal tests let unrelated SQLite writers and message operations
+  proceed while account signing or relay submission is paused.
+- Continuity tests distinguish source acceptance from target acceptance, cover
+  pending outgoing consent across restart, and include grants committed during
+  signing. The 1000-contact case reports preparation time without a hardware-dependent
+  threshold. Background tests await both grant persistence and notification retries.
+- Suspension tests await `Stopped`, advance time and verify quiet device sockets,
+  no wallet signatures and successful explicit restart. Injected storage/task failures
+  must still drain all children and retain errors and pending sends.
+
 ## Running tests
 
 Run these commands from `sdk/dotnet` after restoring dependencies:
@@ -79,9 +135,12 @@ dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-
 After changing shared setup or concurrency behavior, also exercise both scheduling modes:
 
 ```sh
-dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --seed 20260926 --parallel collections --parallel-algorithm aggressive --max-threads 4 --minimum-expected-tests 1 --fail-skips on --timeout 60s
-dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --seed 17 --parallel none --minimum-expected-tests 1 --fail-skips on --timeout 60s
+dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --seed 20260926 --parallel collections --parallel-algorithm aggressive --max-threads 4 --minimum-expected-tests 1 --fail-skips on --timeout 10m
+dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --seed 17 --parallel none --minimum-expected-tests 1 --fail-skips on --timeout 10m
 ```
+
+`--timeout` limits the entire test session, not each test. Allow time for the full
+serial suite; individual asynchronous test handshakes still use bounded waits.
 
 ## Coverage
 
@@ -92,8 +151,6 @@ dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --seed 17
 | Storage | Migrations, account/network binding, transactions, pagination, snapshot isolation, concurrent reads, and cancellation. |
 | Client workflows | Accounts/devices, profiles/contacts, messaging, channels/groups, recovery, deduplication, atomic synchronization cursors, and conversations. |
 | Lifecycle | Dependency ordering, repeated start/stop/disposal, draining active operations, background diagnostics, and shared-pool ownership. |
-
-Tests use real cryptographic algorithms, a strict custom HTTP handler, and in-memory WebSocket peers exercising the real `ClientWebSocket` handshake and framing. Each storage fixture migrates an isolated temporary SQLite database. No live relay, wallet, installed certificate, or sibling checkout is required.
 
 Acceptance uses behavioral checks without an overall coverage-percentage threshold.
 

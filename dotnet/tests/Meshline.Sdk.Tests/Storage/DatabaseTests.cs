@@ -5,6 +5,8 @@ using Meshline.Storage;
 using Meshline.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Meshline.Tests.Storage;
 
@@ -34,8 +36,64 @@ public sealed class DatabaseTests
 
         await using var db = database.Open();
 
-        Assert.Single(await db.Database.GetAppliedMigrationsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Single(await db.Bindings.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Initial_baseline_upgrade_preserves_keys_pending_publications_and_history()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = new TestDatabase();
+        Directory.CreateDirectory(Path.GetDirectoryName(database.Options.Path)!);
+        var local = new LocalDeviceRecord
+        {
+            DeviceId = "device",
+            CertificateJson = "certificate",
+            ProtectedSigningKey = [1, 2, 3],
+            ProtectedEncryptionKey = [4, 5, 6]
+        };
+        var pending = new SignedRequestRecord
+        {
+            Method = "device.state.publish",
+            RelayId = "relay",
+            DocumentJson = "signed-publication",
+            Revision = 7,
+            Pending = true
+        };
+        var message = Message("sender", DateTimeOffset.UnixEpoch);
+        await using (var baseline = new MeshlineDbContext(database.Options, SqliteOpenMode.ReadWriteCreate))
+        {
+            await baseline.GetService<IMigrator>().MigrateAsync("20260925135953_InitialCreate", token);
+            // Seed the original versioned device schema and publication without an execution key.
+            await baseline.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO LocalDevice (DeviceId, CertificateJson, ProtectedSigningKey, ProtectedEncryptionKey, Version) VALUES ({local.DeviceId}, {local.CertificateJson}, {local.ProtectedSigningKey}, {local.ProtectedEncryptionKey}, {3})", token);
+            await baseline.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO SignedRequests (Method, RelayId, DocumentJson, Revision, Pending) VALUES ({pending.Method}, {pending.RelayId}, {pending.DocumentJson}, {pending.Revision}, {pending.Pending})", token);
+            baseline.Messages.Add(message);
+            await baseline.SaveChangesAsync(token);
+        }
+
+        await MeshlineDatabase.MigrateAsync(database.Options, token);
+
+        await using var upgraded = database.Open();
+        var retainedDevice = await upgraded.LocalDevices.SingleAsync(token);
+        Assert.Equal(local.DeviceId, retainedDevice.DeviceId);
+        Assert.Equal(local.CertificateJson, retainedDevice.CertificateJson);
+        Assert.Equal(local.ProtectedSigningKey, retainedDevice.ProtectedSigningKey);
+        Assert.Equal(local.ProtectedEncryptionKey, retainedDevice.ProtectedEncryptionKey);
+        var retainedRequest = await upgraded.SignedRequests.SingleAsync(token);
+        Assert.Equal(pending.Method, retainedRequest.Method);
+        Assert.Equal(pending.RelayId, retainedRequest.RelayId);
+        Assert.Equal(pending.DocumentJson, retainedRequest.DocumentJson);
+        Assert.Equal(pending.Revision, retainedRequest.Revision);
+        Assert.True(retainedRequest.Pending);
+        Assert.Null(retainedRequest.OperationKey);
+        var retainedMessage = await upgraded.Messages.SingleAsync(token);
+        Assert.Equal(message.Sender, retainedMessage.Sender);
+        Assert.Equal(message.MessageId, retainedMessage.MessageId);
+        Assert.Equal(message.CreatedAt, retainedMessage.CreatedAt);
+        Assert.Empty(await upgraded.AccountEstablishments.ToListAsync(token));
+        Assert.Empty(await upgraded.DevicePreparations.ToListAsync(token));
+        Assert.Equal(upgraded.Database.GetMigrations(), await upgraded.Database.GetAppliedMigrationsAsync(token));
     }
 
     [Theory]

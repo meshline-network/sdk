@@ -19,6 +19,7 @@ public sealed class ProfileResolveTests
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
         await fixture.InitializeAsync();
+        var previous = fixture.Client.Profile!.ToJson();
 
         using var otherAccount = new AccountSigner();
         var profile = new AccountProfile
@@ -26,7 +27,7 @@ public sealed class ProfileResolveTests
             Account = scenario == "profile_account" ? otherAccount.AccountId : fixture.Account.AccountId,
             Nickname = "Alice",
             PublicDiscovery = true,
-            UpdatedAt = 0,
+            UpdatedAt = fixture.Relay.Clock.GetUtcNow().ToUnixTimeSeconds(),
             DeviceSignature = []
         };
         profile = profile with
@@ -46,7 +47,7 @@ public sealed class ProfileResolveTests
         var manager = fixture.Client.ProfileManager;
         if (scenario == "valid")
         {
-            var actual = await manager.GetProfileAsync(cancellationToken: Token);
+            var actual = await manager.RefreshProfileAsync(cancellationToken: Token);
 
             Assert.Equal(profile.ToJson(), actual!.ToJson());
 
@@ -58,22 +59,22 @@ public sealed class ProfileResolveTests
         {
             if (scenario == "signature")
             {
-                var error = await Assert.ThrowsAsync<CryptographicException>(() => manager.GetProfileAsync(cancellationToken: Token));
+                var error = await Assert.ThrowsAsync<CryptographicException>(() => manager.RefreshProfileAsync(cancellationToken: Token));
 
                 Assert.Equal("The profile device signature is invalid.", error.Message);
             }
             else
             {
-                var error = await Assert.ThrowsAsync<InvalidDataException>(() => manager.GetProfileAsync(cancellationToken: Token));
+                var error = await Assert.ThrowsAsync<InvalidDataException>(() => manager.RefreshProfileAsync(cancellationToken: Token));
 
                 Assert.Equal("The profile or signing certificate belongs to another account.", error.Message);
             }
 
-            Assert.Null(manager.Profile);
+            Assert.Equal(previous, manager.Profile!.ToJson());
 
             await using var database = fixture.Database.Open();
 
-            Assert.Empty(await database.AccountProfiles.ToListAsync(Token));
+            Assert.Equal(previous, (await database.AccountProfiles.SingleAsync(Token)).DocumentJson);
         }
     }
 }

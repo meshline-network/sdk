@@ -81,6 +81,204 @@ dotnet ef migrations has-pending-model-changes --project src/Meshline.Sdk --star
 
 The test project's design-time factory uses an in-memory SQLite database. Verify both fresh database creation and upgrades from the previous schema when introducing a migration.
 
+Account establishment uses the `ResumableAccountEstablishment` migration after
+`InitialCreate`. Verify that the direct upgrade preserves device keys, pending
+signed publications and history. Intermediate development schemas are not upgrade
+baselines.
+
+## Account establishment
+
+The [account establishment guide](dotnet/docs/guides/account-establishment.md)
+defines the caller contract and recovery limits. Keep implementation details here
+and regression ownership in [TESTING.md](dotnet/TESTING.md#regression-ownership).
+
+### Ownership and durable state
+
+`MeshlineClient` owns the workflow. It records intent and the next step before
+dispatching to a component, then checkpoints the component's outcome. Components
+own idempotent domain execution and persistence. Partial files organize each
+owner; they do not introduce another component, forwarding facade or workflow store.
+
+| Owner | Responsibility and durable evidence |
+| --- | --- |
+| `MeshlineClient` | `AccountEstablishment`: operation ID, relay, lifetimes, initial profile, next step, replacement intent, original local identity and historical authorization checkpoint. |
+| `DeviceManager` | `LocalDevice`: active keys/certificate. `DevicePreparation`: protected draft and last activation receipt. Device-state cache and the `device.state.publish` record in `SignedRequests`. |
+| `AccountManager` | Verified `AccountRoutes` and the `account.route.publish` record in `SignedRequests`; route revisions, replay and confirmation. |
+| `ProfileManager` | Existing profile resolution, creation-only initialization and exact pending profile publication. |
+| `MessageManager` | Contacts, confirmed grants, consent requests and outbox; background authorization supplementation and delivery. |
+| `RelayClientPool` | Identity/certificate binding and session retirement; no workflow or database state. |
+
+`DatabaseBinding` identifies the network, account and device. Its local-device
+binding provides issuance provenance; an empty contact list does not establish
+history for a foreign device. Operation IDs associate resumable work internally.
+The device publication's optional `OperationKey` associates execution with an
+operation and replacement choice; public standalone publications do not inherit it.
+
+### Workflow and replay
+
+Preflight checks local key access before network I/O, refreshes the route, and
+inspects current device authorization. A healthy account with no setup record or
+replacement intent returns without signing or creating a workflow. An unrelated
+unconfirmed route publication does not invalidate a usable route. When no route
+is usable, `GetUnconfirmedRouteAsync` supplies a local, read-only parameter check
+before setup saves intent or prepares keys; route execution revalidates it.
+
+The durable steps are:
+
+1. **Authorize device.** `DeviceManager` prepares or reuses keys, reads complete
+   state, validates capacity and explicit replacement, and reconciles publication.
+   Bootstrap staging returns `AwaitingRoute`, never confirmed authorization.
+2. **Ensure route.** `AccountManager.EnsureRouteAsync` establishes or renews the
+   original route and reconciles its pending request. Execution returns to device
+   authorization afterwards.
+3. **Initialize profile and complete.** `ProfileManager` preserves existing values
+   or creates the initial profile. The client verifies effective route/device
+   authorization and deletes the workflow in a short transaction.
+
+Resume revalidates prerequisites before dispatching the saved step. Expired original
+routes need renewal before a device-state query; unconfirmed bootstrap staging may
+need replay first. A failed checkpoint repeats the component operation safely.
+The historical authorization checkpoint never bypasses current validity checks.
+Completion checks validity before deletion, before commit and after commit. Expiry
+rolls back deletion or restores the same workflow. These checks use local state;
+no extra read, signature or network request runs inside the cleanup transaction.
+
+Inspection interprets the activation receipt and returns the original local ID;
+the client saves that ID before authorization. Repeated inspection within one call
+reuses its key-access result. Every explicit call reads both protected keys again.
+`DeviceManager` derives route readiness from `AccountManager`, without a duplicated
+workflow flag. Failures cross this boundary as domain reasons and actionable
+details; the client translates them to `AccountEstablishmentException`.
+
+Replacement intent keeps the accepted choice and a proposed new choice separately.
+Omitted options resume them. An effective replacement or unresolved proposal cannot
+be changed; later revocation can permit another explicit selection. The device
+owner validates the proposal and returns accepted, rejected or unresolved
+disposition, including on failure. Its saved `OperationKey` distinguishes a submitted
+proposal from an older publication when checkpointing failed. Signing refusal
+before persistence does not freeze a new proposal. Evidence reads for this failure
+path do not add reads to successful or unchanged authorization.
+
+### Device and route publication
+
+Persist the exact certificate draft and both protected keys before account signing.
+Commit activation, binding changes and draft consumption together. Clear consumed
+draft secrets but retain `ActivatedOperationId`, including while a later renewal
+draft is pending. Renewal keeps the original identity and keys. Any key-access
+failure preserves all records; partial permanent loss is outside the supported
+all-retained-or-all-absent local-data contract.
+
+Before device mutation, read complete verified state directly from the original
+relay. Apply only the local add/renew and explicit remove intent, and publish at the
+observed revision plus one. Conflicts reread and merge within a bounded retry loop.
+Only `Pending` requests are replayable; preserve their exact signed content and
+certificate ordering. Reconcile an unknown publication before renewing an expired
+certificate. Reconciliation does not consume the conflict retry budget, and an
+accepted expired certificate is not successful authorization. If renewal expires
+during signing/submission, retain the keys and report failure for explicit retry.
+
+Success requires relay acceptance and effective device authorization. An unchanged
+authorization uses its fresh read as confirmation; mutations require a subsequent
+read. Retire old device sessions before that read so final authentication reuses
+the newly established session. Recovery and relay migration use their own revision
+rules but share device preparation/publication and final authorization checks.
+
+`EnsureRouteAsync` derives bootstrap, renewal and replay from verified routes and
+signed requests. Discovery runs outside the publication gate; revision selection
+and submission share the explicit publication gate. Recheck expiry after acquiring
+it and preserve newer state published by discovery callbacks. A valid route without
+unfinished work needs no network read or signer.
+
+Unexpired unknown route submissions retain the exact document. After discovery,
+an expired request can be superseded on the same relay only with retained verified
+original-route evidence. Choose a revision above both route and saved request;
+retain that floor even if a successor is rejected. A saved request revision or a
+cleared pending flag is not acceptance evidence. Without the original route, an
+expired initial request remains a conflict. Definitive rejection may be retried
+with the identical unexpired document on a later explicit call after fresh discovery,
+but not repeatedly within one call. Never guess a higher bootstrap revision.
+
+Each publication owner classifies unknown outcomes around the actual submission.
+Query, signing and session-acquisition failures before submission are unavailable,
+not unknown outcomes. Standalone publication APIs preserve their exception types.
+Profile initialization resolves first and replays unknown requests exactly; existing
+values win over initial settings. Its publication counter prevents delayed reads
+from overwriting newer local edits, including edits within the same second.
+
+### Local coordination and contact continuity
+
+Each database has one active client/component graph, including across processes.
+Callers await disposal before transferring ownership. Establishment cannot overlap
+caller-initiated device mutations, including from signing or event callbacks.
+`_accountGate` serializes client account workflows; `DeviceManager`'s private
+mutation gate serializes standalone device mutations. `AccountEstablishment`,
+`LocalDevice`, `DevicePreparation` and `DatabaseBinding.DeviceId` need no concurrency
+versions under this contract. Preserve remote revision checks and concurrency tokens
+for records with independent synchronization writers.
+
+Public create/renew rejects an unfinished draft or pending device publication.
+Local activation/renewal acquires the SQLite writer before the key gate, matching
+message transactions. Account signing holds neither lock. Install cached keys
+after commit and retire sessions outside the key gate. Standalone mutation helpers
+belong to the device entry points; authorization execution stages remain private
+to `DeviceManager`, separate from the client's durable workflow steps.
+
+The relay pool owns certificate comparison and session retirement. Cache canonical
+content per immutable certificate object; equal content after deserialization
+retains sessions. Public acquisition and owner rebinding share one transition under
+the pool lock, with a binding recheck at session acquisition. Public signers cannot
+restore a superseded binding; owner rebinding restores committed local state.
+Retained binding history is local to the pool and does not order certificates by
+validity dates. Account sessions remain available throughout device renewal.
+
+Removal/replacement validates retained grant evidence against the exact remaining
+certificates before signing, then repeats continuity and state validation in the
+immediate write transaction that saves the pending publication. Wallet and relay
+waits remain outside that transaction. Contact authorization writes either commit
+before the final check or observe the pending publication and fail promptly,
+including after restart. Revalidate prepared grants before contact snapshot flushes.
+Messaging never acquires the device mutation gate; each enqueue uses one certificate
+snapshot for authorization, encryption and history, rolling back if signing sees
+a different identity.
+
+Continuity includes active and previously confirmed grants plus queued/unknown
+outgoing consent requests. Only `TargetAccepted` confirms the same current grant
+with a valid remaining-device signature. Source acceptance, expired/different grants,
+and unknown delivery are insufficient; failed/canceled requests impose no delivery
+dependency. Do not remove the last usable signer in anticipation of future delivery.
+
+Background grant maintenance derives work from persisted device/contact/outbox state
+at startup. Commit supplemented grants and their encrypted requests together; retain
+message IDs and ciphertext on retry. Commit delivery status and confirmed grants
+together before completing status waiters. Retry preparation failures, isolate
+unavailable peers, and notify successful peers only once per state change.
+Definitive delivery failures remain visible rather than generating new requests
+on every scan. Account establishment never waits for this background delivery.
+
+### Runtime and shutdown
+
+Startup reserves `_runtimeActive` under the account gate, then releases the gate
+before starting children or invoking callbacks. Authorization changes remain
+blocked until shutdown finishes. Canceling startup while it is only waiting for
+that gate must not stop children or cancel establishment queries. Lifetime
+cancellation precedes waiting for lifecycle transitions; concurrent disposal
+shares cancellation and retains observable cleanup failures.
+
+The client stops its runtime after verified local-device removal or confirmed
+local authentication rejection. Network failures, expiry and peer/recipient errors
+are not revocation. Runtime reads never request account signatures. Schedule stop
+outside event callbacks, associate it with the originating runtime token, and drain
+it during disposal so a delayed stop cannot affect a later runtime.
+
+Shutdown attempts every child in reverse dependency order. Each owner drains tasks,
+subscriptions and device sessions even after a failure, then reports all errors
+and the stopped transition. Clear drained task references for later stops. Pool
+invalidation also joins unfinished retirements removed from active entries;
+completed failures remain observable at disposal without blocking future sessions.
+Preserve account sessions and verified relay metadata. A storage failure retains
+pending messages for normal initialization reconciliation. Managers do not stop
+one another or share a cross-component shutdown lock.
+
 ## Automated releases
 
 [release.yml](.github/workflows/release.yml) runs on pushes to `main`:

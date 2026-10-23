@@ -6,7 +6,9 @@
 <summary>Members on this page</summary>
 
 - [`CertificateValidity`](#Meshline.Models.Client.AccountEstablishmentOptions.CertificateValidity)
+- [`InitialProfile`](#Meshline.Models.Client.AccountEstablishmentOptions.InitialProfile)
 - [`RelayId`](#Meshline.Models.Client.AccountEstablishmentOptions.RelayId)
+- [`ReplaceDeviceId`](#Meshline.Models.Client.AccountEstablishmentOptions.ReplaceDeviceId)
 - [`RouteValidity`](#Meshline.Models.Client.AccountEstablishmentOptions.RouteValidity)
 
 </details>
@@ -16,20 +18,24 @@
 
 ## AccountEstablishmentOptions Class
 
-Configures initial account establishment and the validity of its device certificate and route\.
+Configures idempotent account setup without starting background synchronization\.
 
 ```csharp
 public sealed class AccountEstablishmentOptions
 ```
 
 Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system.object 'System\.Object') → AccountEstablishmentOptions
+
+### Remarks
+An unfinished setup retains its saved lifetimes and initial profile\. Omitted options resume that operation;<br>
+conflicting explicit relay or profile values are rejected\. Valid certificates and routes are retained\.
 ### Properties
 
 <a name='Meshline.Models.Client.AccountEstablishmentOptions.CertificateValidity'></a>
 
 ## AccountEstablishmentOptions\.CertificateValidity Property
 
-The requested device certificate lifetime, from one second through 720 days; defaults to 365 days\.
+The lifetime for a certificate that needs issuance or renewal, from one second through 720 days; defaults to 365 days\.
 
 ```csharp
 public System.TimeSpan CertificateValidity { get; set; }
@@ -38,11 +44,24 @@ public System.TimeSpan CertificateValidity { get; set; }
 #### Property Value
 [System\.TimeSpan](https://learn.microsoft.com/en-us/dotnet/api/system.timespan 'System\.TimeSpan')
 
+<a name='Meshline.Models.Client.AccountEstablishmentOptions.InitialProfile'></a>
+
+## AccountEstablishmentOptions\.InitialProfile Property
+
+Optional creation\-only profile values\. Existing profile fields are never changed by account setup\.
+
+```csharp
+public Meshline.Models.Client.AccountInitialProfile? InitialProfile { get; set; }
+```
+
+#### Property Value
+[AccountInitialProfile](Meshline.Models.Client.AccountInitialProfile.md 'Meshline\.Models\.Client\.AccountInitialProfile')
+
 <a name='Meshline.Models.Client.AccountEstablishmentOptions.RelayId'></a>
 
 ## AccountEstablishmentOptions\.RelayId Property
 
-The relay's canonical identifier, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') to resume the existing establishment target or select an eligible registry relay\.
+The relay's canonical identifier\. An existing route or unfinished operation retains its original relay; a conflicting value is rejected\.
 
 ```csharp
 public string? RelayId { get; set; }
@@ -51,11 +70,28 @@ public string? RelayId { get; set; }
 #### Property Value
 [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
 
+<a name='Meshline.Models.Client.AccountEstablishmentOptions.ReplaceDeviceId'></a>
+
+## AccountEstablishmentOptions\.ReplaceDeviceId Property
+
+The device explicitly selected for removal while authorizing the local device in one publication\.
+
+```csharp
+public string? ReplaceDeviceId { get; set; }
+```
+
+#### Property Value
+[System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+### Remarks
+A null value resumes any saved replacement choice; without one, all other devices are preserved\.<br>
+An unresolved submission or an effective replacement cannot be changed while setup is unfinished\.
+
 <a name='Meshline.Models.Client.AccountEstablishmentOptions.RouteValidity'></a>
 
 ## AccountEstablishmentOptions\.RouteValidity Property
 
-The requested account route lifetime, from one second through 3650 days; defaults to 365 days\.
+The lifetime for a route that needs publication or renewal, from one second through 3650 days; defaults to 365 days\.
 
 ```csharp
 public System.TimeSpan RouteValidity { get; set; }

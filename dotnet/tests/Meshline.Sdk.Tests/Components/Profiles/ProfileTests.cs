@@ -92,6 +92,7 @@ public sealed class ProfileTests
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
         await fixture.InitializeAsync();
+        fixture.Relay.Requests.Clear();
 
         var fail = true;
         fixture.Relay.Handler = (request, _) =>

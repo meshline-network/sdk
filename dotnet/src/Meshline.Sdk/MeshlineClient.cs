@@ -6,6 +6,7 @@ using Meshline.Storage;
 using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +17,16 @@ namespace Meshline;
 /// Coordinates account, device, profile, messaging, channel, and group components for one local account and device.
 /// </summary>
 /// <remarks>
-/// Migrate the database explicitly before calling <see cref="ClientComponent.InitializeAsync"/>. Establish or recover account authorization before starting a new device. The client owns its components; the application owns the supplied pool, signer, and secret protector. Events may be raised from background threads.
+/// <para>Migrate the database before <see cref="ClientComponent.InitializeAsync"/>, establish authorization when needed,
+/// then call <see cref="ClientComponent.StartAsync"/> separately. Startup awaits required network authentication;
+/// local history is available after initialization. The client owns its components; the application owns the supplied pool,
+/// signer and secret protector. Events may be raised from background threads.</para>
+/// <para>Verified local-device removal or rejected local authentication suspends background work. An own-state query
+/// denied after device-session renewal also suspends it, preserving the last verified state without declaring revocation.
+/// Background reads never request account signatures. Observe BackgroundError for the cause and StateChanged for completed shutdown.</para>
+/// <para>Use one active client per database, including across processes, and await <see cref="ClientComponent.DisposeAsync"/>
+/// before transferring ownership. The SDK does not enforce exclusivity. Concurrent calls follow each method's calling contract;
+/// <see cref="EstablishAccountAsync"/> must not overlap direct device mutations.</para>
 /// </remarks>
 public sealed partial class MeshlineClient : ClientComponent
 {
@@ -26,8 +36,14 @@ public sealed partial class MeshlineClient : ClientComponent
     public event EventHandler<ConversationChangedEventArgs>? ConversationChanged;
 
     readonly DatabaseOptions _databaseOptions;
+    readonly IAccountSigner? _accountSigner;
     readonly RelayClientPool _relayClients;
     readonly SemaphoreSlim _accountGate = new(1, 1);
+    // Includes startup before the base component reports Running, and cleanup
+    // after failed startup. It is cleared only after all child runtimes stop.
+    volatile bool _runtimeActive;
+    bool _startWaitCanceled;
+    Action? _requestAuthorizationStop;
 
     /// <summary>
     /// The current account's last known route, or <see langword="null"/> when no route is known.
@@ -86,6 +102,7 @@ public sealed partial class MeshlineClient : ClientComponent
     {
         ArgumentNullException.ThrowIfNull(secretProtector);
         _databaseOptions = databaseOptions;
+        _accountSigner = accountSigner;
         _relayClients = relayClients;
         AccountManager = new AccountManager(options, databaseOptions, relayClients, accountSigner);
         DeviceManager = new DeviceManager(options, databaseOptions, relayClients, AccountManager, accountSigner, secretProtector);
@@ -95,6 +112,7 @@ public sealed partial class MeshlineClient : ClientComponent
         GroupManager = new GroupManager(options, databaseOptions, relayClients, DeviceManager, MessageManager, secretProtector);
         AccountManager.BackgroundError += OnComponentError;
         DeviceManager.BackgroundError += OnComponentError;
+        DeviceManager.DeviceStateChanged += OnDeviceAuthorizationChanged;
         ProfileManager.BackgroundError += OnComponentError;
         ChannelManager.BackgroundError += OnComponentError;
         MessageManager.BackgroundError += OnComponentError;
@@ -146,6 +164,25 @@ public sealed partial class MeshlineClient : ClientComponent
     /// <exception cref="AggregateException">A child component fails during cancellation of an unsuccessful startup.</exception>
     protected override async Task OnStartAsync(CancellationToken cancellationToken)
     {
+        // Wait for an executing setup, then reserve the runtime before starting
+        // children. Do not hold the account gate through migration or callbacks.
+        try { await _accountGate.WaitAsync(cancellationToken).ConfigureAwait(false); }
+        catch (OperationCanceledException)
+        {
+            // The base lifecycle invokes OnStop after any failed start. No child
+            // was started here; do not cancel the setup's active metadata reads.
+            _startWaitCanceled = true;
+            throw;
+        }
+        try { _runtimeActive = true; }
+        finally { _accountGate.Release(); }
+        var runtimeToken = RuntimeCancellationToken;
+        var stopRequested = 0;
+        _requestAuthorizationStop = () =>
+        {
+            if (Interlocked.Exchange(ref stopRequested, 1) == 0)
+                _ = StopUnauthorizedDeviceAsync(runtimeToken);
+        };
         await AccountManager.StartAsync(cancellationToken).ConfigureAwait(false);
         await ResumeHomeRelayMigrationAsync(cancellationToken).ConfigureAwait(false);
         await DeviceManager.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -157,86 +194,103 @@ public sealed partial class MeshlineClient : ClientComponent
 
     /// <inheritdoc/>
     /// <exception cref="ObjectDisposedException">A child component has already been disposed.</exception>
-    /// <exception cref="AggregateException">A child component runtime cancellation callback throws during shutdown.</exception>
+    /// <exception cref="AggregateException">Cancellation callbacks or multiple child components fail; all children are stopped before the errors are reported.</exception>
     protected override async Task OnStopAsync()
     {
-        await GroupManager.StopAsync().ConfigureAwait(false);
-        await ChannelManager.StopAsync().ConfigureAwait(false);
-        await MessageManager.StopAsync().ConfigureAwait(false);
-        await ProfileManager.StopAsync().ConfigureAwait(false);
-        await DeviceManager.StopAsync().ConfigureAwait(false);
-        await AccountManager.StopAsync().ConfigureAwait(false);
+        if (_startWaitCanceled)
+        {
+            _startWaitCanceled = false;
+            return;
+        }
+        _requestAuthorizationStop = null;
+        List<Exception> failures = [];
+        ClientComponent[] components = [GroupManager, ChannelManager, MessageManager, ProfileManager, DeviceManager, AccountManager];
+        foreach (var component in components)
+        {
+            try { await component.StopAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+        }
+        _runtimeActive = false;
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 
-    void OnComponentError(object? sender, BackgroundErrorEventArgs args) => ReportBackgroundError(args.Operation, args.Resource, args.Error);
+    void OnDeviceAuthorizationChanged(object? sender, EventArgs args)
+    {
+        var requestStop = _requestAuthorizationStop;
+        if (requestStop is null || Device is not { } device || DeviceState is not { } state) return;
+        var deviceId = device.GetDeviceId(Context);
+        if (!state.Certificates.Any(value => value.GetDeviceId(Context) == deviceId))
+            requestStop();
+    }
+
+    async Task StopUnauthorizedDeviceAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var operation = BeginOperation(ref cancellationToken);
+            // The event can be raised by a child task which shutdown must drain.
+            // Return to that task before stopping, and bind the queued stop to this
+            // runtime so it cannot stop a later start or deadlock with disposal.
+            await Task.Yield();
+            await StopAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (ObjectDisposedException) { }
+        catch (Exception exception)
+        {
+            ReportBackgroundError(BackgroundOperation.Synchronize, Options.AccountId, exception);
+        }
+    }
+
+    void OnComponentError(object? sender, BackgroundErrorEventArgs args)
+    {
+        // Suspend unusable local-device access without rewriting verified state or
+        // treating peer errors, network failures, or socket-token expiry as revocation.
+        if (ReferenceEquals(sender, DeviceManager) && args.Error is RelayException error
+            && (args.Resource == Options.AccountId && error.Error.Code is "unauthorized" or "device_unknown"
+                || args.Operation == BackgroundOperation.Connect && error.Error.Code == "device_unknown"))
+            _requestAuthorizationStop?.Invoke();
+        ReportBackgroundError(args.Operation, args.Resource, args.Error);
+    }
 
     /// <summary>
-    /// Creates and authorizes a local device and establishes the account's initial home-relay route.
+    /// Idempotently establishes or renews local-device authorization while preserving the account's other devices and original relay.
     /// </summary>
-    /// <param name="options">Optional relay selection and validity settings; omitted settings use their defaults.</param>
+    /// <param name="options">Optional initial settings and explicit device replacement. An unfinished operation retains its saved lifetimes and profile.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
-    /// <returns>A task that completes when the operation finishes.</returns>
+    /// <returns>A task that completes after confirming effective route/device authorization and initializing the profile as needed.</returns>
     /// <remarks>
-    /// Requires initialization, an account signer, and protected local key storage. Interrupted establishment resumes using the same database and selected relay. An existing route without valid local-device authorization requires explicit account recovery.
+    /// <para>Requires initialization. Valid authorization is reused; account signing is requested only for authorization changes
+    /// or account-authenticated state access. Repeat this method with the same database to resume interrupted setup.
+    /// Start background synchronization separately through <see cref="ClientComponent.StartAsync"/>.</para>
+    /// <para>Retain the database, device keys and protection material together, or begin with all local data absent.
+    /// Partial permanent loss is unsupported. Key-access failures preserve records and never regenerate keys.
+    /// Device reauthorization does not restore lost chat history.</para>
+    /// <para>Stop synchronization before changing authorization. Do not overlap this method with
+    /// CreateDeviceAsync, RenewDeviceAsync, RemoveDeviceAsync or PublishDeviceStateAsync on this client's DeviceManager,
+    /// including from signing or event callbacks. Await completion, failure or cancellation before starting the other operation.</para>
     /// </remarks>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
-    /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. A verified active relay, account signer, complete device state, or local-device authorization required by the operation is unavailable. A route is already known without valid local-device authorization, or an interrupted establishment targets another relay.</exception>
+    /// <exception cref="InvalidOperationException">Initialization is incomplete, synchronization is running when authorization needs changing, no active relay is configured, or the pool is bound to an unrelated device.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
-    /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
-    /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
-    /// <exception cref="InvalidDataException">Relay evidence or returned state is missing, inconsistent, or fails protocol validation.</exception>
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     /// <exception cref="DecoderFallbackException">A relay response contains bytes that are not valid UTF-8.</exception>
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
     /// <exception cref="DbUpdateException">Persisting local changes fails, including database constraint or optimistic-concurrency failures.</exception>
-    /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails.</exception>
     /// <exception cref="ArgumentException">The target relay, previous device state, or publication input is invalid or belongs to another account.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A certificate or route validity duration, or a selected publication revision, is outside its supported range.</exception>
+    /// <exception cref="AccountEstablishmentException">Setup requires caller action, verified state is unavailable, or publication is not confirmed.
+    /// Inspect Reason and the optional device, key-access or contact details. InnerException preserves signing, transport and validation failures.</exception>
     public async Task EstablishAccountAsync(AccountEstablishmentOptions? options = null, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();
         using var _ = BeginOperation(ref cancellationToken);
-        options ??= new();
+        ValidateEstablishmentOptions(options ??= new());
         await _accountGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var route = await AccountManager.RefreshRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-            if (route is not null)
-            {
-                if (Device is not null)
-                {
-                    var state = await DeviceManager.GetOwnDeviceStateAsync(route.RelayId, cancellationToken).ConfigureAwait(false);
-                    if (state is not null && state.ValidateDeviceAuthorization(Device.GetDeviceId(Context), Context) is null)
-                    {
-                        await using var completed = new MeshlineDbContext(_databaseOptions);
-                        await completed.AccountEstablishments.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
-                        return;
-                    }
-                }
-                throw new InvalidOperationException("The account already has a route. Start the existing account or explicitly recover it.");
-            }
-            if (Route is not null)
-                throw new InvalidOperationException("A previous account route is known. Use account recovery instead of initial establishment.");
-            await using var database = new MeshlineDbContext(_databaseOptions);
-            var establishment = await database.AccountEstablishments.SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-            if (establishment is not null && options.RelayId is not null && establishment.RelayId != options.RelayId)
-                throw new InvalidOperationException("Resume establishment at its original relay, or recover the account explicitly.");
-            var relayId = await SelectRelayAsync(establishment?.RelayId ?? options.RelayId, cancellationToken).ConfigureAwait(false);
-            if (establishment is null)
-            {
-                establishment = new() { RelayId = relayId };
-                database.AccountEstablishments.Add(establishment);
-                await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-            var certificate = await PrepareLocalDeviceAsync(options.CertificateValidity, cancellationToken).ConfigureAwait(false);
-            var publication = await DeviceManager.PublishDeviceStateAsync(relayId, [certificate], cancellationToken: cancellationToken).ConfigureAwait(false);
-            if (publication.Status != DeviceStatePublishStatus.Staged)
-                throw new InvalidOperationException("The relay already treats this account as established. Resolve the current route before continuing.");
-            await AccountManager.PublishRouteAsync(relayId, options.RouteValidity, cancellationToken: cancellationToken).ConfigureAwait(false);
-            await ConfirmLocalAuthorizationAsync(relayId, cancellationToken).ConfigureAwait(false);
-            database.AccountEstablishments.Remove(establishment);
-            await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await EstablishAccountCoreAsync(options, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -309,10 +363,11 @@ public sealed partial class MeshlineClient : ClientComponent
             {
                 ReportBackgroundError(BackgroundOperation.Connect, Route?.RelayId, exception);
             }
-            await PrepareLocalDeviceAsync(options.CertificateValidity, cancellationToken).ConfigureAwait(false);
-            await DeviceManager.PublishDeviceStateAsync(relayId, options: new() { PreviousState = options.PreviousDeviceState, IsRecovery = true, Revision = options.DeviceStateRevision }, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await DeviceManager.PublishDeviceStateAsync(relayId,
+                new() { PreviousState = options.PreviousDeviceState, IsRecovery = true, Revision = options.DeviceStateRevision },
+                options.CertificateValidity, cancellationToken).ConfigureAwait(false);
             await AccountManager.PublishRouteAsync(relayId, options.RouteValidity, options.RouteRevision, isRecovery: true, cancellationToken).ConfigureAwait(false);
-            await ConfirmLocalAuthorizationAsync(relayId, cancellationToken).ConfigureAwait(false);
+            await DeviceManager.ConfirmAuthorizationAsync(relayId, cancellationToken).ConfigureAwait(false);
             await using var database = new MeshlineDbContext(_databaseOptions);
             await database.HomeRelayMigrations.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
             await database.AccountEstablishments.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);

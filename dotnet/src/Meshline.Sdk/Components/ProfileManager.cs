@@ -8,6 +8,7 @@ using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Org.BouncyCastle.Math.EC.Rfc8032;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -152,7 +153,33 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
         finally { _profileGate.Release(); }
     }
 
-    async Task<AccountProfile> PublishProfileCoreAsync(ProfileUpdate update, AccountProfile? restored, CancellationToken cancellationToken)
+    internal async Task InitializeAccountProfileAsync(AccountInitialProfile initial, bool createIfMissing, CancellationToken cancellationToken)
+    {
+        EnsureInitialized();
+        var callerToken = cancellationToken;
+        using var operation = BeginOperation(ref cancellationToken);
+        if (!createIfMissing)
+        {
+            var publication = Interlocked.Read(ref _profilePublication);
+            var existing = await ResolveProfileAsync(AccountId, cancellationToken).ConfigureAwait(false);
+            if (existing is not null) await SaveProfileAsync(existing, cancellationToken, publication).ConfigureAwait(false);
+            return;
+        }
+        var update = new ProfileUpdate { PublicDiscovery = initial.PublicDiscovery };
+        if (initial.Nickname is not null) update.Nickname = initial.Nickname;
+        if (initial.Bio is not null) update.Bio = initial.Bio;
+        if (initial.Avatar is not null) update.Avatar = initial.Avatar;
+        try
+        {
+            await PublishProfileCoreAsync(update, null, cancellationToken, initializeOnly: true).ConfigureAwait(false);
+        }
+        catch (ProfilePublicationException exception) when (callerToken.IsCancellationRequested && exception.InnerException is OperationCanceledException)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+        }
+    }
+
+    async Task<AccountProfile> PublishProfileCoreAsync(ProfileUpdate update, AccountProfile? restored, CancellationToken cancellationToken, bool initializeOnly = false)
     {
         EnsureInitialized();
         using var _ = BeginOperation(ref cancellationToken);
@@ -168,6 +195,30 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
             var relayId = route.RelayId;
             await using var database = new MeshlineDbContext(databaseOptions);
             var signed = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "profile.publish", cancellationToken).ConfigureAwait(false);
+            if (initializeOnly)
+            {
+                var existing = await ResolveProfileAsync(AccountId, cancellationToken, relayId).ConfigureAwait(false);
+                if (existing is not null)
+                {
+                    await SaveProfileAsync(existing, cancellationToken).ConfigureAwait(false);
+                    return existing.Profile;
+                }
+                if (await database.AccountProfiles.AnyAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false))
+                    throw new InvalidDataException("A previously known profile is unavailable; initial values cannot replace it.");
+                if (signed is not null && signed.RelayId == relayId)
+                {
+                    var original = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
+                    // A definitive rejection allows re-signing after discovery.
+                    // Keep the original content in SignedRequests so interruption
+                    // after rejection does not lose it or require workflow metadata.
+                    if (!signed.Pending)
+                    {
+                        restored = original;
+                        update = new();
+                    }
+                }
+                if (signed is { Pending: true }) update = new();
+            }
             if (signed is { Pending: true } && (restored is null || signed.RelayId == relayId))
             {
                 request = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
@@ -178,6 +229,11 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
             else
             {
                 var current = await ResolveProfileAsync(AccountId, cancellationToken, relayId).ConfigureAwait(false);
+                if (initializeOnly && current is not null)
+                {
+                    await SaveProfileAsync(current, cancellationToken).ConfigureAwait(false);
+                    return current.Profile;
+                }
                 var basis = current?.Profile;
                 if (restored is not null)
                 {
@@ -224,13 +280,17 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
                 await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
+            catch (Exception exception) when (initializeOnly && exception is HttpRequestException or TimeoutException or RelayException or InvalidDataException or CryptographicException or OperationCanceledException)
+            {
+                throw new ProfilePublicationException(exception);
+            }
             await SaveProfileAsync(new ProfileResolveResult { Profile = request, SignerCertificate = certificate }, cancellationToken, published: true).ConfigureAwait(false);
+            return request;
         }
         finally
         {
             _profileGate.Release();
         }
-        return request;
     }
 
     static T? Apply<T>(FieldUpdate<T> update, T? current) where T : class => update.IsDeleted ? null : update.IsSpecified ? update.Value : current;

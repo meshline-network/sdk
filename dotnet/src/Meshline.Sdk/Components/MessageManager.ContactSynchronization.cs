@@ -81,7 +81,7 @@ sealed partial class MessageManager
                 if (waiting is not null)
                 {
                     record.GrantToJson = ProtocolModel.FromJson<ContactConsent>(waiting.ConsentJson)!.Grant.ToJson();
-                    if (waitingSend?.AcceptedAt is not null || waiting.SendState == MessageSendState.TargetAccepted) record.ConfirmedGrantToJson = record.GrantToJson;
+                    if ((waitingSend?.State ?? waiting.SendState) == MessageSendState.TargetAccepted) record.ConfirmedGrantToJson = record.GrantToJson;
                 }
                 record.UpdatedAt = NextContactTime(record.UpdatedAt);
                 await ClearRequestsAsync(database, accountId, notifications, token).ConfigureAwait(false);
@@ -190,6 +190,7 @@ sealed partial class MessageManager
             }
             if (sync.RequestSnapshot == true)
             {
+                await ValidateContactAuthorizationsAsync(database, token).ConfigureAwait(false);
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
                 string after = "";
                 while (true)

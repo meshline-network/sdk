@@ -28,7 +28,7 @@ sealed partial class RelayClient
     /// </summary>
     public event EventHandler? SocketConnected;
     /// <summary>
-    /// Occurs when the notification dispatcher reports an error or connection invalidation.
+    /// Occurs when the notification dispatcher reports an error or connection invalidation, metadata refresh fails, or device authentication is rejected with device_unknown.
     /// </summary>
     public event EventHandler<Exception>? ErrorOccurred;
     /// <summary>

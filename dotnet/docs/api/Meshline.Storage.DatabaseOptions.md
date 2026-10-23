@@ -23,7 +23,8 @@ public sealed class DatabaseOptions
 Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system.object 'System\.Object') → DatabaseOptions
 
 ### Remarks
-Use a separate database for each network, account, and device\. Assigning the path does not open a database or create its parent directory\. Call [MigrateAsync\(DatabaseOptions, CancellationToken\)](Meshline.Storage.MeshlineDatabase.md#Meshline.Storage.MeshlineDatabase.MigrateAsync(Meshline.Storage.DatabaseOptions,System.Threading.CancellationToken) 'Meshline\.Storage\.MeshlineDatabase\.MigrateAsync\(Meshline\.Storage\.DatabaseOptions, System\.Threading\.CancellationToken\)') before initializing clients or components\.
+Use a separate database for each network, account, and device\. Assigning the path does not open a database or create its parent directory\. Call [MigrateAsync\(DatabaseOptions, CancellationToken\)](Meshline.Storage.MeshlineDatabase.md#Meshline.Storage.MeshlineDatabase.MigrateAsync(Meshline.Storage.DatabaseOptions,System.Threading.CancellationToken) 'Meshline\.Storage\.MeshlineDatabase\.MigrateAsync\(Meshline\.Storage\.DatabaseOptions, System\.Threading\.CancellationToken\)') before initializing clients or components\.<br>
+Each database has one active client or independently composed component graph, including across processes\. Await disposal before transferring ownership\. The SDK does not enforce exclusive database ownership\.
 ### Properties
 
 <a name='Meshline.Storage.DatabaseOptions.Path'></a>

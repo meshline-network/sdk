@@ -41,7 +41,19 @@ public sealed class MeshlineClient : Meshline.Components.ClientComponent
 Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system.object 'System\.Object') → [ClientComponent](Meshline.Components.ClientComponent.md 'Meshline\.Components\.ClientComponent') → MeshlineClient
 
 ### Remarks
-Migrate the database explicitly before calling [InitializeAsync\(CancellationToken\)](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.InitializeAsync(System.Threading.CancellationToken) 'Meshline\.Components\.ClientComponent\.InitializeAsync\(System\.Threading\.CancellationToken\)')\. Establish or recover account authorization before starting a new device\. The client owns its components; the application owns the supplied pool, signer, and secret protector\. Events may be raised from background threads\.
+
+Migrate the database before [InitializeAsync\(CancellationToken\)](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.InitializeAsync(System.Threading.CancellationToken) 'Meshline\.Components\.ClientComponent\.InitializeAsync\(System\.Threading\.CancellationToken\)'), establish authorization when needed,<br>
+            then call [StartAsync\(CancellationToken\)](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.StartAsync(System.Threading.CancellationToken) 'Meshline\.Components\.ClientComponent\.StartAsync\(System\.Threading\.CancellationToken\)') separately. Startup awaits required network authentication;<br>
+            local history is available after initialization. The client owns its components; the application owns the supplied pool,<br>
+            signer and secret protector. Events may be raised from background threads.<br>
+
+Verified local-device removal or rejected local authentication suspends background work. An own-state query<br>
+            denied after device-session renewal also suspends it, preserving the last verified state without declaring revocation.<br>
+            Background reads never request account signatures. Observe BackgroundError for the cause and StateChanged for completed shutdown.<br>
+
+Use one active client per database, including across processes, and await [DisposeAsync\(\)](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.DisposeAsync() 'Meshline\.Components\.ClientComponent\.DisposeAsync\(\)')<br>
+            before transferring ownership. The SDK does not enforce exclusivity. Concurrent calls follow each method's calling contract;<br>
+            [EstablishAccountAsync\(AccountEstablishmentOptions, CancellationToken\)](Meshline.MeshlineClient.md#Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken) 'Meshline\.MeshlineClient\.EstablishAccountAsync\(Meshline\.Models\.Client\.AccountEstablishmentOptions, System\.Threading\.CancellationToken\)') must not overlap direct device mutations.
 ### Constructors
 
 <a name='Meshline.MeshlineClient.MeshlineClient(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Interactions.ISecretProtector,Meshline.Interactions.IAccountSigner)'></a>
@@ -306,7 +318,7 @@ Requires a known route, complete device state, and a local device\. Progress is 
 
 ## MeshlineClient\.EstablishAccountAsync\(AccountEstablishmentOptions, CancellationToken\) Method
 
-Creates and authorizes a local device and establishes the account's initial home\-relay route\.
+Idempotently establishes or renews local\-device authorization while preserving the account's other devices and original relay\.
 
 ```csharp
 public System.Threading.Tasks.Task EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions? options=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -317,7 +329,7 @@ public System.Threading.Tasks.Task EstablishAccountAsync(Meshline.Models.Client.
 
 `options` [AccountEstablishmentOptions](Meshline.Models.Client.AccountEstablishmentOptions.md 'Meshline\.Models\.Client\.AccountEstablishmentOptions')
 
-Optional relay selection and validity settings; omitted settings use their defaults\.
+Optional initial settings and explicit device replacement\. An unfinished operation retains its saved lifetimes and profile\.
 
 <a name='Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken).cancellationToken'></a>
 
@@ -327,30 +339,18 @@ A token that can cancel the operation\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task 'System\.Threading\.Tasks\.Task')<br>
-A task that completes when the operation finishes\.
+A task that completes after confirming effective route/device authorization and initializing the profile as needed\.
 
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The caller cancels the operation or a component or relay lifetime ends\.
 
-[System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
-An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
-
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. A verified active relay, account signer, complete device state, or local\-device authorization required by the operation is unavailable\. A route is already known without valid local\-device authorization, or an interrupted establishment targets another relay\.
+Initialization is incomplete, synchronization is running when authorization needs changing, no active relay is configured, or the pool is bound to an unrelated device\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.
-
-[System\.Net\.Http\.HttpRequestException](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httprequestexception 'System\.Net\.Http\.HttpRequestException')<br>
-Relay discovery, authentication, or the HTTP request fails at the transport layer\.
-
-[RelayException](Meshline.Transport.RelayException.md 'Meshline\.Transport\.RelayException')<br>
-The relay rejects the operation with a structured protocol error that is not handled by this method\.
-
-[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
-Relay evidence or returned state is missing, inconsistent, or fails protocol validation\.
 
 [System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
 A stored or received protocol document cannot be serialized or deserialized\.
@@ -364,17 +364,29 @@ The SQLite database cannot be opened or a database command fails, for example be
 [Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
 Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
 
-[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
-The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\.
-
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
 The target relay, previous device state, or publication input is invalid or belongs to another account\.
 
 [System\.ArgumentOutOfRangeException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentoutofrangeexception 'System\.ArgumentOutOfRangeException')<br>
 A certificate or route validity duration, or a selected publication revision, is outside its supported range\.
 
+[AccountEstablishmentException](Meshline.Models.Client.AccountEstablishmentException.md 'Meshline\.Models\.Client\.AccountEstablishmentException')<br>
+Setup requires caller action, verified state is unavailable, or publication is not confirmed\.<br>
+            Inspect Reason and the optional device, key\-access or contact details\. InnerException preserves signing, transport and validation failures\.
+
 ### Remarks
-Requires initialization, an account signer, and protected local key storage\. Interrupted establishment resumes using the same database and selected relay\. An existing route without valid local\-device authorization requires explicit account recovery\.
+
+Requires initialization. Valid authorization is reused; account signing is requested only for authorization changes<br>
+            or account-authenticated state access. Repeat this method with the same database to resume interrupted setup.<br>
+            Start background synchronization separately through [StartAsync\(CancellationToken\)](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.StartAsync(System.Threading.CancellationToken) 'Meshline\.Components\.ClientComponent\.StartAsync\(System\.Threading\.CancellationToken\)').<br>
+
+Retain the database, device keys and protection material together, or begin with all local data absent.<br>
+            Partial permanent loss is unsupported. Key-access failures preserve records and never regenerate keys.<br>
+            Device reauthorization does not restore lost chat history.<br>
+
+Stop synchronization before changing authorization. Do not overlap this method with<br>
+            CreateDeviceAsync, RenewDeviceAsync, RemoveDeviceAsync or PublishDeviceStateAsync on this client's DeviceManager,<br>
+            including from signing or event callbacks. Await completion, failure or cancellation before starting the other operation.
 
 <a name='Meshline.MeshlineClient.GetConversationAsync(string,System.Threading.CancellationToken)'></a>
 

@@ -60,14 +60,45 @@ public static class Sessions
             Console.Error.WriteLine($"{error.Operation}: {error.Error}");
 
         await client.InitializeAsync(cancellationToken);
+        using var session = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var connection = StartConnectionAsync();
         try
         {
-            await client.StartAsync(cancellationToken);
-            await runApplication(client, cancellationToken);
+            // Local history is available while connection/startup is still pending.
+            await runApplication(client, session.Token);
         }
         finally
         {
-            await client.StopAsync();
+            await session.CancelAsync();
+            try { await connection; }
+            catch (OperationCanceledException) when (session.IsCancellationRequested) { }
+            finally { await client.StopAsync(); }
+        }
+
+        async Task StartConnectionAsync()
+        {
+            var delay = TimeSpan.FromSeconds(1);
+            while (true)
+            {
+                try
+                {
+                    await client.StartAsync(session.Token);
+                    return;
+                }
+                catch (OperationCanceledException) when (session.IsCancellationRequested) { throw; }
+                catch (Exception error)
+                {
+                    // Replace this diagnostic with the application's connection/error UI.
+                    Console.Error.WriteLine($"Startup: {error}");
+                    if (error is not (HttpRequestException or TimeoutException)
+                        && error is not RelayException { Error.Code: "temporarily_unavailable" or "bad_gateway" or "rate_limited" })
+                        return;
+                }
+                // Retry only transient startup failures. Authorization/key failures
+                // need explicit user action; never call establishment from this loop.
+                await Task.Delay(delay, session.Token);
+                delay = TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds * 2, 30));
+            }
         }
     }
     #endregion
@@ -79,9 +110,35 @@ public static class Sessions
         CancellationToken cancellationToken = default)
     {
         // The client was constructed with an account signer and has not started.
-        await initializedClient.RecoverAccountAsync(
-            new AccountRecoveryOptions { RelayId = relayId }, cancellationToken);
+        await initializedClient.EstablishAccountAsync(
+            new AccountEstablishmentOptions { RelayId = relayId }, cancellationToken);
     }
+    #endregion
+
+    #region establishment-selection
+    public static async Task<DeviceSelectionInfo?> EstablishOrGetSelectionAsync(
+        MeshlineClient client, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await client.EstablishAccountAsync(cancellationToken: cancellationToken);
+            return null;
+        }
+        catch (AccountEstablishmentException error)
+            when (error.Reason == AccountEstablishmentReason.DeviceSelectionRequired)
+        {
+            // Return the verified list to the application. It owns the user's choice.
+            return error.DeviceSelection;
+        }
+    }
+
+    public static Task ReplaceSelectedDeviceAsync(
+        MeshlineClient client, string selectedDeviceId,
+        CancellationToken cancellationToken = default) =>
+        client.EstablishAccountAsync(new AccountEstablishmentOptions
+        {
+            ReplaceDeviceId = selectedDeviceId
+        }, cancellationToken);
     #endregion
 
     #region migration

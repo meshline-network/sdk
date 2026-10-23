@@ -6,16 +6,16 @@
 
 | Situation | Operation |
 | --- | --- |
-| Account has no established route | `EstablishAccountAsync` after initialization. |
+| First explicit enablement | `EstablishAccountAsync` after initialization. |
 | Same authorized device and usable local database | `InitializeAsync`, then `StartAsync`. |
-| Existing account needs restored device authorization | `RecoverAccountAsync` with the account signer before starting. |
+| Existing account needs new-device authorization, renewal, or explicit reauthorization | `EstablishAccountAsync` with the account signer before starting. |
 | Authorized account moves to a different home relay | `ChangeHomeRelayAsync` with the account signer and existing state. |
 
 All account writes require access to the account signing mechanism. Preserve the existing database and protection keys when they are available; a new empty database cannot reconstruct all local history or protected group secrets.
 
 ## Recover account access
 
-Initialize a client constructed with an account signer, then explicitly select recovery:
+Initialize a client constructed with an account signer, then explicitly establish authorization:
 
 <!-- snippet: recovery -->
 ```csharp
@@ -25,15 +25,15 @@ public static async Task RecoverAsync(
     CancellationToken cancellationToken = default)
 {
     // The client was constructed with an account signer and has not started.
-    await initializedClient.RecoverAccountAsync(
-        new AccountRecoveryOptions { RelayId = relayId }, cancellationToken);
+    await initializedClient.EstablishAccountAsync(
+        new AccountEstablishmentOptions { RelayId = relayId }, cancellationToken);
 }
 ```
 <!-- /snippet -->
 
-Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). After recovery completes, start the client and observe synchronization. `AccountRecoveryOptions` can carry verified `PreviousDeviceState` and explicit device-state and route revisions when the application needs them. Otherwise the SDK selects recovery revisions. A supplied previous state can preserve devices; do not invent previous state or assume every old device is preserved when that state is unavailable.
+Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). After setup completes, start the client separately. Read [account establishment](account-establishment.md) for structured failures, explicit full-list replacement, the complete-local-data contract, key-access diagnostics, and protocol limits. New-device authorization preserves existing profile fields and other devices.
 
-Recovery publishes device state and an account route. It is not a read-only probe and must not run automatically whenever initialization, a request, or socket connection fails. Diagnose storage access, network binding, secret decryption, and relay availability first.
+`RecoverAccountAsync` supports advanced explicit recovery with revision and previous-state options. The unified establishment entry point does not call it as a fallback. Neither API is a general response to network or storage errors. Device reauthorization does not restore old chat history.
 
 ## Move to another home relay
 

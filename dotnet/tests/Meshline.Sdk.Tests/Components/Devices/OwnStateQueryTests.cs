@@ -425,6 +425,9 @@ public sealed class OwnStateQueryTests
         var replacement = await fixture.Pool.GetAsync(fixture.Relay.RelayId, manager, Token);
         // The manager must attach to the replacement and start its notification connection itself.
         await AsyncTest.UntilAsync(() => fixture.Relay.Sockets.Count == 2 && fixture.Relay.Sockets.Last().Requests.Any(request => request.Method == "auth.device.verify"));
+        // Request observation precedes the reply. Queue notifications only after the
+        // authentication response, as a real authenticated relay would do.
+        await fixture.Relay.Sockets.Last().AuthenticationReplied.WaitAsync(TimeSpan.FromSeconds(5), Token);
         var observed = AsyncTest.Signal();
         replacement.NotificationReceived += (_, request) => { if (request.Method == "device.state.changed") observed.TrySetResult(); };
         fixture.Relay.Sockets.Last().Push(JsonSerializer.Serialize(new { jsonrpc = "2.0", method = "device.state.changed", @params = new { revision = manager.DeviceState!.Revision + 1 } }));

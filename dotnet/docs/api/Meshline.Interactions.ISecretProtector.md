@@ -98,5 +98,11 @@ The restored plaintext secret bytes; the caller is responsible for their lifetim
 
 #### Exceptions
 
+[SecretAccessException](Meshline.Interactions.SecretAccessException.md 'Meshline\.Interactions\.SecretAccessException')<br>
+The provider can diagnose why the secret is unavailable\.
+
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The operation observes cancellation of [cancellationToken](Meshline.Interactions.ISecretProtector.md#Meshline.Interactions.ISecretProtector.UnprotectAsync(System.ReadOnlyMemory_byte_,string,System.Threading.CancellationToken).cancellationToken 'Meshline\.Interactions\.ISecretProtector\.UnprotectAsync\(System\.ReadOnlyMemory\<byte\>, string, System\.Threading\.CancellationToken\)\.cancellationToken')\.
+
+### Remarks
+Throw SecretAccessException to distinguish temporary unavailability from positively established permanent loss\. Other read failures are treated as unknown\. All failures preserve storage; a diagnosis never authorizes automatic key replacement or database deletion\.

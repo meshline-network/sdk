@@ -24,6 +24,8 @@ public interface ISecretProtector
     /// <param name="purpose">A stable purpose string binding protection to its intended use; pass the same value when restoring the secret.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The restored plaintext secret bytes; the caller is responsible for their lifetime.</returns>
+    /// <remarks>Throw SecretAccessException to distinguish temporary unavailability from positively established permanent loss. Other read failures are treated as unknown. All failures preserve storage; a diagnosis never authorizes automatic key replacement or database deletion.</remarks>
+    /// <exception cref="SecretAccessException">The provider can diagnose why the secret is unavailable.</exception>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>.</exception>
     Task<byte[]> UnprotectAsync(ReadOnlyMemory<byte> protectedData, string purpose, CancellationToken cancellationToken = default);
 }

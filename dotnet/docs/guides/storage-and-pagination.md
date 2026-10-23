@@ -12,6 +12,23 @@ Keep a distinct database for each local account/device session. Preserve its pro
 
 Schema migrations are applied explicitly. Use the SDK migration entry point instead of editing internal tables or invoking EF migration classes directly. The `InitialCreate` migration is the 1.0.0 database baseline; pre-1.0 development databases built from a different initial migration are outside that upgrade baseline.
 
+`ResumableAccountEstablishment` upgrades `InitialCreate` while retaining device
+keys, pending signed publications and history. Intermediate development schemas
+and incomplete setup records from older workflow formats are outside this upgrade
+path. Current operations retain their protected keys, saved intent and exact pending
+requests across restarts; a checkpoint never replaces current authorization checks.
+
+Use one active client per database and transfer ownership only after disposal; see
+[lifecycle](lifecycle.md#session-order). Retain the database, device keys and
+protection material together, or begin with all local data absent. Partial permanent
+loss is unsupported. Every key-access failure preserves storage; a protector can
+distinguish temporary, permanent and unknown failure through `SecretAccessException`.
+See [key diagnosis and retry](account-establishment.md#keys-and-interrupted-setup).
+Reauthorizing a device does not recreate missing historical decryption keys.
+
+For contributors, [storage ownership and retry invariants](../../../MAINTENANCE.md#account-establishment)
+describe the workflow, preparation receipt, binding and publication records.
+
 ## Local snapshot readers
 
 List APIs such as `GetMessageHistoryAsync`, `GetConversationsAsync`, `GetContactsAsync`, `GetPostsAsync`, and `GetMessagesAsync` return `QueryReader<T>`. Each reader opens a fixed SQLite snapshot:

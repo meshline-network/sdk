@@ -127,7 +127,7 @@ sealed partial class MessageManager
             database.ContactRequests.Add(record);
             result = RequestSnapshot(record, outgoing.State);
             notifications.Add(() => ContactRequestChanged?.Invoke(this, new(accountId, record.Direction, result, ContactRequestChangeKind.Added)));
-        }, cancellationToken).ConfigureAwait(false);
+        }, cancellationToken, contactAuthorization: true).ConfigureAwait(false);
         return result;
     }
 
@@ -208,7 +208,7 @@ sealed partial class MessageManager
             await ClearRequestsAsync(database, accountId, notifications, token).ConfigureAwait(false);
             await QueueSyncAsync(database, notifications, record, token).ConfigureAwait(false);
             NotifyContact(notifications, record, ContactChangeKind.Relationship | ContactChangeKind.Authorization);
-        }, cancellationToken).ConfigureAwait(false);
+        }, cancellationToken, contactAuthorization: true).ConfigureAwait(false);
         return (await GetContactAsync(accountId, cancellationToken).ConfigureAwait(false))!;
     }
 
@@ -366,7 +366,7 @@ sealed partial class MessageManager
             await ClearRequestsAsync(database, accountId, notifications, token).ConfigureAwait(false);
             await QueueSyncAsync(database, notifications, record, token).ConfigureAwait(false);
             NotifyContact(notifications, record, ContactChangeKind.Deleted);
-        }, cancellationToken).ConfigureAwait(false);
+        }, cancellationToken, contactAuthorization: true).ConfigureAwait(false);
     }
 
     async Task<ContactConsent> CreateConsentAsync(string accountId, string? note, CancellationToken cancellationToken)

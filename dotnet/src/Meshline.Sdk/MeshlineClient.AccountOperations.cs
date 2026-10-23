@@ -7,23 +7,6 @@ namespace Meshline;
 
 sealed partial class MeshlineClient
 {
-    async Task<DeviceCertificate> PrepareLocalDeviceAsync(TimeSpan validity, CancellationToken cancellationToken)
-    {
-        if (Device is null) return await DeviceManager.CreateDeviceAsync(validity, cancellationToken).ConfigureAwait(false);
-        var now = Clock.UtcNow.ToUnixTimeSeconds();
-        return Device.NotBefore <= now && Device.ExpiresAt > now ? Device : await DeviceManager.RenewDeviceAsync(validity, cancellationToken).ConfigureAwait(false);
-    }
-
-    async Task ConfirmLocalAuthorizationAsync(string relayId, CancellationToken cancellationToken)
-    {
-        var certificate = Device ?? throw new InvalidOperationException("No local device has been created.");
-        if (await DeviceManager.GetOwnDeviceStateAsync(relayId, cancellationToken).ConfigureAwait(false) is null)
-            throw new InvalidDataException("The home relay returned no device state after account publication.");
-        if (DeviceManager.GetAuthorizationState(certificate.GetDeviceId(Context)) != DeviceAuthorizationState.Authorized)
-            throw new InvalidDataException("The home relay has not authorized the local device.");
-        await _relayClients.GetAsync(relayId, DeviceManager, cancellationToken).ConfigureAwait(false);
-    }
-
     async Task<AccountDeviceState> ReadMigrationDeviceStateAsync(string sourceRelayId, AccountDeviceState? fallback, CancellationToken cancellationToken)
     {
         try { await DeviceManager.GetOwnDeviceStateAsync(sourceRelayId, cancellationToken).ConfigureAwait(false); }

@@ -54,6 +54,11 @@ The configured account identifier is invalid\.
 
 [System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
 The configured account identifier uses an unsupported account namespace\.
+
+### Remarks
+Callers must not run device creation, renewal, removal, or state publication concurrently with<br>
+[EstablishAccountAsync\(AccountEstablishmentOptions, CancellationToken\)](Meshline.MeshlineClient.md#Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken) 'Meshline\.MeshlineClient\.EstablishAccountAsync\(Meshline\.Models\.Client\.AccountEstablishmentOptions, System\.Threading\.CancellationToken\)') on the same client, including from signing or event callbacks\.<br>
+Await the current operation's completion, failure, or cancellation before starting the other operation\.
 ### Constructors
 
 <a name='Meshline.Components.DeviceManager.DeviceManager(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Components.AccountManager,Meshline.Interactions.IAccountSigner,Meshline.Interactions.ISecretProtector)'></a>
@@ -113,6 +118,11 @@ The configured account identifier is invalid\.
 
 [System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
 The configured account identifier uses an unsupported account namespace\.
+
+### Remarks
+Callers must not run device creation, renewal, removal, or state publication concurrently with<br>
+[EstablishAccountAsync\(AccountEstablishmentOptions, CancellationToken\)](Meshline.MeshlineClient.md#Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken) 'Meshline\.MeshlineClient\.EstablishAccountAsync\(Meshline\.Models\.Client\.AccountEstablishmentOptions, System\.Threading\.CancellationToken\)') on the same client, including from signing or event callbacks\.<br>
+Await the current operation's completion, failure, or cancellation before starting the other operation\.
 ### Properties
 
 <a name='Meshline.Components.DeviceManager.DeviceState'></a>
@@ -188,7 +198,7 @@ The newly stored local device certificate\.
 The operation observes cancellation of [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.CreateDeviceAsync(System.TimeSpan,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.CreateDeviceAsync\(System\.TimeSpan, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. An account signer or required secret protector is unavailable; a local device already exists in this database\.
+This component or a required component has not completed initialization\. An account signer or required secret protector is unavailable, a local device already exists, or device preparation/publication is unfinished\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component or a component used by the operation has been disposed\.
@@ -209,7 +219,7 @@ The local device key cannot be validated against its certificate, or cryptograph
 The requested certificate validity is outside one second through 720 days\.
 
 ### Remarks
-Requires an account signer, a secret protector, and a database without a local device\. The returned certificate is stored locally; publish device state before treating the device as authorized by the relay\.
+Requires an account signer, a secret protector, and a database without a local device or unfinished device preparation/publication\. The returned certificate is stored locally; publish device state before treating the device as authorized by the relay\.
 
 <a name='Meshline.Components.DeviceManager.DeriveSharedSecretAsync(System.ReadOnlyMemory_byte_,System.Threading.CancellationToken)'></a>
 
@@ -620,6 +630,9 @@ The target account or relay identifier is invalid, or supplied contact evidence 
 [System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
 An account identifier in the query uses an unsupported namespace\.
 
+### Remarks
+While running, queries use device authentication only\. A stopped manager may use account authentication when its local device authorization is unavailable\. Device\-authenticated reads retry an expired session with the same identity but never escalate a rejection into account signing; use explicit account establishment for reauthorization\.
+
 <a name='Meshline.Components.DeviceManager.PublishDeviceStateAsync(string,System.Collections.Generic.IReadOnlyList_Meshline.Models.Protocol.DeviceCertificate_,Meshline.Models.Client.DeviceStatePublishOptions,System.Threading.CancellationToken)'></a>
 
 ## DeviceManager\.PublishDeviceStateAsync\(string, IReadOnlyList\<DeviceCertificate\>, DeviceStatePublishOptions, CancellationToken\) Method
@@ -704,7 +717,8 @@ The prior state belongs to another account or is invalid, or the complete certif
 The selected device\-state revision is not a newer nonnegative safe integer\. A relay\-provided staging timestamp is outside the supported DateTimeOffset range\.
 
 ### Remarks
-A supplied list is the complete authorized device set, not a delta\. With no list, known devices are preserved and the local certificate is refreshed; unavailable prior state or missing local authorization requires explicit recovery\. Staged publication is not yet authoritative\.
+A supplied list is the complete authorized device set, not a delta\. With no list, known devices are preserved and the local certificate is refreshed; unavailable prior state or missing local authorization requires explicit recovery\. Staged publication is not yet authoritative\.<br>
+Staged and unknown\-outcome submissions remain pending\. Retry with the same complete certificate list, relay, and optional revision to reuse the signed request\. A call without a certificate list performs a refresh and may advance the revision\.
 
 <a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken)'></a>
 
@@ -955,7 +969,7 @@ The caller cancels the operation or a component or relay lifetime ends\.
 An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. Published device state is unavailable, removal would invalidate a contact grant without accepted replacement signatures, or the relay only stages the removal\.
+This component or a required component has not completed initialization\. Published device state or retained contact history is unavailable, removal would invalidate a contact grant without accepted replacement signatures, or the relay only stages the removal\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.
@@ -990,6 +1004,10 @@ The [deviceId](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceMa
 [System\.ArgumentOutOfRangeException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentoutofrangeexception 'System\.ArgumentOutOfRangeException')<br>
 The next device\-state revision exceeds the protocol safe\-integer limit\.
 
+### Remarks
+Uses the same retained\-history and confirmed\-grant checks as account setup with an explicit replacement\.<br>
+This operation checks existing evidence; it does not send contact\-grant updates or start background synchronization\.
+
 <a name='Meshline.Components.DeviceManager.RenewDeviceAsync(System.TimeSpan,System.Threading.CancellationToken)'></a>
 
 ## DeviceManager\.RenewDeviceAsync\(TimeSpan, CancellationToken\) Method
@@ -1023,7 +1041,7 @@ The renewed local device certificate with the same device keys\.
 The operation observes cancellation of [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RenewDeviceAsync(System.TimeSpan,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.RenewDeviceAsync\(System\.TimeSpan, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. An account signer or required secret protector is unavailable; no local device has been created\.
+This component or a required component has not completed initialization\. An account signer or required secret protector is unavailable, no local device has been created, or device preparation/publication is unfinished\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component or a component used by the operation has been disposed\.
@@ -1047,7 +1065,7 @@ The requested certificate validity is outside one second through 720 days\.
 The stored local device certificate is JSON null\.
 
 ### Remarks
-The renewed certificate retains the device identity\. Publish device state to make the renewed authorization authoritative at the relay\.
+The renewed certificate retains the device identity\. Complete any unfinished device preparation or publication before renewing\. Publish device state to make the renewed authorization authoritative at the relay\.
 
 <a name='Meshline.Components.DeviceManager.SignAsync(System.ReadOnlyMemory_byte_,System.Threading.CancellationToken)'></a>
 

@@ -16,6 +16,7 @@ not yet be available in that package.
 | [Application integrations](guides/integrations.md) | Bind the network and account; implement signing, registry access, and secret protection. |
 | [Lifecycle and ownership](guides/lifecycle.md) | Initialize, start, stop, and dispose clients and independently composed components. |
 | [Accounts and devices](guides/accounts-and-devices.md) | Resolve routes, authorize devices, renew certificates, and publish device state. |
+| [Idempotent account establishment](guides/account-establishment.md) | Enable an account, resume interrupted setup, renew authorization, and explicitly replace a selected device. |
 
 ## Everyday application work
 

@@ -11,6 +11,7 @@ Lifecycle\-managed components and events for accounts, devices, profiles, contac
 | Classes | |
 | :--- | :--- |
 | [AccountManager](Meshline.Components.AccountManager.md 'Meshline\.Components\.AccountManager') | Resolves and publishes signed account routes and retains the current account's known route\. |
+| [AccountRouteException](Meshline.Components.AccountRouteException.md 'Meshline\.Components\.AccountRouteException') | Structured failure from AccountManager\.EnsureRouteAsync\. |
 | [BackgroundErrorEventArgs](Meshline.Components.BackgroundErrorEventArgs.md 'Meshline\.Components\.BackgroundErrorEventArgs') | Describes a background failure and the operation and resource associated with it\. |
 | [ChannelFollowChangedEventArgs](Meshline.Components.ChannelFollowChangedEventArgs.md 'Meshline\.Components\.ChannelFollowChangedEventArgs') | Describes a change to the local following state of a channel\. |
 | [ChannelManager](Meshline.Components.ChannelManager.md 'Meshline\.Components\.ChannelManager') | Manages public channel metadata, posts, follows, and local timeline synchronization\. |
@@ -35,6 +36,7 @@ Lifecycle\-managed components and events for accounts, devices, profiles, contac
 
 | Enums | |
 | :--- | :--- |
+| [AccountRouteFailure](Meshline.Components.AccountRouteFailure.md 'Meshline\.Components\.AccountRouteFailure') | A machine\-readable failure from ensuring the account's home route\. |
 | [AccountState](Meshline.Components.AccountState.md 'Meshline\.Components\.AccountState') | Indicates what the component knows about the current account's establishment\. |
 | [BackgroundOperation](Meshline.Components.BackgroundOperation.md 'Meshline\.Components\.BackgroundOperation') | Identifies the background activity that produced a diagnostic error\. |
 | [ChannelPostChangeKind](Meshline.Components.ChannelPostChangeKind.md 'Meshline\.Components\.ChannelPostChangeKind') | Identifies how a channel post changed\. |

@@ -1,3 +1,4 @@
+using Meshline.Components;
 using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Tests.Support;
@@ -154,6 +155,10 @@ public sealed class MessageSynchronizationTests
         Exception? error = null;
         fixture.Client.MessageManager.BackgroundError += (_, args) =>
         {
+            // A connection diagnostic can arrive before the synchronization pass
+            // handles that failure. Wait for the pass before stopping its runtime.
+            if ((outcome is "network" or "signature" or "missing")
+                && (args.Operation != BackgroundOperation.Synchronize || args.Resource != fixture.Relay.RelayId)) return;
             error = args.Error;
             failed.TrySetResult();
         };

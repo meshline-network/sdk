@@ -5,6 +5,7 @@ using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -64,13 +65,20 @@ sealed partial class GroupManager
     protected override async Task OnStopAsync()
     {
         messageManager.TimelineChanged -= OnAccountTimelineChanged;
-        await Task.WhenAll(_refresh, _poll).ConfigureAwait(false);
+        List<Exception> failures = [];
+        try { await Task.WhenAll(_refresh, _poll).ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        _refresh = _poll = Task.CompletedTask;
         RelayClient[] relays;
         lock (_subscriptionGate) { relays = _subscriptions.Values.ToArray(); _subscriptions.Clear(); }
         foreach (var relay in relays) DetachRelay(relay);
-        if (_subscriptionWorker is not null) await _subscriptionWorker.DisposeAsync().ConfigureAwait(false);
+        try { if (_subscriptionWorker is not null) await _subscriptionWorker.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
         _subscriptionWorker = null;
-        _syncStatus.Stop(OnSyncStatusChanged);
+        try { _syncStatus.Stop(OnSyncStatusChanged); }
+        catch (Exception error) { failures.Add(error); }
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 
     void OnAccountTimelineChanged(object? sender, EventArgs args) => Wake();

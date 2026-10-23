@@ -57,7 +57,7 @@ public static async Task RunNewAccountAsync(
 ```
 <!-- /snippet -->
 
-`MigrateAsync` creates or upgrades the schema. `InitializeAsync` loads component state; it does not migrate storage. `EstablishAccountAsync` selects an eligible relay, creates and authorizes the device, and publishes the initial route. Supply `AccountEstablishmentOptions.RelayId` when relay selection must be explicit. Interrupted establishment can resume with the same database and selected relay.
+`MigrateAsync` creates or upgrades the schema. `InitializeAsync` loads component state; it does not migrate storage. `EstablishAccountAsync` idempotently prepares authorization and the initial profile, preserving existing devices and the original home relay. It does not start background synchronization. Supply `AccountEstablishmentOptions.RelayId` when initial relay selection must be explicit. Interrupted establishment resumes with the same database and selected relay. See [account establishment](account-establishment.md) for new-device authorization, renewal, device selection, and structured failures.
 
 The client is disposed before the pool because `await using` declarations unwind in reverse order. The application retains ownership of its signer and protector. Keep the background-error handler connected for the entire session.
 

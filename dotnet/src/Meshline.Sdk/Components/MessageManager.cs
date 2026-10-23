@@ -5,6 +5,7 @@ using Meshline.Storage;
 using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -99,9 +100,15 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     {
         deviceManager.DeviceChanged -= OnDeviceChanged;
         deviceManager.DeviceStateChanged -= OnOwnDeviceStateChanged;
-        await Task.WhenAll(_sender, _synchronizer, _poller, _refresh).ConfigureAwait(false);
+        List<Exception> failures = [];
+        try { await Task.WhenAll(_sender, _synchronizer, _poller, _refresh).ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        _sender = _synchronizer = _poller = _refresh = Task.CompletedTask;
         DetachRelays();
-        _syncStatus.Stop(OnSyncStatusChanged);
+        try { _syncStatus.Stop(OnSyncStatusChanged); }
+        catch (Exception error) { failures.Add(error); }
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 
     /// <inheritdoc/>

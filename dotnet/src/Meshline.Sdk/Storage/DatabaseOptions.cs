@@ -5,6 +5,7 @@ namespace Meshline.Storage;
 /// </summary>
 /// <remarks>
 /// Use a separate database for each network, account, and device. Assigning the path does not open a database or create its parent directory. Call <see cref="MeshlineDatabase.MigrateAsync"/> before initializing clients or components.
+/// Each database has one active client or independently composed component graph, including across processes. Await disposal before transferring ownership. The SDK does not enforce exclusive database ownership.
 /// </remarks>
 public sealed class DatabaseOptions
 {

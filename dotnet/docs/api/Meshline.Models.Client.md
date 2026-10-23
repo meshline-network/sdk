@@ -10,7 +10,10 @@ Application\-facing options, drafts, queries, result models, and pagination type
 
 | Classes | |
 | :--- | :--- |
-| [AccountEstablishmentOptions](Meshline.Models.Client.AccountEstablishmentOptions.md 'Meshline\.Models\.Client\.AccountEstablishmentOptions') | Configures initial account establishment and the validity of its device certificate and route\. |
+| [AccountDeviceInfo](Meshline.Models.Client.AccountDeviceInfo.md 'Meshline\.Models\.Client\.AccountDeviceInfo') | A verified device certificate and its canonical identifier for caller selection\. |
+| [AccountEstablishmentException](Meshline.Models.Client.AccountEstablishmentException.md 'Meshline\.Models\.Client\.AccountEstablishmentException') | Structured failure information from explicit account establishment\. |
+| [AccountEstablishmentOptions](Meshline.Models.Client.AccountEstablishmentOptions.md 'Meshline\.Models\.Client\.AccountEstablishmentOptions') | Configures idempotent account setup without starting background synchronization\. |
+| [AccountInitialProfile](Meshline.Models.Client.AccountInitialProfile.md 'Meshline\.Models\.Client\.AccountInitialProfile') | Creation\-only profile values used by account establishment\. |
 | [AccountRecoveryOptions](Meshline.Models.Client.AccountRecoveryOptions.md 'Meshline\.Models\.Client\.AccountRecoveryOptions') | Configures explicit account recovery, including prior device state and revision overrides\. |
 | [ChannelInfo](Meshline.Models.Client.ChannelInfo.md 'Meshline\.Models\.Client\.ChannelInfo') | Combines a channel reference with its known descriptor and local following state\. |
 | [ChannelPostDraft](Meshline.Models.Client.ChannelPostDraft.md 'Meshline\.Models\.Client\.ChannelPostDraft') | Supplies the body and attachments for a new public channel post\. |
@@ -20,11 +23,13 @@ Application\-facing options, drafts, queries, result models, and pagination type
 | [ChannelRef](Meshline.Models.Client.ChannelRef.md 'Meshline\.Models\.Client\.ChannelRef') | Identifies a channel and the relay hosting it\. |
 | [ChannelUpdate](Meshline.Models.Client.ChannelUpdate.md 'Meshline\.Models\.Client\.ChannelUpdate') | Describes metadata field updates for a channel\. |
 | [ClientOptions](Meshline.Models.Client.ClientOptions.md 'Meshline\.Models\.Client\.ClientOptions') | Binds a client or component to one Meshline network and account\. |
+| [ContactAuthorizationIssue](Meshline.Models.Client.ContactAuthorizationIssue.md 'Meshline\.Models\.Client\.ContactAuthorizationIssue') | A contact authorization that cannot safely survive the requested replacement\. |
 | [ContactInfo](Meshline.Models.Client.ContactInfo.md 'Meshline\.Models\.Client\.ContactInfo') | Contains a contact's relationship, local alias, and authorization state in both directions\. |
 | [ContactRequestInfo](Meshline.Models.Client.ContactRequestInfo.md 'Meshline\.Models\.Client\.ContactRequestInfo') | Contains a locally stored contact request and any associated outbox status\. |
 | [Conversation](Meshline.Models.Client.Conversation.md 'Meshline\.Models\.Client\.Conversation') | Summarizes a local direct, group, or channel conversation\. |
 | [ConversationQuery](Meshline.Models.Client.ConversationQuery.md 'Meshline\.Models\.Client\.ConversationQuery') | Filters local conversations by kind, unread state, and message presence\. |
 | [ConversationSummary](Meshline.Models.Client.ConversationSummary.md 'Meshline\.Models\.Client\.ConversationSummary') | Contains the latest message preview used to summarize a conversation\. |
+| [DeviceSelectionInfo](Meshline.Models.Client.DeviceSelectionInfo.md 'Meshline\.Models\.Client\.DeviceSelectionInfo') | The current complete device list supplied when explicit selection is needed\. |
 | [DeviceStatePublishOptions](Meshline.Models.Client.DeviceStatePublishOptions.md 'Meshline\.Models\.Client\.DeviceStatePublishOptions') | Controls the prior state, recovery mode, and revision used when publishing device authorization\. |
 | [DeviceStatePublishResult](Meshline.Models.Client.DeviceStatePublishResult.md 'Meshline\.Models\.Client\.DeviceStatePublishResult') | Contains the submitted device state and whether the relay accepted or temporarily staged it\. |
 | [DirectMessageDraft](Meshline.Models.Client.DirectMessageDraft.md 'Meshline\.Models\.Client\.DirectMessageDraft') | Supplies plaintext content and an optional reply reference for an encrypted direct message\. |
@@ -51,6 +56,7 @@ Application\-facing options, drafts, queries, result models, and pagination type
 
 | Enums | |
 | :--- | :--- |
+| [AccountEstablishmentReason](Meshline.Models.Client.AccountEstablishmentReason.md 'Meshline\.Models\.Client\.AccountEstablishmentReason') | A machine\-readable reason why account setup did not complete\. |
 | [ContactGrantState](Meshline.Models.Client.ContactGrantState.md 'Meshline\.Models\.Client\.ContactGrantState') | Describes the local assessment of a contact grant's usability\. |
 | [ContactRequestDirection](Meshline.Models.Client.ContactRequestDirection.md 'Meshline\.Models\.Client\.ContactRequestDirection') | Selects incoming requests, outgoing requests, or both\. |
 | [ConversationKind](Meshline.Models.Client.ConversationKind.md 'Meshline\.Models\.Client\.ConversationKind') | Selects the kinds of local conversations to include; values may be combined\. |

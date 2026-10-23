@@ -19,6 +19,7 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
     readonly AccountSigner relayKey = new();
     readonly HttpClient http;
     readonly List<OfflineRelay> neighbors = [];
+    readonly ConcurrentDictionary<string, DeviceCertificate> deviceSessions = new();
     public string Host { get; }
 
     public void LinkTo(OfflineRelay relay)
@@ -208,10 +209,15 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
                 return Profiles.TryGetValue(profileAccount, out var profile) ? Json(profile) : Error("not_found");
             case "profile.publish":
                 var publishedProfile = ProtocolModel.FromJson<AccountProfile>(request.Body!)!;
+                if (request.Session is null || !deviceSessions.TryGetValue(request.Session, out var profileSigner))
+                    return Error("forbidden");
+                if (profileSigner.Account != publishedProfile.Account
+                    || !Org.BouncyCastle.Math.EC.Rfc8032.Ed25519.Verify(publishedProfile.DeviceSignature.AsSpan(), profileSigner.SigningPublicKey.AsSpan(), publishedProfile.GetSigningInput(Context)))
+                    return Error("invalid_signature");
                 Profiles[publishedProfile.Account] = new()
                 {
                     Profile = publishedProfile,
-                    SignerCertificate = Devices[publishedProfile.Account].Certificates[0]
+                    SignerCertificate = profileSigner
                 };
                 return new(HttpStatusCode.NoContent);
             case "message.timeline.sync":
@@ -236,6 +242,7 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
                 });
             case "auth.account.verify":
             case "auth.device.verify":
+                DeviceCertificate? authenticatedDevice = null;
                 if (request.Method == "auth.account.verify")
                 {
                     var proof = ProtocolModel.FromJson<AccountAuthenticationRequest>(request.Body!)!;
@@ -248,9 +255,11 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
                     var proof = ProtocolModel.FromJson<DeviceAuthenticationRequest>(request.Body!)!;
                     if (proof.SignerCertificate.Validate(Context) is not null || proof.Nonce != "offline-challenge" || !Org.BouncyCastle.Math.EC.Rfc8032.Ed25519.Verify(proof.DeviceSignature.AsSpan(), proof.SignerCertificate.SigningPublicKey.AsSpan(), proof.GetSigningInput(RelayId, "https://" + Host, Context)))
                         return Error("invalid_signature");
+                    authenticatedDevice = proof.SignerCertificate;
                 }
 
                 var count = Interlocked.Increment(ref authenticationCount);
+                if (authenticatedDevice is not null) deviceSessions["session-" + count] = authenticatedDevice;
                 return Json(new SessionCredentials
                 {
                     Token = "session-" + count,
@@ -259,10 +268,15 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
                 });
             case "account.route.resolve":
                 var account = Uri.UnescapeDataString(query.TrimStart('?').Split('=', 2).Last());
-                return Routes.TryGetValue(account, out var route) ? Json(route) : Error("not_found");
+                return Routes.TryGetValue(account, out var route) && route.ExpiresAt > now ? Json(route) : Error("not_found");
             case "account.route.publish":
                 var submitted = ProtocolModel.FromJson<AccountRoute>(request.Body!)!;
                 Assert.Null(submitted.Validate(Context));
+                if (Routes.TryGetValue(submitted.Account, out var priorRoute))
+                {
+                    if (submitted.Revision < priorRoute.Revision) return Error("stale_state");
+                    if (submitted.Revision == priorRoute.Revision && submitted.ToJson() != (priorRoute with { RelaySignature = null }).ToJson()) return Error("state_conflict");
+                }
                 var published = SignRoute(submitted);
                 Routes[published.Account] = published;
                 foreach (var relay in neighbors)
@@ -271,6 +285,11 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
             case "device.state.publish":
                 var state = ProtocolModel.FromJson<AccountDeviceState>(request.Body!)!;
                 Assert.Null(state.Validate(Context));
+                if (Devices.TryGetValue(state.Account, out var priorState))
+                {
+                    if (state.Revision < priorState.Revision) return Error("stale_state");
+                    if (state.Revision == priorState.Revision && state.ToJson() != priorState.ToJson()) return Error("state_conflict");
+                }
                 Devices[state.Account] = state;
                 return Json(new DeviceStatePublishResponse
                 {
@@ -279,6 +298,8 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
                 });
             case "device.state.resolve":
                 var requested = request.Body is null ? Uri.UnescapeDataString(query.TrimStart('?').Split('=', 2).Last()) : ProtocolModel.FromJson<SignedDeviceStateQuery>(request.Body)!.Account;
+                if (Routes.TryGetValue(requested, out var deviceRoute) && deviceRoute.ExpiresAt <= now)
+                    return Error("target_not_local");
                 return Devices.TryGetValue(requested, out var deviceState) ? Json(deviceState) : Error("not_found");
             default:
                 throw new InvalidOperationException("Unscripted offline HTTP request: " + request.Method);

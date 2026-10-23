@@ -8,6 +8,7 @@ internal sealed class SecretProtector : ISecretProtector
 {
     readonly byte[] key = RandomNumberGenerator.GetBytes(32);
     internal bool Fail { get; set; }
+    internal Func<string, Exception?>? ReadFailure { get; set; }
 
     public Task<byte[]> ProtectAsync(ReadOnlyMemory<byte> plaintext, string purpose, CancellationToken cancellationToken = default)
     {
@@ -24,6 +25,7 @@ internal sealed class SecretProtector : ISecretProtector
     public Task<byte[]> UnprotectAsync(ReadOnlyMemory<byte> protectedData, string purpose, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (ReadFailure?.Invoke(purpose) is { } failure) throw failure;
         if (Fail)
             throw new IOException("Injected secret protection failure");
         var output = new byte[protectedData.Length - 28];

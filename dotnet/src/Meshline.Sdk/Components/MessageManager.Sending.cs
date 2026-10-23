@@ -4,6 +4,7 @@ using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Storage;
 using Meshline.Transport;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Org.BouncyCastle.Math.EC.Rfc8032;
 using System.Collections.Immutable;
@@ -27,18 +28,25 @@ sealed partial class MessageManager
         _syncRequests.Writer.TryWrite(true);
     }
 
-    async Task TransactAsync(Func<MeshlineDbContext, List<Action>, CancellationToken, Task> action, CancellationToken cancellationToken) =>
-        PublishNotifications(await CommitAsync(action, cancellationToken).ConfigureAwait(false));
+    async Task TransactAsync(Func<MeshlineDbContext, List<Action>, CancellationToken, Task> action, CancellationToken cancellationToken, bool contactAuthorization = false) =>
+        PublishNotifications(await CommitAsync(action, cancellationToken, contactAuthorization).ConfigureAwait(false));
 
-    async Task<List<Action>> CommitAsync(Func<MeshlineDbContext, List<Action>, CancellationToken, Task> action, CancellationToken cancellationToken)
+    async Task<List<Action>> CommitAsync(Func<MeshlineDbContext, List<Action>, CancellationToken, Task> action, CancellationToken cancellationToken, bool contactAuthorization = false)
     {
         var notifications = new List<Action>();
         await _databaseGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             await using var database = new MeshlineDbContext(databaseOptions);
-            await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            // Acquire the SQLite writer before reading pending publications. Device
+            // removal uses the same transaction boundary for its final check and save.
+            await database.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var transaction = ((SqliteConnection)database.Database.GetDbConnection()).BeginTransaction(deferred: false);
+            await using var enlisted = await database.Database.UseTransactionAsync(transaction, cancellationToken).ConfigureAwait(false);
+            if (contactAuthorization && await database.SignedRequests.AnyAsync(value => value.Method == "device.state.publish" && value.Pending, cancellationToken).ConfigureAwait(false))
+                throw new InvalidOperationException("Reconcile the pending device publication before changing contact authorizations.");
             await action(database, notifications, cancellationToken).ConfigureAwait(false);
+            if (contactAuthorization) await ValidateContactAuthorizationsAsync(database, cancellationToken).ConfigureAwait(false);
             foreach (var entry in database.ChangeTracker.Entries<MessageOutboxRecord>().Where(value => value.State is EntityState.Added or EntityState.Modified).ToArray())
             {
                 await ProcessContactSendChangeAsync(database, entry.Entity, notifications, cancellationToken).ConfigureAwait(false);
@@ -93,6 +101,8 @@ sealed partial class MessageManager
             ?? throw new InvalidOperationException("The account device state is unavailable.");
         var own = ProtocolModel.FromJson<AccountDeviceState>(ownRecord.DocumentJson)!;
         if (own.ValidateDeviceAuthorization(certificate.GetDeviceId(Context), Context) is { } localViolation) throw new UnauthorizedAccessException(localViolation.Message);
+        var outgoingGrant = payload switch { ContactConsent consent => consent.Grant, ContactGrant grant => grant, _ => null };
+        if (outgoingGrant is not null) ValidateGrant(outgoingGrant, own, Context);
         authorization ??= await ReadAuthorizationAsync(database, recipient, cancellationToken).ConfigureAwait(false);
         if (payload is DirectMessage && recipient != Options.AccountId && authorization is not ContactGrant)
             throw new UnauthorizedAccessException("A direct message requires a contact grant from its recipient.");
@@ -107,7 +117,7 @@ sealed partial class MessageManager
         }
         var now = DateTimeOffset.FromUnixTimeSeconds(Clock.UtcNow.ToUnixTimeSeconds());
         var messageId = Identifiers.CreateMessageId();
-        var request = await EncryptAsync(messageId, now.ToUnixTimeSeconds(), recipient, payload, recipients, CurrentCertificates(own), authorization, cancellationToken).ConfigureAwait(false);
+        var request = await EncryptAsync(certificate, messageId, now.ToUnixTimeSeconds(), recipient, payload, recipients, CurrentCertificates(own), authorization, cancellationToken).ConfigureAwait(false);
         var record = new MessageOutboxRecord
         {
             MessageId = messageId,
@@ -181,7 +191,12 @@ sealed partial class MessageManager
         try
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15), Clock.Provider);
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false)) Wake();
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (Interlocked.Exchange(ref _contactMaintenanceRetryPending, 0) != 0)
+                    _refreshRequests.Writer.TryWrite(true);
+                Wake();
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }

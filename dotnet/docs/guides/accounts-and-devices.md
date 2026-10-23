@@ -8,7 +8,48 @@ An account identity belongs to the account signer. Its signed route identifies t
 
 Use `AccountManager.GetRouteAsync` to resolve the current or another account's route. `client.Route`, `client.Device`, and `client.DeviceState` expose currently known state. `AccountManager.State` reports the account state; it is separate from component lifecycle and transport connection state.
 
-For first-time setup, use the [quick-start establishment workflow](quick-start.md). It coordinates device creation, device-state publication, and route publication. Lower-level `PublishRouteAsync` and `PublishDeviceStateAsync` exist for applications managing those operations explicitly and require an account signer.
+For explicit setup, including new devices and expired authorization, use [idempotent account establishment](account-establishment.md). It coordinates durable keys, device-state publication, route renewal, and initial profile creation. Lower-level `PublishRouteAsync` and `PublishDeviceStateAsync` exist for applications managing those operations explicitly and require an account signer.
+
+On the same client, callers must await establishment before directly creating,
+renewing, removing, or publishing devices, and await any ongoing device mutation
+before starting establishment. This ordering also applies to signing/event callbacks;
+completion, failure, or cancellation must finish before the other operation starts.
+
+For route management alone, use `AccountManager.EnsureRouteAsync(relayId, validity,
+cancellationToken)`. It retains an unexpired verified route without network requests
+or account signing, reconciles an unfinished publication even when an older valid
+route exists, and renews only when necessary. It reads remote state before any
+publication. `validity` applies to a newly created route; it does not require an
+existing route to have that much time remaining. An unfinished request must use its
+original relay and lifetime. `PublishRouteAsync` remains the explicit publication
+API, including revision selection and recovery behavior.
+
+First route publication requires current authoritative or unexpired staged device
+state at that relay. Complete setup should use `EstablishAccountAsync`; successful
+route assurance alone does not confirm local-device authorization or initialize
+the profile. It does not migrate relays or start synchronization. Keep one manager
+per local account session, and finish explicit home-relay migration through the
+client's migration API before running account establishment.
+
+Catch `AccountRouteException` and use `Failure` to decide what must change before
+another explicit call to `EnsureRouteAsync`:
+
+| Failure | Handling |
+| --- | --- |
+| `StateUnavailable` | Restore access to complete, verified route state before retrying. A failed query does not prove account absence. |
+| `SubmissionUnknown` | Retry with the original relay and lifetime to reconcile the retained signed request; the submission may already have succeeded. |
+| `StateConflict` | Obtain newer authoritative state or correct relay prerequisites when the relay rejects a revision and discovery cannot resolve the conflict. |
+| `SignerRequired` | Supply an account signer before retrying. |
+| `SignatureDeclined` | Let the caller obtain renewed user consent before retrying account signing. |
+| `RelayMismatch` | Use the retained or unfinished publication's relay; resolve intentional migration through the migration API. |
+| `OperationConflict` | Resume the unfinished publication with its original lifetime. |
+
+A later explicit call may retry a definitively rejected unexpired route request
+after fresh discovery. Superseding an expired request requires retained verified
+original-route evidence; its saved revision alone is insufficient. See
+[protocol limits](account-establishment.md#protocol-limits-and-concurrency) before
+recovering an installation with expired or undiscoverable route history.
+Cancellation preserves the request and does not undo remote acceptance.
 
 ### Metadata reads and refreshes
 
@@ -56,11 +97,33 @@ public static async Task RenewDeviceAsync(
 
 Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). Inspect `DeviceStatePublishResult.Status`: a relay can temporarily stage a state instead of accepting it as authoritative. `StagedUntil` describes that temporary state when available. Do not present a staged publication as completed authorization.
 
+Staged submissions and submissions with an unknown outcome remain pending across
+restart. For an exact retry, pass the same complete certificate list, relay and
+revision (if one was supplied); the SDK reuses the signed request. A call without a
+certificate list performs a refresh and may advance the revision. Authoritative
+state reads reconcile pending requests; a temporary staging response does not.
+
 `GetAuthorizationState(deviceId)` distinguishes authorization conditions for a known device. `GetCertificate(deviceId)` retrieves a known certificate. `DeviceChanged` and `DeviceStateChanged` notify applications about changes; query current state again when updating UI.
 
 ## Removing devices and preserving access
 
 `RemoveDeviceAsync` independently reads the latest device state before publishing updated authorization; it requires the account signer. Do not treat deletion of a local database as remote device revocation. Removing a device's authorization affects future authorized operations, while local copies of already retrieved data remain under the application's storage policy.
+
+Standalone removal and `EstablishAccountAsync` with `ReplaceDeviceId` use the same
+contact-continuity checks. A valid selected device requires retained contact-history
+provenance and local issuance history. Active grants that depend on that device
+must have a confirmed, valid signature from a remaining device on the same grant
+content. An expired confirmation or confirmation of an older grant is insufficient.
+Missing evidence blocks publication, even when the local contact list is empty.
+Expired devices no longer supply usable signatures and do not create this hazard.
+
+`RemoveDeviceAsync` checks existing evidence and reports failure with
+`InvalidOperationException`; it does not deliver grant updates. Account setup also
+checks existing evidence without delivering updates and returns structured
+`ContactIssues` through `AccountEstablishmentException`. Both operations leave
+background synchronization under the caller's control. See
+[contact authorization continuity](account-establishment.md#contact-authorization-continuity) for background grant updates, retry and
+history limitations.
 
 Routine startup uses an already authorized device and need not request an account signature. Expired or unavailable authorization requires deliberate handling: renew or republish with the account signer when appropriate, or use the [account recovery workflow](recovery-and-migration.md). Transport outages alone do not justify replacing authorization.
 
