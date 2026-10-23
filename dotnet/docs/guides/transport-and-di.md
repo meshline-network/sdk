@@ -4,7 +4,19 @@
 
 ## Pools and relay sessions
 
-Share one `RelayClientPool` among components for a single network/account/device session. Account and device authentication use separate pooled sessions. The first device-authenticated request binds the pool to that device; do not share it across independent devices or accounts.
+Share one `RelayClientPool` among components for one network, account and local
+device. The pool owns separate account and device sessions. Device acquisition
+binds it to the signer's identity and canonical certificate content.
+
+A renewed certificate retires device sessions while account sessions remain
+available. Canonically equal certificates reuse the current sessions, including
+after deserialization. Account setup and standalone renewal maintain this binding;
+direct `GetAsync` calls with a custom `IDeviceSigner` support renewal of the same
+device as well. Supply the current certificate: a certificate already replaced
+in this pool is rejected, and an acquisition begun before renewal cannot restore
+its old binding. Certificate validity dates do not determine renewal order, so a
+renewal may shorten the lifetime. Independent devices and accounts need their own
+pools.
 
 The pool uses the supplied `IRelayRegistry` directly and does not dispose it. Opt into `CachedRelayRegistry` when the provider needs caching; see [integrations](integrations.md).
 

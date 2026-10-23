@@ -3,6 +3,7 @@ using Meshline.Models;
 using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -13,7 +14,9 @@ namespace Meshline.Transport;
 /// Owns and shares relay clients for one network, account, and device, with separate account and device sessions.
 /// </summary>
 /// <remarks>
-/// Share one pool among components for the same network, account, and device. The first device-authenticated request binds the pool to that device. Account and device sessions are kept separate. Dispose dependent components before disposing the pool.
+/// Share one pool among components for the same network, account, and device. Device acquisition binds the pool
+/// to the signer's identity and certificate; renewal retires its device sessions while retaining account sessions.
+/// Dispose dependent components before disposing the pool.
 /// </remarks>
 public sealed class RelayClientPool : IAsyncDisposable
 {
@@ -35,8 +38,11 @@ public sealed class RelayClientPool : IAsyncDisposable
     readonly Dictionary<string, List<Entry>> _entries = new(StringComparer.Ordinal);
     readonly Dictionary<string, MetadataCache<RelayDescriptor>> _descriptors = new(StringComparer.Ordinal);
     readonly Dictionary<string, MetadataCache<RelayLimits>> _limits = new(StringComparer.Ordinal);
-    string? _deviceId;
-    readonly List<Task> _retirements = [];
+    readonly ConditionalWeakTable<DeviceCertificate, DeviceBinding> _deviceCertificates = new();
+    // Validity windows cannot order renewals: a new certificate may shorten its predecessor's lifetime.
+    readonly HashSet<DeviceBinding> _retiredBindings = [];
+    DeviceBinding? _device;
+    readonly List<(SessionMode? Mode, Task Disposal)> _retirements = [];
     readonly CancellationTokenSource _lifetime = new();
     Task? _disposal;
 
@@ -95,7 +101,7 @@ public sealed class RelayClientPool : IAsyncDisposable
     }
 
     /// <summary>
-    /// Gets a shared relay client suitable for the requested authorization mode.
+    /// Gets a shared relay client without requiring authentication.
     /// </summary>
     /// <param name="relayId">The relay's canonical lowercase Neo script-hash identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
@@ -107,7 +113,7 @@ public sealed class RelayClientPool : IAsyncDisposable
         (await GetEntryAsync(relayId, null, null, cancellationToken).ConfigureAwait(false)).Client;
 
     /// <summary>
-    /// Gets a shared relay client suitable for the requested authorization mode.
+    /// Gets a shared relay client for account-authenticated requests.
     /// </summary>
     /// <param name="relayId">The relay's canonical lowercase Neo script-hash identifier.</param>
     /// <param name="signer">The account signer for an account session.</param>
@@ -123,7 +129,7 @@ public sealed class RelayClientPool : IAsyncDisposable
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     /// <exception cref="DecoderFallbackException">A relay response contains bytes that are not valid UTF-8.</exception>
     /// <exception cref="CryptographicException">The configured signer or cryptographic provider fails while signing an authentication proof or verifying relay evidence.</exception>
-    /// <exception cref="InvalidOperationException">The relay is not registered as active, the signer's identity changes, or the pool is already bound to another device.</exception>
+    /// <exception cref="InvalidOperationException">The relay is not registered as active or the signer's account identity changes.</exception>
     public async Task<RelayClient> GetAsync(string relayId, IAccountSigner signer, CancellationToken cancellationToken)
     {
         if (signer.AccountId != AccountId)
@@ -134,12 +140,17 @@ public sealed class RelayClientPool : IAsyncDisposable
     }
 
     /// <summary>
-    /// Gets a shared relay client suitable for the requested authorization mode.
+    /// Gets a shared relay client for device-authenticated requests.
     /// </summary>
     /// <param name="relayId">The relay's canonical lowercase Neo script-hash identifier.</param>
     /// <param name="signer">The device signer for a device session; the pool binds to its device identity.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A pool-owned shared client; callers must leave its lifetime management to the pool.</returns>
+    /// <remarks>
+    /// A changed certificate for the same device retires its previous device sessions before authentication. Account sessions remain available.
+    /// Canonically equal certificates reuse the current binding, including after deserialization.
+    /// Concurrent acquisition cannot restore a superseded binding, and certificates already replaced in this pool are rejected.
+    /// </remarks>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="ObjectDisposedException">The pool has been disposed or the selected client is retired while it is being acquired.</exception>
@@ -150,31 +161,42 @@ public sealed class RelayClientPool : IAsyncDisposable
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     /// <exception cref="DecoderFallbackException">A relay response contains bytes that are not valid UTF-8.</exception>
     /// <exception cref="CryptographicException">The configured signer or cryptographic provider fails while signing an authentication proof or verifying relay evidence.</exception>
-    /// <exception cref="InvalidOperationException">The relay is not registered as active, the signer's identity changes, or the pool is already bound to another device.</exception>
+    /// <exception cref="InvalidOperationException">The relay is not registered as active, the signer's identity or certificate changes during acquisition, the certificate was already replaced, or the pool is bound to another device.</exception>
     public async Task<RelayClient> GetAsync(string relayId, IDeviceSigner signer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var observedDevice = Volatile.Read(ref _device);
         var certificate = signer.Certificate;
         if (certificate.Account != AccountId)
             throw new ArgumentException("The device belongs to another account.", nameof(signer));
-        var deviceId = certificate.GetDeviceId(Context);
+        var device = DescribeDevice(certificate);
+        Task retirement;
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposal is not null, this);
-            if (_deviceId is not null && _deviceId != deviceId)
-                throw new InvalidOperationException("The relay client pool is already bound to another device.");
-            _deviceId = deviceId;
+            if (_device != device)
+            {
+                if (!ReferenceEquals(_device, observedDevice))
+                    throw new InvalidOperationException("The device binding changed while acquiring its certificate.");
+                if (_device is not null && _device.DeviceId != device.DeviceId)
+                    throw new InvalidOperationException("The relay pool is bound to another device.");
+                if (_retiredBindings.Contains(device))
+                    throw new InvalidOperationException("The device certificate was already replaced in this relay pool.");
+            }
+            retirement = BindDevice(device);
         }
+        await retirement.WaitAsync(cancellationToken).ConfigureAwait(false);
         return (await GetEntryAsync(relayId, SessionMode.Device, (client, token) =>
         {
             var current = signer.Certificate;
-            if (current.Account != AccountId || current.GetDeviceId(Context) != deviceId)
-                throw new InvalidOperationException("The relay client's device identity has changed.");
+            if (current.Account != AccountId || DescribeDevice(current) != device)
+                throw new InvalidOperationException("The relay client's device identity or certificate has changed.");
             return client.AuthenticateAsync(signer, token);
-        }, cancellationToken).ConfigureAwait(false)).Client;
+        }, cancellationToken, device).ConfigureAwait(false)).Client;
     }
 
-    async Task<Entry> GetEntryAsync(string relayId, SessionMode? mode, Func<RelayClient, CancellationToken, Task>? authenticate, CancellationToken cancellationToken)
+    async Task<Entry> GetEntryAsync(string relayId, SessionMode? mode, Func<RelayClient, CancellationToken, Task>? authenticate,
+        CancellationToken cancellationToken, DeviceBinding? device = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Entry entry;
@@ -183,6 +205,9 @@ public sealed class RelayClientPool : IAsyncDisposable
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposal is not null, this);
+            // Entry acquisition and certificate binding must agree under the same lock.
+            if (device is not null && _device != device)
+                throw new InvalidOperationException("The relay client pool is already bound to another device or certificate.");
             _entries.TryGetValue(relayId, out var entries);
             entry = (mode is null ? entries?.FirstOrDefault()
                 : entries?.FirstOrDefault(candidate => candidate.Mode == mode) ?? entries?.FirstOrDefault(static candidate => candidate.Mode is null))!;
@@ -242,8 +267,8 @@ public sealed class RelayClientPool : IAsyncDisposable
                 _entries.Remove(entry.Client.RelayId);
         }
         entry.Disposal = DisposeEntryAsync(entry);
-        _retirements.RemoveAll(static task => task.IsCompletedSuccessfully);
-        _retirements.Add(entry.Disposal);
+        _retirements.RemoveAll(static retirement => retirement.Disposal.IsCompletedSuccessfully);
+        _retirements.Add((entry.Mode, entry.Disposal));
     }
 
     async Task DisposeEntryAsync(Entry entry)
@@ -283,16 +308,57 @@ public sealed class RelayClientPool : IAsyncDisposable
 
     internal async Task InvalidateDeviceAsync()
     {
-        List<Task> tasks = [];
+        Task retirement;
+        lock (_gate)
+            retirement = RetireDeviceEntries();
+        await retirement.ConfigureAwait(false);
+    }
+
+    internal Task RebindDeviceAsync(string? previousDeviceId, DeviceCertificate certificate)
+    {
+        if (certificate.Account != AccountId)
+            throw new ArgumentException("The device belongs to another account.", nameof(certificate));
+        var device = DescribeDevice(certificate);
         lock (_gate)
         {
-            foreach (var entry in _entries.Values.SelectMany(static entries => entries).Where(static entry => entry.Mode == SessionMode.Device).ToArray())
-            {
-                Retire(entry);
-                tasks.Add(entry.Disposal!);
-            }
+            ObjectDisposedException.ThrowIf(_disposal is not null, this);
+            if (_device is not null && _device.DeviceId != device.DeviceId && _device.DeviceId != previousDeviceId)
+                throw new InvalidOperationException("The relay pool is bound to an unrelated device.");
+            // The owner restores committed local state; public signers cannot restore retired bindings.
+            return BindDevice(device);
         }
-        await Task.WhenAll(tasks).ConfigureAwait(false);
+    }
+
+    // Called under _gate by acquisition or the owner restoring committed local state.
+    Task BindDevice(DeviceBinding device)
+    {
+        if (_device == device) return Task.CompletedTask;
+        if (_device is not null) _retiredBindings.Add(_device);
+        _device = device;
+        return RetireDeviceEntries();
+    }
+
+    DeviceBinding DescribeDevice(DeviceCertificate certificate)
+    {
+        // Certificates are immutable. Cache canonical content by object identity,
+        // but compare content across deserialization; record/array equality is insufficient.
+        return _deviceCertificates.TryGetValue(certificate, out var device) ? device
+            : _deviceCertificates.GetValue(certificate, value => new(value.GetDeviceId(Context), value.ToJson()));
+    }
+
+    // Called under _gate: binding changes and retirement form one pool transition.
+    Task RetireDeviceEntries()
+    {
+        // Join cleanup even after sessions leave the active set. Completed failures
+        // remain observable at pool disposal without blocking later transitions.
+        var tasks = _retirements.Where(static retirement => retirement.Mode == SessionMode.Device && !retirement.Disposal.IsCompleted)
+            .Select(static retirement => retirement.Disposal).ToList();
+        foreach (var entry in _entries.Values.SelectMany(static entries => entries).Where(static entry => entry.Mode == SessionMode.Device).ToArray())
+        {
+            Retire(entry);
+            tasks.Add(entry.Disposal!);
+        }
+        return Task.WhenAll(tasks);
     }
 
     /// <summary>
@@ -317,7 +383,7 @@ public sealed class RelayClientPool : IAsyncDisposable
         {
             foreach (var entry in _entries.Values.SelectMany(static entries => entries).ToArray())
                 Retire(entry);
-            tasks = [.. _retirements, .. _descriptors.Values.Select(cache => cache.StopAsync(dispose: true)), .. _limits.Values.Select(cache => cache.StopAsync(dispose: true))];
+            tasks = [.. _retirements.Select(static retirement => retirement.Disposal), .. _descriptors.Values.Select(cache => cache.StopAsync(dispose: true)), .. _limits.Values.Select(cache => cache.StopAsync(dispose: true))];
         }
         try
         {
@@ -330,6 +396,8 @@ public sealed class RelayClientPool : IAsyncDisposable
             if (_ownsHttp) _http.Dispose();
         }
     }
+
+    sealed record DeviceBinding(string DeviceId, string CertificateJson);
 
     sealed class Entry(RelayClient client, CancellationToken cancellationToken)
     {

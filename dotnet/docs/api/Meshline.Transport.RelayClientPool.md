@@ -36,7 +36,9 @@ Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system
 Implements [System\.IAsyncDisposable](https://learn.microsoft.com/en-us/dotnet/api/system.iasyncdisposable 'System\.IAsyncDisposable')
 
 ### Remarks
-Share one pool among components for the same network, account, and device\. The first device\-authenticated request binds the pool to that device\. Account and device sessions are kept separate\. Dispose dependent components before disposing the pool\.
+Share one pool among components for the same network, account, and device\. Device acquisition binds the pool<br>
+to the signer's identity and certificate; renewal retires its device sessions while retaining account sessions\.<br>
+Dispose dependent components before disposing the pool\.
 ### Constructors
 
 <a name='Meshline.Transport.RelayClientPool.RelayClientPool(Meshline.Models.Client.ClientOptions,Meshline.Interactions.IRelayRegistry,System.Net.Http.HttpClient)'></a>
@@ -175,7 +177,7 @@ A registered cancellation callback throws while pool or session lifetimes are ca
 
 ## RelayClientPool\.GetAsync\(string, IAccountSigner, CancellationToken\) Method
 
-Gets a shared relay client suitable for the requested authorization mode\.
+Gets a shared relay client for account\-authenticated requests\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Transport.RelayClient> GetAsync(string relayId, Meshline.Interactions.IAccountSigner signer, System.Threading.CancellationToken cancellationToken);
@@ -237,13 +239,13 @@ A relay response contains bytes that are not valid UTF\-8\.
 The configured signer or cryptographic provider fails while signing an authentication proof or verifying relay evidence\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-The relay is not registered as active, the signer's identity changes, or the pool is already bound to another device\.
+The relay is not registered as active or the signer's account identity changes\.
 
 <a name='Meshline.Transport.RelayClientPool.GetAsync(string,Meshline.Interactions.IDeviceSigner,System.Threading.CancellationToken)'></a>
 
 ## RelayClientPool\.GetAsync\(string, IDeviceSigner, CancellationToken\) Method
 
-Gets a shared relay client suitable for the requested authorization mode\.
+Gets a shared relay client for device\-authenticated requests\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Transport.RelayClient> GetAsync(string relayId, Meshline.Interactions.IDeviceSigner signer, System.Threading.CancellationToken cancellationToken);
@@ -305,13 +307,18 @@ A relay response contains bytes that are not valid UTF\-8\.
 The configured signer or cryptographic provider fails while signing an authentication proof or verifying relay evidence\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-The relay is not registered as active, the signer's identity changes, or the pool is already bound to another device\.
+The relay is not registered as active, the signer's identity or certificate changes during acquisition, the certificate was already replaced, or the pool is bound to another device\.
+
+### Remarks
+A changed certificate for the same device retires its previous device sessions before authentication\. Account sessions remain available\.<br>
+Canonically equal certificates reuse the current binding, including after deserialization\.<br>
+Concurrent acquisition cannot restore a superseded binding, and certificates already replaced in this pool are rejected\.
 
 <a name='Meshline.Transport.RelayClientPool.GetAsync(string,System.Threading.CancellationToken)'></a>
 
 ## RelayClientPool\.GetAsync\(string, CancellationToken\) Method
 
-Gets a shared relay client suitable for the requested authorization mode\.
+Gets a shared relay client without requiring authentication\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Transport.RelayClient> GetAsync(string relayId, System.Threading.CancellationToken cancellationToken);

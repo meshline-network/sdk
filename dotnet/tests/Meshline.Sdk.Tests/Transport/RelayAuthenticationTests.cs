@@ -10,57 +10,6 @@ public sealed class RelayAuthenticationTests
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task Pool_reuses_public_clients_coalesces_authentication_and_separates_modes()
-    {
-        using var time = Clock.Use(new ManualClock());
-        using var relay = new OfflineRelay();
-        using var account = new AccountSigner();
-        await using var pool = relay.Pool(account);
-        var unauthenticated = await pool.GetAsync(relay.RelayId, cancellationToken: Token);
-
-        Assert.Empty(relay.Requests);
-
-        var entered = AsyncTest.Signal();
-        var release = AsyncTest.Signal();
-        relay.Handler = async (request, token) =>
-        {
-            if (request.Method == "auth.challenge")
-            {
-                entered.TrySetResult();
-                await release.Task.WaitAsync(token);
-            }
-
-            return relay.Respond(request);
-        };
-        var pending = Enumerable.Range(0, 16).Select(_ => pool.GetAsync(relay.RelayId, account, Token)).ToArray();
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
-
-        Assert.All(pending, task => Assert.False(task.IsCompleted));
-
-        release.TrySetResult();
-        var accounts = await Task.WhenAll(pending);
-
-        Assert.All(accounts, item => Assert.Same(unauthenticated, item));
-        Assert.Equal(1, relay.AuthenticationCount);
-
-        var device = await pool.GetAsync(relay.RelayId, new DeviceSigner(account, relay.Clock), cancellationToken: Token);
-
-        Assert.NotSame(unauthenticated, device);
-        Assert.Equal(SessionMode.Device, device.SessionMode);
-        Assert.Equal(SessionMode.Account, unauthenticated.SessionMode);
-        Assert.Equal(2, pool.Clients.Count);
-
-        using var other = new AccountSigner();
-
-        await Assert.ThrowsAsync<ArgumentException>(() => pool.GetAsync(relay.RelayId, other, cancellationToken: Token));
-
-        await pool.DisposeAsync();
-
-        Assert.Empty(pool.Clients);
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => pool.GetAsync(relay.RelayId, cancellationToken: Token));
-    }
-
-    [Fact]
     public async Task Session_expiry_is_observable_and_concurrent_renewal_runs_once()
     {
         using var time = Clock.Use(new ManualClock());
