@@ -1,10 +1,12 @@
 import { agreeKey, devicePublicKey, encryptionPublicKey, requireLength, signDevice, verifyDevice, systemRandom, type RandomSource } from '../crypto/primitives.js';
-import { ProtocolError, StateConflictError } from '../errors.js';
+import { ProtocolError, SecretAccessError, StateConflictError } from '../errors.js';
+import type { ContactAuthorizationIssue, DeviceSelectionInfo } from '../client/account-establishment.js';
+import { DeviceAuthorizationError, SubmissionOutcomeError } from './authorization-error.js';
 import { validateIdentifier } from '../identity/identifiers.js';
 import { matchesAccount, validateAccountId, validateRelayId } from '../identity/neo.js';
 import type { AccountSigner, DeviceSigner, SecretProtector } from '../interactions.js';
 import { deviceStatePublishResponseCodec, validateDeviceStatePublishResponse, type DeviceStatePublishResponse } from '../models/device-state.js';
-import { contactAuthorizationCodec, contactGrantCodec, contactGrantInput, contactRecordCodec, deviceStateQueryInput, signedDeviceStateQueryCodec, validateContactGrant, validateContactInvite, validateDeviceStateQuery, verifyContactGrant, verifyContactInvite, type ContactAuthorization, type SignedDeviceStateQuery } from '../models/contacts.js';
+import { contactAuthorizationCodec, contactConsentCodec, contactGrantCodec, contactGrantInput, contactRecordCodec, deviceStateQueryInput, signedDeviceStateQueryCodec, validateContactGrant, validateContactInvite, validateDeviceStateQuery, verifyContactGrant, verifyContactInvite, type ContactAuthorization, type ContactGrant, type SignedDeviceStateQuery } from '../models/contacts.js';
 import {
     accountDeviceStateCodec, certificateAccountInput, certificateDeviceInput, certificateId, deviceCertificateCodec, deviceStateInput,
     validateCertificate, validateDeviceState, type AccountDeviceState, type DeviceCertificate,
@@ -18,7 +20,7 @@ import { MetadataCache } from '../runtime/metadata-cache.js';
 import { throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
 import { finishSignedRequest, putSignedRequest, readSignedRequest, requestKey, type SignedRequest } from '../storage/signed-request.js';
-import type { MeshlineStore, RecordKey, StoredRecord, StoreMutation } from '../storage/store.js';
+import type { MeshlineStore, RecordKey, RecordQuery, StoredRecord, StoreMutation, StoreSnapshot } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
 import type { RelayClientPool } from '../transport/pool.js';
 import type { RelayClient } from '../transport/client.js';
@@ -38,9 +40,13 @@ export interface PublishDeviceStateOptions {
 }
 export interface DeviceStatePublishResult extends DeviceStatePublishResponse { readonly deviceState: AccountDeviceState }
 interface StateResolution { state: AccountDeviceState | undefined; changed: boolean }
+/** @internal Result of local key inspection, optionally extended with fresh relay authorization. */
+interface DeviceAuthorizationInspection { readonly previousLocalDeviceId: string | undefined; readonly authorized: boolean }
 const method = 'device.state.publish';
+const deviceLimit = 8;
 const localKey: RecordKey = { collection: 'local_device', key: 'current' };
 const bindingKey: RecordKey = { collection: 'identity_binding', key: 'device' };
+const preparationKey: RecordKey = { collection: 'device_preparation', key: 'current' };
 const stateKey = (account: string): RecordKey => ({ collection: 'device_states', key: account });
 const clone = (value: DeviceCertificate): DeviceCertificate => deviceCertificateCodec.decode(deviceCertificateCodec.encode(value));
 const copyState = (value: AccountDeviceState): AccountDeviceState => accountDeviceStateCodec.decode(accountDeviceStateCodec.encode(value));
@@ -131,6 +137,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         validity(validitySeconds);
         if (!this.#protector || !this.#accountSigner) throw new ProtocolError('integration_required', 'Creating a device requires an account signer and a secret protector.');
         const certificate = await this.runOperation(scope => this.#keyGate.run(async () => {
+            await this.#requireNoPendingPreparation(scope);
             const existing = await this.#store.read([localKey, bindingKey], scope);
             if (existing.sets.some(rows => rows.length)) throw new StateConflictError('A local device already exists in this database.');
             let signing: Uint8Array | undefined; let encryption: Uint8Array | undefined;
@@ -155,6 +162,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
     async renewDevice(validitySeconds: number, signal?: AbortSignal): Promise<DeviceCertificate> {
         validity(validitySeconds);
         const certificate = await this.runOperation(scope => this.#keyGate.run(async () => {
+            await this.#requireNoPendingPreparation(scope);
             const saved = (await this.#store.read([localKey], scope)).sets[0]![0]?.value;
             if (!saved) throw new ProtocolError('device_required', 'No local device has been created.');
             const previous = this.#readCertificate(saved); const key = await this.#getKey('signing', scope);
@@ -165,7 +173,13 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
             }, scope);
             this.#local = issued; return issued;
         }, scope), signal);
+        await this.relayClients.rebindDevice(certificate);
         this.#notify('deviceChanged', certificateId(certificate, this.context)); return clone(certificate);
+    }
+    async #requireNoPendingPreparation(signal: AbortSignal): Promise<void> {
+        const snapshot = await this.#store.read([preparationKey, requestKey(method)], signal);
+        if (snapshot.sets[0]![0]?.value.operationId || readSignedRequest(snapshot.sets[1]![0]?.value)?.pending)
+            throw new StateConflictError('Resume the unfinished device preparation or publication before standalone creation or renewal.');
     }
     async #getKey(kind: 'signing' | 'encryption', signal: AbortSignal): Promise<Uint8Array> {
         const cached = kind === 'signing' ? this.#signingKey : this.#encryptionKey; if (cached) return cached;
@@ -182,6 +196,225 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
             if (kind === 'signing') this.#signingKey = key; else this.#encryptionKey = key;
             return key;
         } catch (error) { if (key instanceof Uint8Array) key.fill(0); throw error; }
+    }
+    /** @internal Check keys before discovery, then reuse that inspection to verify relay state and replacement intent. */
+    inspectAuthorization(options: { operationId?: string; relayId?: string; replaceDeviceId?: string; proposedReplaceDeviceId?: string }, signal: AbortSignal,
+        inspection?: DeviceAuthorizationInspection): Promise<DeviceAuthorizationInspection> {
+        return this.runOperation(async scope => {
+            inspection ??= await this.#keyGate.run(async () => {
+                const snapshot = await this.#store.read([localKey, preparationKey, bindingKey], scope);
+                const local = snapshot.sets[0]![0]?.value; const draft = snapshot.sets[1]![0]?.value;
+                if (Boolean(local) !== Boolean(snapshot.sets[2]!.length)) throw new ProtocolError('invalid_storage', 'Local device and its binding must exist together.');
+                if (local) {
+                    const certificate = this.#readCertificate(local);
+                    const keys = await this.#readProtectedKeys(local, certificate, scope);
+                    this.#clearKeys();
+                    this.#signingKey = keys.signing;
+                    this.#encryptionKey = keys.encryption;
+                }
+                if (draft?.operationId) {
+                    if (typeof draft.operationId !== 'string' || draft.certificate === undefined) throw new ProtocolError('invalid_storage', 'Malformed device preparation.');
+                    const certificate = deviceCertificateCodec.decode(draft.certificate);
+                    const keys = await this.#readProtectedKeys(draft, certificate, scope);
+                    keys.signing.fill(0); keys.encryption.fill(0);
+                }
+                let previousLocalDeviceId = local && String(local.deviceId);
+                if (options.operationId && draft?.activatedOperationId === options.operationId)
+                    previousLocalDeviceId = typeof draft.previousLocalDeviceId === 'string' ? draft.previousLocalDeviceId : undefined;
+                return { previousLocalDeviceId, authorized: false };
+            }, scope);
+            if (!options.relayId && options.proposedReplaceDeviceId === undefined) return inspection;
+
+            const current = options.relayId ? await this.#readAuthorizationState(options.relayId, scope) : undefined;
+            if (options.relayId && !current) throw new DeviceAuthorizationError('accountStateUnavailable', 'The existing account has no readable complete device state.');
+            const snapshot = await this.#store.read([requestKey(method), preparationKey], scope);
+            const pending = readSignedRequest(snapshot.sets[0]![0]?.value)?.pending;
+            const effective = this.#authorizationEffective(current, options.replaceDeviceId);
+            if (options.proposedReplaceDeviceId !== undefined && options.proposedReplaceDeviceId !== options.replaceDeviceId && (pending || effective))
+                throw new DeviceAuthorizationError('operationParametersConflict', 'Reconcile the original replacement before choosing another device.');
+            const authorized = effective && !pending && !snapshot.sets[1]![0]?.value.operationId;
+            if (authorized) await this.relayClients.get(options.relayId!, { mode: 'device', signer: this }, scope);
+            return { ...inspection, authorized };
+        }, signal);
+    }
+    async #readAuthorizationState(relayId: string, signal: AbortSignal): Promise<AccountDeviceState | undefined> {
+        if (!this.#accountSigner && (!this.#local || this.#local.notBefore > this.clock.nowSeconds() || this.#local.expiresAt <= this.clock.nowSeconds()))
+            throw new DeviceAuthorizationError('accountSignerRequired', 'An account signer is required to inspect authorization for this device.');
+        try { return await this.getOwnDeviceState(relayId, signal); }
+        catch (error) {
+            throwIfAborted(signal);
+            if (!this.#accountSigner && error instanceof RelayError && ['unauthorized', 'device_unknown'].includes(error.code))
+                throw new DeviceAuthorizationError('accountSignerRequired', 'An account signer is required to inspect revoked device authorization.', {}, { cause: error });
+            throw error;
+        }
+    }
+    #authorizationEffective(state: AccountDeviceState | undefined, replaceDeviceId?: string): boolean {
+        const certificate = this.#local;
+        const registered = certificate && state?.certificates.find(value => certificateId(value, this.context) === certificateId(certificate, this.context));
+        return registered !== undefined && registered.notBefore <= this.clock.nowSeconds() && registered.expiresAt > this.clock.nowSeconds()
+            && deviceCertificateCodec.stringify(registered) === deviceCertificateCodec.stringify(certificate!)
+            && (replaceDeviceId === undefined || !state!.certificates.some(value => certificateId(value, this.context) === replaceDeviceId));
+    }
+    async #readProtectedKeys(record: JsonObject, certificate: DeviceCertificate, signal: AbortSignal): Promise<{ signing: Uint8Array; encryption: Uint8Array }> {
+        let signing: Uint8Array | undefined; let encryption: Uint8Array | undefined;
+        try {
+            if (!this.#protector) throw new SecretAccessError('unknown', 'A secret protector is required to read local keys.');
+            const id = certificateId(certificate, this.context);
+            signing = await this.#protector.unprotect(decodeBase64Url(record.protectedSigningKey as string), this.#purpose(id, 'signing'), signal);
+            encryption = await this.#protector.unprotect(decodeBase64Url(record.protectedEncryptionKey as string), this.#purpose(id, 'encryption'), signal);
+            throwIfAborted(signal); requireLength(signing, 32, 'Signing key'); requireLength(encryption, 32, 'Encryption key');
+            if (!equalBytes(devicePublicKey(signing), certificate.signingPublicKey) || !equalBytes(encryptionPublicKey(encryption), certificate.encryptionPublicKey))
+                throw new SecretAccessError('unknown', 'Protected keys do not match the retained certificate.');
+            return { signing, encryption };
+        } catch (error) {
+            signing?.fill(0); encryption?.fill(0); throwIfAborted(signal);
+            throw new DeviceAuthorizationError('localKeyAccessRequired', 'Restore access to the complete retained local data before retrying.',
+                { keyIssue: error instanceof SecretAccessError ? error.failure : 'unknown' }, { cause: error });
+        }
+    }
+    async #prepareAuthorizationDevice(operationId: string, seconds: number, signal: AbortSignal): Promise<DeviceCertificate> {
+        const snapshot = await this.#store.read([localKey, preparationKey], signal);
+        const local = snapshot.sets[0]![0]?.value;
+        let draft = snapshot.sets[1]![0]?.value;
+        if (draft?.operationId && draft.operationId !== operationId) throw new StateConflictError('Another device preparation must be resumed first.');
+        if (!draft?.operationId && this.#local && this.#local.notBefore <= this.clock.nowSeconds() && this.#local.expiresAt > this.clock.nowSeconds()) return this.#local;
+
+        const signer = this.#accountSigner;
+        if (!signer) throw new DeviceAuthorizationError('accountSignerRequired', 'An account signer is required to authorize a device.');
+        if (signer.accountId !== this.accountId || !matchesAccount(this.accountId, signer.publicKey)) throw new ProtocolError('invalid_identity', 'Account signer belongs to another account.');
+        let keys: { signing: Uint8Array; encryption: Uint8Array } | undefined;
+        try {
+            let certificate: DeviceCertificate;
+            if (draft?.operationId) {
+                certificate = deviceCertificateCodec.decode(draft.certificate!);
+                keys = await this.#readProtectedKeys(draft, certificate, signal);
+            } else {
+                keys = local ? { signing: (await this.#getKey('signing', signal)).slice(), encryption: (await this.#getKey('encryption', signal)).slice() }
+                    : { signing: this.#random.bytes(32), encryption: this.#random.bytes(32) };
+                certificate = local ? this.#readCertificate(local) : { account: this.accountId, accountPublicKey: signer.publicKey.slice(), signingPublicKey: devicePublicKey(keys.signing), encryptionPublicKey: encryptionPublicKey(keys.encryption),
+                    notBefore: 0, expiresAt: 1, deviceSignature: new Uint8Array(64), accountSignature: new Uint8Array(64) };
+            }
+
+            if (!draft?.operationId || certificate.expiresAt <= this.clock.nowSeconds()) {
+                const now = this.clock.nowSeconds();
+                certificate = { ...certificate, notBefore: now, expiresAt: now + seconds, accountSignature: new Uint8Array(64) };
+                certificate = { ...certificate, deviceSignature: signDevice(certificateDeviceInput(certificate, this.context), keys.signing) };
+                const id = certificateId(certificate, this.context);
+                const next: JsonObject = { ...(draft?.activatedOperationId ? { activatedOperationId: draft.activatedOperationId } : {}), operationId,
+                    ...(local ? { previousLocalDeviceId: local.deviceId! } : {}), certificate: deviceCertificateCodec.encode(certificate),
+                    protectedSigningKey: local?.protectedSigningKey ?? draft?.protectedSigningKey ?? await this.#protect(keys.signing, id, 'signing', signal),
+                    protectedEncryptionKey: local?.protectedEncryptionKey ?? draft?.protectedEncryptionKey ?? await this.#protect(keys.encryption, id, 'encryption', signal) };
+                const previous = draft;
+                await updateStore(this.#store, [localKey, preparationKey], current => {
+                    if (fingerprint(current.sets[0]![0]?.value) !== fingerprint(local) || fingerprint(current.sets[1]![0]?.value) !== fingerprint(previous)) throw new StateConflictError('Device preparation changed.');
+                    return { mutations: [{ kind: 'put', ...preparationKey, value: next }], result: undefined };
+                }, signal);
+                draft = next;
+            }
+
+            try { certificate = { ...certificate, accountSignature: (await signer.sign(certificateAccountInput(certificate, this.context), signal)).slice() }; }
+            catch (error) {
+                throwIfAborted(signal);
+                if (error instanceof DOMException && error.name === 'NotAllowedError') throw new DeviceAuthorizationError('signatureDeclined', 'Account authorization was declined.', {}, { cause: error });
+                throw error;
+            }
+            throwIfAborted(signal); validateCertificate(certificate, this.context);
+            if (certificate.expiresAt <= this.clock.nowSeconds()) throw new DeviceAuthorizationError('authorizationNotYetEffective', 'Certificate expired while awaiting authorization. Retry with the retained keys.');
+
+            const id = certificateId(certificate, this.context); const prepared = draft!;
+            await this.#keyGate.run(async () => {
+                await updateStore(this.#store, [localKey, preparationKey, bindingKey], current => {
+                    if (fingerprint(current.sets[0]![0]?.value) !== fingerprint(local) || fingerprint(current.sets[1]![0]?.value) !== fingerprint(prepared)) throw new StateConflictError('Device preparation changed before activation.');
+                    return { mutations: [
+                        { kind: 'put', ...localKey, value: { deviceId: id, certificate: deviceCertificateCodec.encode(certificate), protectedSigningKey: prepared.protectedSigningKey!, protectedEncryptionKey: prepared.protectedEncryptionKey! } },
+                        { kind: 'put', ...bindingKey, value: { deviceId: id } },
+                        { kind: 'put', ...preparationKey, value: { activatedOperationId: operationId, ...(prepared.previousLocalDeviceId ? { previousLocalDeviceId: prepared.previousLocalDeviceId } : {}) } },
+                    ], result: undefined };
+                }, signal);
+                this.#clearKeys();
+                this.#signingKey = keys!.signing;
+                this.#encryptionKey = keys!.encryption;
+                keys = undefined;
+                this.#local = certificate;
+            }, signal);
+            await this.relayClients.rebindDevice(certificate);
+            this.#notify('deviceChanged', id);
+            return certificate;
+        } finally { keys?.signing.fill(0); keys?.encryption.fill(0); }
+    }
+    /** @internal Idempotent device authorization; the client alone checkpoints workflow steps. */
+    authorizeDevice(options: { operationId: string; relayId: string; validitySeconds: number; replaceDeviceId?: string; previousLocalDeviceId?: string }, signal: AbortSignal): Promise<'authorized' | 'awaitingRoute'> {
+        validity(options.validitySeconds); validateRelayId(options.relayId);
+        return this.runOperation(scope => this.#publicationGate.run(async () => {
+            const operationKey = `${options.operationId}/${options.replaceDeviceId ?? ''}`;
+            let conflicts = 0;
+            for (;;) {
+                const route = this.#account.route;
+                if (route && (route.relayId !== options.relayId || route.expiresAt <= this.clock.nowSeconds()))
+                    throw new DeviceAuthorizationError('accountStateUnavailable', 'Confirm the original home route before device authorization.');
+                const current = route ? await this.#readAuthorizationState(options.relayId, scope) : undefined;
+                if (route && !current) throw new DeviceAuthorizationError('accountStateUnavailable', 'The established account has no readable complete device state.');
+                const pending = readSignedRequest((await this.#store.read([requestKey(method)], scope)).sets[0]![0]?.value);
+                // An unresolved request retains its original certificate, even after expiry. Resolve it before renewal.
+                const certificate = pending?.pending ? this.#local : await this.#prepareAuthorizationDevice(options.operationId, options.validitySeconds, scope);
+                if (!certificate) throw new StateConflictError('The pending device publication has no retained local certificate.');
+
+                const localId = certificateId(certificate, this.context);
+                const selection: DeviceSelectionInfo = { deviceLimit, revision: current?.revision ?? 0,
+                    ...(options.previousLocalDeviceId ? { previousLocalDeviceId: options.previousLocalDeviceId } : {}),
+                    devices: (current?.certificates ?? []).map(value => ({ deviceId: certificateId(value, this.context), certificate: clone(value) })) };
+                const registered = current?.certificates.find(value => certificateId(value, this.context) === localId);
+                const replacing = options.replaceDeviceId && current?.certificates.some(value => certificateId(value, this.context) === options.replaceDeviceId);
+                if (options.replaceDeviceId === localId || options.replaceDeviceId && !replacing && !registered)
+                    throw new DeviceAuthorizationError('deviceSelectionRequired', 'Choose an existing other device from the current list.', { deviceSelection: selection });
+                if (!pending?.pending && this.#authorizationEffective(current, options.replaceDeviceId)) {
+                    await this.relayClients.get(options.relayId, { mode: 'device', signer: this }, scope);
+                    return 'authorized';
+                }
+
+                let certificates = (current?.certificates ?? []).filter(value => certificateId(value, this.context) !== options.replaceDeviceId);
+                certificates = registered ? certificates.map(value => certificateId(value, this.context) === localId ? certificate : value) : [...certificates, certificate];
+                if (pending?.pending) {
+                    const request = accountDeviceStateCodec.decode(pending.document);
+                    const contents = (values: readonly DeviceCertificate[]) => canonicalJson(values.map(value => deviceCertificateCodec.stringify(value)).sort());
+                    // Compare the intended set independently of wire order. Rejected revisions remain consumed.
+                    const matchesIntent = pending.relayId === options.relayId
+                        && (pending.operationKey === undefined || pending.operationKey === operationKey)
+                        && pending.revision > (current?.revision ?? -1)
+                        && contents(request.certificates) === contents(certificates);
+                    if (!matchesIntent)
+                        throw new DeviceAuthorizationError('operationParametersConflict', 'A different device publication is unresolved. Reconcile its original intent before enabling this device.');
+                    certificates = [...request.certificates];
+                }
+                if (certificates.length > deviceLimit) throw new DeviceAuthorizationError('deviceSelectionRequired', 'The device list is full; explicitly choose a device to replace.', { deviceSelection: selection });
+                if (!this.#accountSigner) throw new DeviceAuthorizationError('accountSignerRequired', 'An account signer is required to authorize this device.');
+
+                try {
+                    // Preparation validates removal continuity on every attempt, including exact signed replays.
+                    const signed = await this.#prepare(options.relayId, { certificates, ...(current ? { previousState: current } : {}) }, this.#accountSigner, scope, operationKey, selection);
+                    const result = await this.#submit(signed, this.#accountSigner, scope, true);
+                    if (result.changed) this.#notify('deviceStateChanged', copyState(result.result.deviceState));
+                    if (result.result.status === 'staged') {
+                        if (route) throw new DeviceAuthorizationError('authorizationNotYetEffective', 'The relay has only staged device authorization.');
+                        return 'awaitingRoute';
+                    }
+                    if (!route) throw new DeviceAuthorizationError('stateConflict', 'The relay already considers the account established but no verified original route is available.');
+                    if (certificate.expiresAt <= this.clock.nowSeconds()) {
+                        if (pending?.pending) continue;
+                        throw new DeviceAuthorizationError('authorizationNotYetEffective', 'Certificate expired during publication. Retry with the retained keys.');
+                    }
+                    await this.relayClients.invalidateDevice();
+                    const confirmed = await this.#readAuthorizationState(options.relayId, scope);
+                    if (!this.#authorizationEffective(confirmed, options.replaceDeviceId))
+                        throw new DeviceAuthorizationError('authorizationNotYetEffective', 'The relay has not confirmed the requested local authorization and replacement.');
+                    await this.relayClients.get(options.relayId, { mode: 'device', signer: this }, scope);
+                    return 'authorized';
+                } catch (error) {
+                    if (route && error instanceof RelayError && ['state_conflict', 'stale_state'].includes(error.code) && conflicts++ < 2) continue;
+                    throw error;
+                }
+            }
+        }, scope), signal);
     }
     sign(input: Uint8Array, signal?: AbortSignal): Promise<Uint8Array> {
         const copy = input.slice();
@@ -253,7 +486,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         return this.runOperation(async scope => {
             await this.#loadState(accountId, scope);
             const relay = relayId ?? await this.#home(scope);
-            const useAccount = accountId === this.accountId && this.#accountSigner !== undefined && (!this.#local || this.getAuthorizationState(certificateId(this.#local, this.context)) !== 'authorized');
+            const useAccount = (afterCurrent || !this.#local) && accountId === this.accountId && this.#accountSigner !== undefined && (!this.#local || this.getAuthorizationState(certificateId(this.#local, this.context)) !== 'authorized');
             const key = JSON.stringify([accountId, relay, useAccount, this.#local && fingerprint(deviceCertificateCodec.encode(this.#local)), authorization && canonicalJson(contactAuthorizationCodec.encode(authorization))]);
             if (this.#stateStopping) throw new DOMException('Device state refreshes are stopping.', 'AbortError');
             let entry = this.#stateQueries.get(key);
@@ -271,7 +504,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
             if (afterCurrent) await cache.drain(scope);
             const result = await cache.read(usable, token => this.runOperation(async querySignal => {
                 try {
-                    const resolved = await this.#resolveState(accountId, relay, useAccount, querySignal, authorization);
+                    const resolved = await this.#resolveState(accountId, relay, useAccount, querySignal, authorization, afterCurrent);
                     if (resolved.changed && resolved.state) this.#notify('deviceStateChanged', copyState(resolved.state));
                     if (resolved.state) {
                         const contact = accountId !== this.accountId ? (await this.#store.read([{ collection: 'contacts', key: accountId }], querySignal)).sets[0]![0]?.value : undefined;
@@ -297,7 +530,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         try { await Promise.all([...this.#stateQueries.values()].map(entry => entry.cache.stop(dispose))); }
         finally { this.#stateStopping = dispose; if (dispose) { this.#stateQueries.clear(); this.#verifiedStates.clear(); this.#stateRefreshedAt.clear(); } }
     }
-    async #resolveState(accountId: string, relay: string, useAccount: boolean, scope: AbortSignal, authorization?: ContactAuthorization): Promise<StateResolution> {
+    async #resolveState(accountId: string, relay: string, useAccount: boolean, scope: AbortSignal, authorization?: ContactAuthorization, allowAccount = false): Promise<StateResolution> {
         let parameters: JsonObject = { account: accountId };
         if (authorization) {
             let query: SignedDeviceStateQuery = { account: accountId, authorization, signerCertificate: this.certificate, createdAt: this.clock.nowSeconds(), deviceSignature: new Uint8Array(64) };
@@ -312,7 +545,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         try {
             try { response = await read(useAccount); }
             catch (error) {
-                if (!useAccount && accountId === this.accountId && this.#accountSigner && error instanceof RelayError && ['unauthorized', 'device_unknown'].includes(error.code)) response = await read(true);
+                if (allowAccount && !useAccount && accountId === this.accountId && this.#accountSigner && error instanceof RelayError && ['unauthorized', 'device_unknown'].includes(error.code)) response = await read(true);
                 else throw error;
             }
         } catch (error) { if (error instanceof RelayError && error.code === 'not_found') return { state: undefined, changed: false }; throw error; }
@@ -338,7 +571,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         }, signal), options.signal);
         if (changed) this.#notify('deviceStateChanged', copyState(result.deviceState)); return { ...result, deviceState: copyState(result.deviceState) };
     }
-    async #submit(signed: SignedRequest, signer: AccountSigner, signal: AbortSignal): Promise<{ result: DeviceStatePublishResult; changed: boolean }> {
+    async #submit(signed: SignedRequest, signer: AccountSigner, signal: AbortSignal, classify = false): Promise<{ result: DeviceStatePublishResult; changed: boolean }> {
         const state = accountDeviceStateCodec.decode(signed.document); const client = await this.relayClients.get(signed.relayId, { mode: 'account', signer }, signal);
         let response;
         try { response = await client.requestHttp('PUT', method, signed.document, { signal }); }
@@ -347,55 +580,76 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
                 try { await finishSignedRequest(this.#store, method, signed); }
                 catch (storageError) { throw new AggregateError([error, storageError], 'Device-state rejection could not be persisted.'); }
             }
+            if (classify && !(error instanceof RelayError && error.isDefinitiveRejection) && !signal.aborted) throw new SubmissionOutcomeError('Device publication outcome is unknown.', { cause: error });
             throw error;
         }
-        if (response === undefined) throw new ProtocolError('invalid_response', 'Device publication returned no result.');
-        const receipt = deviceStatePublishResponseCodec.decode(response); validateDeviceStatePublishResponse(receipt, this.clock.nowSeconds());
+        let receipt: DeviceStatePublishResponse;
+        try {
+            if (response === undefined) throw new ProtocolError('invalid_response', 'Device publication returned no result.');
+            receipt = deviceStatePublishResponseCodec.decode(response); validateDeviceStatePublishResponse(receipt, this.clock.nowSeconds());
+        } catch (error) {
+            if (classify && !signal.aborted) throw new SubmissionOutcomeError('Device publication acknowledgement could not be verified.', { cause: error });
+            throw error;
+        }
         let changed = false;
-        if (receipt.status === 'accepted') { changed = await this.#save(state, signal); this.#cacheState(state, this.clock.monotonicMilliseconds()); } else await finishSignedRequest(this.#store, method, signed);
+        if (receipt.status === 'accepted') { changed = await this.#save(state, signal); this.#cacheState(state, this.clock.monotonicMilliseconds()); }
         return { changed, result: { ...receipt, deviceState: state } };
     }
     /** Prevents removal of the last usable signature on a locally issued contact grant before replacement delivery acceptance. */
     async removeDevice(deviceId: string, signal?: AbortSignal): Promise<void> {
         validateIdentifier('device', deviceId);
         let changed: AccountDeviceState | undefined;
-        await this.runOperation(async scope => {
+        await this.runOperation(scope => this.#publicationGate.run(async () => {
             const relayId = await this.#home(scope); const current = await this.getOwnDeviceState(relayId, scope);
             if (!current) throw new ProtocolError('device_state_required', 'The account has no published device state.');
             const certificates = current.certificates.filter(value => certificateId(value, this.context) !== deviceId); if (certificates.length === current.certificates.length) return;
-            await this.#publicationGate.run(async () => {
-                const signer = this.#accountSigner; if (!signer) throw new ProtocolError('signer_required', 'An account signer is required to remove a device.');
-                const signed = await this.#prepare(relayId, { certificates, previousState: current }, signer, scope, deviceId);
-                const result = await this.#submit(signed, signer, scope);
-                if (result.result.status !== 'accepted') throw new ProtocolError('removal_staged', 'Device removal was staged and is not yet authoritative.');
-                if (result.changed) changed = result.result.deviceState;
-            }, scope);
-        }, signal);
+            const signer = this.#accountSigner; if (!signer) throw new ProtocolError('signer_required', 'An account signer is required to remove a device.');
+            const signed = await this.#prepare(relayId, { certificates, previousState: current }, signer, scope);
+            const result = await this.#submit(signed, signer, scope);
+            if (result.result.status !== 'accepted') throw new ProtocolError('removal_staged', 'Device removal was staged and is not yet authoritative.');
+            if (result.changed) changed = result.result.deviceState;
+        }, scope), signal);
         if (changed) this.#notify('deviceStateChanged', copyState(changed));
     }
-    #checkRemoval(deviceId: string, certificates: readonly DeviceCertificate[], contacts: readonly StoredRecord[]): void {
+    #checkContinuity(deviceId: string, current: AccountDeviceState, certificates: readonly DeviceCertificate[], contacts: readonly StoredRecord[], requests: readonly StoredRecord[], binding: JsonObject | undefined, selection?: DeviceSelectionInfo): void {
         const now = this.clock.nowSeconds();
-        for (const row of contacts) {
-            const contact = contactRecordCodec.decode(row.value.record!); const issued = contact.grantToContact;
-            if (contact.status !== 'active' || !issued || !issued.signatures[deviceId] || (issued.expiresAt ?? Infinity) <= now) continue;
-            const confirmed = row.value.confirmedGrantTo === undefined ? undefined : contactGrantCodec.decode(row.value.confirmedGrantTo);
-            if (confirmed && (confirmed.expiresAt ?? Infinity) <= now) continue;
-            if (!confirmed) throw new ProtocolError('contact_grant_at_risk', 'Device removal would invalidate a contact grant before replacement signatures have been accepted for delivery.');
+        const removed = current.certificates.find(value => certificateId(value, this.context) === deviceId);
+        if (!removed || removed.expiresAt <= now) return;
+        const issues: ContactAuthorizationIssue[] = [];
+        const confirmedSignature = (issued: ContactGrant, confirmed: ContactGrant | undefined, accountId: string): boolean => {
+            if (!confirmed || (confirmed.expiresAt ?? Infinity) <= now || confirmed.grantor !== this.accountId || confirmed.grantee !== accountId) return false;
             validateContactGrant(confirmed, now);
-            if (confirmed.grantor !== this.accountId || confirmed.grantee !== contact.account || contact.account !== row.key) throw new ProtocolError('invalid_storage', 'Confirmed contact grant has inconsistent account binding.');
             const input = contactGrantInput(confirmed, this.context);
-            if (!certificates.some(certificate => certificate.notBefore <= now && now < certificate.expiresAt && confirmed.signatures[certificateId(certificate, this.context)] !== undefined
-                && verifyDevice(input, confirmed.signatures[certificateId(certificate, this.context)]!, certificate.signingPublicKey)))
-                throw new ProtocolError('contact_grant_at_risk', 'Device removal would invalidate a contact grant before replacement signatures have been accepted for delivery.');
+            return equalBytes(input, contactGrantInput(issued, this.context)) && certificates.some(certificate => certificate.notBefore <= now && now < certificate.expiresAt
+                && confirmed.signatures[certificateId(certificate, this.context)] !== undefined
+                && verifyDevice(input, confirmed.signatures[certificateId(certificate, this.context)]!, certificate.signingPublicKey));
+        };
+        if (binding?.deviceId !== deviceId) issues.push({ code: 'contact_history_unavailable' });
+        else {
+            const affected = new Set<string>();
+            for (const row of contacts) {
+                const contact = contactRecordCodec.decode(row.value.record!);
+                if (contact.status !== 'active') continue;
+                const confirmed = row.value.confirmedGrantTo === undefined ? undefined : contactGrantCodec.decode(row.value.confirmedGrantTo);
+                for (const issued of [contact.grantToContact, confirmed]) if (issued && (issued.expiresAt ?? Infinity) > now && issued.signatures[deviceId]
+                    && !confirmedSignature(issued, confirmed, contact.account)) affected.add(contact.account);
+            }
+            for (const row of requests) {
+                if (row.value.direction !== 'outgoing' || ['failed', 'canceled'].includes(String(row.value.sendState))) continue;
+                const grant = contactConsentCodec.decode(row.value.consent!).grant;
+                if ((grant.expiresAt ?? Infinity) <= now || !grant.signatures[deviceId]) continue;
+                if (row.value.sendState !== 'targetAccepted' || !confirmedSignature(grant, grant, String(row.value.accountId))) affected.add(String(row.value.accountId));
+            }
+            for (const accountId of [...affected].sort()) issues.push({ accountId, code: 'replacement_grant_not_confirmed' });
+        }
+        if (issues.length) {
+            if (!selection) throw new ProtocolError('contact_grant_at_risk', 'Device removal cannot guarantee contact authorization continuity.');
+            throw new DeviceAuthorizationError('contactContinuityUnverifiable', 'Complete contact authorization continuity before replacing this device.', { deviceSelection: selection, contactIssues: issues });
         }
     }
-    async #prepare(relayId: string, options: PublishDeviceStateOptions, signer: AccountSigner, signal: AbortSignal, removedDevice?: string): Promise<SignedRequest> {
-        const queries = [stateKey(this.accountId), requestKey(method), ...(removedDevice ? [{ collection: 'contacts' }] : [])];
+    async #prepare(relayId: string, options: PublishDeviceStateOptions, signer: AccountSigner, signal: AbortSignal, operationKey?: string, selection?: DeviceSelectionInfo): Promise<SignedRequest> {
+        const queries: RecordQuery[] = [stateKey(this.accountId), requestKey(method)];
         const snapshot = await this.#store.read(queries, signal); const known = snapshot.sets[0]![0]?.value; const saved = snapshot.sets[1]![0]?.value;
-        if (removedDevice) {
-            if (!known || !options.previousState || canonicalJson(known) !== accountDeviceStateCodec.stringify(options.previousState)) throw new StateConflictError('Device state changed before preparing removal.');
-            this.#checkRemoval(removedDevice, options.certificates!, snapshot.sets[2]!);
-        }
         const signed = readSignedRequest(saved); const knownState = known && accountDeviceStateCodec.decode(known);
         const knownRevision = Math.max(knownState?.revision ?? -1, signed?.revision ?? -1, options.previousState?.revision ?? -1);
         const refreshStaging = options.certificates === undefined && !options.recovery && options.revision === undefined;
@@ -414,22 +668,32 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
                 certificates = registered ? certificates.map(value => certificateId(value, this.context) === id ? local : value) : [...certificates, local];
             }
         }
+        const previous = knownState && (!options.previousState || knownState.revision >= options.previousState.revision) ? knownState : options.previousState;
+        const retainedIds = new Set(certificates.map(value => certificateId(value, this.context)));
+        const removed = previous?.certificates.filter(value => !retainedIds.has(certificateId(value, this.context)) && value.expiresAt > this.clock.nowSeconds()) ?? [];
+        const checkContinuity = (current: StoreSnapshot) => {
+            for (const certificate of removed) this.#checkContinuity(certificateId(certificate, this.context), previous!, certificates,
+                current.sets[2]!, current.sets[3]!, current.sets[4]![0]?.value, selection);
+        };
+        if (removed.length) {
+            queries.push({ collection: 'contacts' }, { collection: 'contact_requests' }, bindingKey);
+            checkContinuity(await this.#store.read(queries, signal));
+        }
         const pending = signed?.pending ? accountDeviceStateCodec.decode(signed.document) : undefined;
-        if (!refreshStaging && pending && signed!.relayId === relayId && (options.revision === undefined || options.revision === signed!.revision)
+        if (pending && signed!.relayId === relayId && (options.revision === undefined || options.revision === signed!.revision)
             && canonicalJson(pending.certificates.map(value => deviceCertificateCodec.encode(value))) === canonicalJson(certificates.map(value => deviceCertificateCodec.encode(value)))) {
             validateDeviceState(pending, this.context); if (pending.account !== this.accountId) throw new ProtocolError('invalid_storage', 'Pending device state belongs to another account.'); return signed!;
         }
-        if (pending && !refreshStaging && !options.recovery && options.revision === undefined) throw new StateConflictError('Device publication has an unknown result. Retry the original certificates or resolve current state.');
+        if (pending && !options.recovery && options.revision === undefined) throw new StateConflictError('Device publication has an unknown result. Retry the original certificates or resolve current state.');
         const publicKey = signer.publicKey.slice();
         if (signer.accountId !== this.accountId || !matchesAccount(this.accountId, publicKey)) throw new ProtocolError('invalid_identity', 'Account signer changed identity.');
         const revision = nextRevision(knownRevision, options.revision ?? (options.recovery ? Math.max(nextRevision(knownRevision), this.clock.nowSeconds() * 1000) : undefined));
         let state: AccountDeviceState = { account: this.accountId, accountPublicKey: publicKey, revision, certificates: certificates.map(clone), accountSignature: new Uint8Array(64) };
         state = { ...state, accountSignature: (await signer.sign(deviceStateInput(state, this.context), signal)).slice() }; validateDeviceState(state, this.context);
-        const prepared: SignedRequest = { relayId, revision, document: accountDeviceStateCodec.encode(state), pending: true };
+        const prepared: SignedRequest = { relayId, revision, document: accountDeviceStateCodec.encode(state), pending: true, ...(operationKey ? { operationKey } : {}) };
         await updateStore(this.#store, queries, current => {
             if (fingerprint(current.sets[0]![0]?.value) !== fingerprint(known) || fingerprint(current.sets[1]![0]?.value) !== fingerprint(saved)) throw new StateConflictError('Device state changed while signing.');
-            if (removedDevice && canonicalJson(current.sets[2]!.map(row => ({ key: row.key, value: row.value }))) !== canonicalJson(snapshot.sets[2]!.map(row => ({ key: row.key, value: row.value }))))
-                throw new StateConflictError('Contact grants changed while signing device removal.');
+            checkContinuity(current);
             return { mutations: [putSignedRequest(method, prepared)], result: undefined };
         }, signal);
         return prepared;
@@ -463,7 +727,6 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         if (!state || this.getAuthorizationState(certificateId(this.#local, this.context)) !== 'authorized')
             throw new ProtocolError('unauthorized_device', 'The local device has no current published authorization.');
         this.#refresh = new AsyncPulse();
-        await this.#useHome(await this.#home(signal), signal);
         const runtime = this.runtimeSignal;
         this.#removeRouteListener = this.#account.on('accountChanged', () => { this.#refresh?.pulse(); });
         this.#removeRelayListener = this.relayClients.on('relayChanged', client => {
@@ -498,14 +761,14 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         try {
             for (;;) {
                 await this.#refresh!.wait(signal);
-                if (!this.#accountSigner && this.getAuthorizationState(certificateId(this.#local!, this.context)) !== 'authorized') continue;
+                if (this.getAuthorizationState(certificateId(this.#local!, this.context)) !== 'authorized') continue;
+                let relayId: string | undefined;
                 try {
-                    const relayId = await this.#home(signal);
+                    relayId = await this.#home(signal);
                     await this.#useHome(relayId, signal);
                 } catch (error) {
                     throwIfAborted(signal);
-                    this.notifyBackgroundError({ operation: 'synchronize', ...(this.#homeClient ? { resource: this.#homeClient.relayId } : {}), error });
-
+                    this.notifyBackgroundError({ operation: 'connect', ...(relayId ? { resource: relayId } : {}), error });
                 }
             }
         } catch (error) { if (!signal.aborted) throw error; }

@@ -7,7 +7,10 @@
 | Symptom | Likely cause | What to do |
 | --- | --- | --- |
 | Client cannot open its database | Missing migration, incorrect binding, inaccessible storage, or lost protector | Migrate explicitly; check the network/account/database and restore access to the original protection keys. Surface corruption instead of opening a new empty store. |
-| Existing account fails initial establishment | This database has no authorized device for the existing route | Use the application's explicit account recovery flow with an account signer. |
+| Existing account needs authorization on a fresh installation | This database has no device authorized for the account | Explicitly call `establishAccount` with an account signer; it retains the existing device list and home relay. |
+| `deviceSelectionRequired` | The complete device list has reached its protocol limit | Present `deviceSelection.devices` and retry with the user's explicit `replaceDeviceId`. |
+| `localKeyAccessRequired` | The original protector cannot read retained keys | Inspect `keyIssue`, restore access, and retry. Preserve the database; partial local-data loss is outside the supported recovery contract. |
+| `submissionOutcomeUnknown` | A publication may have succeeded without a verified response | Retry explicit establishment with the original options and store; the SDK reconciles or reuses the saved request. |
 | Send returns but the peer has no message yet | The return is an outbox status, or background work is stopped | Start the client, inspect `getSendStatus`, and observe `sendStatusChanged`. |
 | Page does not show a new arrival | The reader holds a fixed snapshot | Dispose it and open a new reader. |
 | Profile edit or migration reports a conflict | An earlier request is uncertain or authoritative state changed | Let the original operation reconcile; inspect the current state before choosing another edit or target. |

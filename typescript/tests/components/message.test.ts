@@ -1,5 +1,6 @@
-import { afterEach, expect, test, vi } from 'vitest';
-import { MessageManager, StateConflictError, contactRecordCodec, contactGrantCodec, certificateId, messageSendRequestCodec, type QueryReader, type MessageEvents } from '@meshline/sdk';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { MessageManager, StateConflictError, contactRecordCodec, contactGrantCodec, certificateId, deviceStateInput, signAccount, messageSendRequestCodec, decryptMessage, contactGrantInput, type QueryReader, type MessageEvents } from '@meshline/sdk';
+import { MessageContacts } from '../../packages/sdk/dist/messages/contacts.js';
 import { context } from '../support/relay-fixture.js';
 import { MessagingNetwork } from '../support/messaging-network.js';
 
@@ -19,271 +20,376 @@ async function connect(f: Awaited<ReturnType<typeof fixture>>) {
     await a.messages.synchronize(network.descriptor.relayId);
 }
 
-test('MessageManager establishes contacts, exchanges encrypted direct messages and queries stable history', async () => {
-    const f = await fixture(); await connect(f); const { network, a, b } = f;
-    const requests = [...a.pool.clients, ...b.pool.clients].map(client => vi.spyOn(client, 'requestHttp'));
-    expect(await a.messages.getContact(b.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
-    expect(await b.messages.getContact(a.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
-    const sent = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: '完整 SDK 工作流 😀' } }); expect(sent.state).toBe('queued');
-    await network.until(async () => Boolean(await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId })));
-    expect((await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId }))!.body!.text).toBe('完整 SDK 工作流 😀');
-    await network.until(async () => (await a.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted');
-    expect(await all(a.messages.getMessageHistory(b.accountId))).toHaveLength(1); expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(0);
-    expect(await all(a.messages.getContactRequests())).toEqual([]); expect(await all(b.messages.getContactRequests())).toEqual([]);
-    expect(a.messages.lastBackgroundError).toBeUndefined(); expect(b.messages.lastBackgroundError).toBeUndefined();
-    for (let index = 0; index < 2; index++) {
-        const next = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'cached ' + index } });
-        await vi.waitFor(() => expect(network.submissions.some(request => request.envelope.messageId === next.messageId)).toBe(true), { timeout: 5000 });
-        await b.messages.synchronize(network.descriptor.relayId);
-        expect(await b.messages.getMessage({ sender: a.accountId, messageId: next.messageId })).toBeDefined();
-    }
-    const calls = requests.flatMap(request => request.mock.calls);
-    expect(calls.filter(([, method]) => method === 'account.route.resolve')).toHaveLength(0);
-    expect(calls.filter(([, method]) => method === 'device.state.resolve')).toHaveLength(0);
-});
-
-test('ungranted direct sends are rejected; self messages persist locally and queued cancellation prevents transmission', async () => {
-    const { a, b, network } = await fixture();
-    await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'not authorized' } })).rejects.toThrow('grant');
-    const states = vi.spyOn(a.device, 'getDeviceState');
-    const sent = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'self message' } });
-    expect(states).toHaveBeenCalledTimes(1); states.mockRestore();
-    expect(await a.messages.cancelMessage(sent.messageId)).toBe(true); expect(await a.messages.cancelMessage(sent.messageId)).toBe(false);
-    await a.messages.start(); await network.until(async () => network.submissions.length > 0);
-    expect(network.submissions.some(request => request.envelope.messageId === sent.messageId)).toBe(false);
-    expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(1); expect((await a.messages.getSendStatus(sent.messageId))!.state).toBe('canceled');
-});
-
-test('send preparation reuses both states during a blocked refresh and still rejects revoked authorization', async () => {
-    const f = await fixture(); await connect(f); const { a, b, network } = f; await a.messages.stop(); await b.messages.stop();
-    const client = await a.pool.get(network.descriptor.relayId, { mode: 'device', signer: a.device });
-    const request = client.requestHttp.bind(client); const gate = deferred();
-    const spy = vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
-        if (args[1] === 'device.state.resolve') await gate.promise;
-        return request(...args);
-    });
-    const refresh = a.device.refreshDeviceState();
-    try {
-        await vi.waitFor(() => expect(spy.mock.calls.some(([, method]) => method === 'device.state.resolve')).toBe(true));
-        expect((await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'cached preparation' } })).state).toBe('queued');
-    } finally { gate.resolve(); }
-    await refresh; spy.mockRestore();
-    await a.device.publishDeviceState(network.descriptor.relayId, { certificates: [] });
-    const before = await a.store.read([{ collection: 'message_outbox' }]);
-    await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'revoked sender' } })).rejects.toThrow();
-    expect((await a.store.read([{ collection: 'message_outbox' }])).sets).toEqual(before.sets);
-});
-
-test.each(['own failure', 'peer failure', 'cancel', 'dispose'])('send preparation drains both queries without enqueueing on %s', async action => {
-    const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
-    const before = await a.store.read([{ collection: 'message_outbox' }]); const cleanup = deferred(); const caller = new AbortController();
-    const signals: AbortSignal[] = []; let complete = false; let settled = 0;
-    const state = a.device.getDeviceState.bind(a.device);
-    const spy = vi.spyOn(a.device, 'getDeviceState').mockImplementation(async (target, signal) => {
-        signals.push(signal!);
-        try {
-            if (action === (target === a.accountId ? 'own failure' : 'peer failure')) throw new Error(action);
-            await cleanup.promise; signal!.throwIfAborted(); return await state(target, signal);
-        } finally { settled++; }
-    });
-    const sending = a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'must not enqueue' } }, caller.signal)
-        .catch(error => error).then(result => { complete = true; return result; });
-    let disposal: Promise<void> | undefined;
-    try {
-        await vi.waitFor(() => expect(signals).toHaveLength(2));
-        if (action === 'cancel') caller.abort();
-        if (action === 'dispose') disposal = a.messages.dispose();
-        if (action === 'cancel' || action === 'dispose') expect(signals.every(signal => signal.aborted)).toBe(true);
-        else expect(settled).toBe(1);
-        expect(complete).toBe(false);
-    } finally { cleanup.resolve(); }
-    const error = await sending; await disposal; spy.mockRestore(); expect(settled).toBe(2);
-    expect(error).toMatchObject(action.endsWith('failure') ? { message: action } : { name: 'AbortError' });
-    expect((await a.store.read([{ collection: 'message_outbox' }])).sets).toEqual(before.sets);
-});
-
-test('contact invitation, duplicate outgoing request, dismissal and queued request cancellation retain clear local state', async () => {
-    const { a, b } = await fixture(); const invitation = await b.messages.createInvite(1730003000);
-    const first = await a.messages.addContact(invitation, '通过邀请添加'); const duplicate = await a.messages.addContact(invitation, 'second note'); expect(duplicate.messageId).toBe(first.messageId);
-    expect((await all(a.messages.getContactRequests({ direction: 'outgoing' })))[0]).toMatchObject({ note: '通过邀请添加', sendState: 'queued' });
-    expect(await a.messages.cancelMessage(first.messageId)).toBe(true); expect(await all(a.messages.getContactRequests())).toEqual([]);
-    await a.messages.dismissContactRequest(b.accountId); await expect(a.messages.acceptContactRequest(b.accountId)).rejects.toThrow('no incoming');
-});
-
-test('contact request events distinguish additions and removals without phantom contact changes', async () => {
-    const { a, b } = await fixture(); const requests: MessageEvents['contactRequestChanged'][] = []; const contacts: MessageEvents['contactChanged'][] = [];
-    a.messages.on('contactRequestChanged', value => { requests.push(value); }); a.messages.on('contactChanged', value => { contacts.push(value); });
-    const request = await a.messages.addContact(b.accountId, 'one request'); await a.messages.addContact(b.accountId);
-    expect(requests).toEqual([{ accountId: b.accountId, direction: 'outgoing', kind: 'added', request }]);
-    await a.messages.cancelMessage(request.messageId); await a.messages.cancelMessage(request.messageId); await a.messages.dismissContactRequest(b.accountId);
-    expect(requests).toEqual([{ accountId: b.accountId, direction: 'outgoing', kind: 'added', request }, { accountId: b.accountId, direction: 'outgoing', kind: 'removed' }]);
-    expect(contacts).toEqual([]);
-});
-
-test('request delivery events retain each committed send state and dismiss only existing incoming requests', async () => {
-    const { a, b, network } = await fixture(); const outgoing: MessageEvents['contactRequestChanged'][] = []; const incoming: MessageEvents['contactRequestChanged'][] = [];
-    a.messages.on('contactRequestChanged', value => { outgoing.push(value); }); b.messages.on('contactRequestChanged', value => { incoming.push(value); });
-    const request = await a.messages.addContact(b.accountId, 'delivery snapshots'); await a.messages.start();
-    await network.until(async () => (await a.messages.getSendStatus(request.messageId))?.state === 'targetAccepted');
-    expect(outgoing.map(value => value.request?.sendState)).toEqual(['queued', 'submitting', 'targetAccepted']);
-    expect(outgoing).toMatchObject([{ kind: 'added' }, { kind: 'updated' }, { kind: 'updated' }]);
-    await b.messages.start(); await network.until(async () => incoming.length > 0); await b.messages.stop();
-    await b.messages.dismissContactRequest(a.accountId); await b.messages.dismissContactRequest(a.accountId);
-    expect(incoming).toEqual([{ accountId: a.accountId, direction: 'incoming', kind: 'added', request: expect.objectContaining({ messageId: request.messageId, note: 'delivery snapshots' }) },
-        { accountId: a.accountId, direction: 'incoming', kind: 'removed' }]);
-});
-
-test('contact events expose relationship, alias and deletion snapshots from successful transactions', async () => {
-    const f = await fixture(); const { a, b } = f; const changes: MessageEvents['contactChanged'][] = [];
-    a.messages.on('contactChanged', value => { changes.push(value); }); await connect(f); await a.messages.stop(); await b.messages.stop();
-    expect(changes).toContainEqual({ accountId: b.accountId, kinds: ['relationship', 'authorization'], contact: expect.objectContaining({ accountId: b.accountId, state: 'active', grantFromContact: 'valid', grantToContact: 'valid' }) });
-    changes.length = 0; await a.messages.setContactAlias(b.accountId, 'first'); await a.messages.setContactAlias(b.accountId, 'second'); await a.messages.removeContact(b.accountId);
-    expect(changes).toEqual([{ accountId: b.accountId, kinds: ['alias'], contact: expect.objectContaining({ alias: 'first' }) },
-        { accountId: b.accountId, kinds: ['alias'], contact: expect.objectContaining({ alias: 'second' }) }, { accountId: b.accountId, kinds: ['deleted'] }]);
-});
-
-test('failed and retried contact transactions never publish uncommitted or duplicate events', async () => {
-    const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
-    const changes: MessageEvents['contactChanged'][] = []; a.messages.on('contactChanged', value => { changes.push(value); });
-    const commit = a.store.commit.bind(a.store); let failures = 1; let conflict = false;
-    const spy = vi.spyOn(a.store, 'commit').mockImplementation(async (...args) => {
-        if (args[1].some(value => value.collection === 'contacts')) {
-            expect(changes).toEqual([]);
-            if (failures-- > 0) throw conflict ? new StateConflictError('contended store') : new Error('disk full');
+describe('Message delivery and history', () => {
+    test('MessageManager establishes contacts, exchanges encrypted direct messages and queries stable history', async () => {
+        const f = await fixture(); await connect(f); const { network, a, b } = f;
+        const requests = [...a.pool.clients, ...b.pool.clients].map(client => vi.spyOn(client, 'requestHttp'));
+        expect(await a.messages.getContact(b.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
+        expect(await b.messages.getContact(a.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
+        const sent = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: '完整 SDK 工作流 😀' } }); expect(sent.state).toBe('queued');
+        await network.until(async () => Boolean(await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId })));
+        expect((await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId }))!.body!.text).toBe('完整 SDK 工作流 😀');
+        await network.until(async () => (await a.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted');
+        expect(await all(a.messages.getMessageHistory(b.accountId))).toHaveLength(1); expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(0);
+        expect(await all(a.messages.getContactRequests())).toEqual([]); expect(await all(b.messages.getContactRequests())).toEqual([]);
+        expect(a.messages.lastBackgroundError).toBeUndefined(); expect(b.messages.lastBackgroundError).toBeUndefined();
+        for (let index = 0; index < 2; index++) {
+            const next = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'cached ' + index } });
+            await vi.waitFor(() => expect(network.submissions.some(request => request.envelope.messageId === next.messageId)).toBe(true), { timeout: 5000 });
+            await b.messages.synchronize(network.descriptor.relayId);
+            expect(await b.messages.getMessage({ sender: a.accountId, messageId: next.messageId })).toBeDefined();
         }
-        return commit(...args);
+        const calls = requests.flatMap(request => request.mock.calls);
+        expect(calls.filter(([, method]) => method === 'account.route.resolve')).toHaveLength(0);
+        expect(calls.filter(([, method]) => method === 'device.state.resolve')).toHaveLength(0);
     });
-    try {
-        await expect(a.messages.setContactAlias(b.accountId, 'failed')).rejects.toThrow('disk full'); expect(changes).toEqual([]);
-        expect((await a.messages.getContact(b.accountId))!.alias).toBeUndefined();
-        conflict = true; failures = 1; await a.messages.setContactAlias(b.accountId, 'committed');
-        expect(changes).toEqual([{ accountId: b.accountId, kinds: ['alias'], contact: expect.objectContaining({ alias: 'committed' }) }]);
-    } finally { spy.mockRestore(); }
-});
 
-test('alias/removal persist and enqueue encrypted account synchronization atomically', async () => {
-    const f = await fixture(); await connect(f); const { a, b, network } = f; await a.messages.stop();
-    await a.messages.setContactAlias(b.accountId, '测试联系人'); expect((await a.messages.getContact(b.accountId))!.alias).toBe('测试联系人');
-    expect(await all(a.messages.getContacts('测试'))).toHaveLength(1);
-    const before = (await a.store.read([{ collection: 'message_outbox' }])).sets[0]!.length;
-    await a.messages.removeContact(b.accountId); expect(await a.messages.getContact(b.accountId)).toBeUndefined();
-    const rows = await a.store.read([{ collection: 'contacts', key: b.accountId }, { collection: 'message_outbox' }]);
-    expect(contactRecordCodec.decode(rows.sets[0]![0]!.value.record!).status).toBe('deleted'); expect(rows.sets[1]!.length).toBe(before + 1);
-    await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'removed contact' } })).rejects.toThrow('grant');
-    expect(network.submissions.length).toBeGreaterThan(0);
-});
+    test('ungranted direct sends are rejected; self messages persist locally and queued cancellation prevents transmission', async () => {
+        const { a, b, network } = await fixture();
+        await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'not authorized' } })).rejects.toThrow('grant');
+        const states = vi.spyOn(a.device, 'getDeviceState');
+        const sent = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'self message' } });
+        expect(states).toHaveBeenCalledTimes(1); states.mockRestore();
+        expect(await a.messages.cancelMessage(sent.messageId)).toBe(true); expect(await a.messages.cancelMessage(sent.messageId)).toBe(false);
+        await a.messages.start(); await network.until(async () => network.submissions.length > 0);
+        expect(network.submissions.some(request => request.envelope.messageId === sent.messageId)).toBe(false);
+        expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(1); expect((await a.messages.getSendStatus(sent.messageId))!.state).toBe('canceled');
+    });
 
-test('alias updates return contact snapshots including empty/cleared values and survive observer disposal', async () => {
-    const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
-    const first = await a.messages.setContactAlias(b.accountId, '私有别名 😀');
-    expect(first).toEqual(await a.messages.getContact(b.accountId));
-    expect(first).toMatchObject({ accountId: b.accountId, alias: '私有别名 😀', state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
-    const empty = await a.messages.setContactAlias(b.accountId, '');
-    expect(empty).toMatchObject({ alias: '' }); expect(first).toMatchObject({ alias: '私有别名 😀' });
-    const cleared = await a.messages.setContactAlias(b.accountId, null);
-    expect(cleared).toEqual(await a.messages.getContact(b.accountId)); expect(cleared).not.toHaveProperty('alias');
-    let disposal: Promise<void> | undefined;
-    a.messages.on('contactChanged', () => { disposal = a.messages.dispose(); return disposal; });
-    await expect(a.messages.setContactAlias(b.accountId, 'final')).resolves.toMatchObject({ accountId: b.accountId, alias: 'final', state: 'active' });
-    expect(disposal).toBeDefined(); await disposal; expect(a.messages.lifecycleState).toBe('disposed');
-});
-
-test('an unchanged contact alias returns its snapshot without writes, signing or duplicate sync', async () => {
-    const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
-    for (const alias of ['same', '', null]) {
-        await a.messages.setContactAlias(b.accountId, alias);
-        const expected = await a.messages.getContact(b.accountId); const before = await a.store.read([]);
-        const changes: MessageEvents['contactChanged'][] = []; const detach = a.messages.on('contactChanged', value => { changes.push(value); });
-        const sign = vi.spyOn(a.device, 'sign');
+    test('send preparation reuses both states during a blocked refresh and still rejects revoked authorization', async () => {
+        const f = await fixture(); await connect(f); const { a, b, network } = f; await a.messages.stop(); await b.messages.stop();
+        const client = await a.pool.get(network.descriptor.relayId, { mode: 'device', signer: a.device });
+        const request = client.requestHttp.bind(client); const gate = deferred();
+        const spy = vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+            if (args[1] === 'device.state.resolve') await gate.promise;
+            return request(...args);
+        });
+        const refresh = a.device.refreshDeviceState();
         try {
-            const actual = await a.messages.setContactAlias(b.accountId, alias);
-            expect((await a.store.read([])).version).toBe(before.version);
-            expect(sign).not.toHaveBeenCalled(); expect(changes).toEqual([]); expect(actual).toEqual(expected);
-        } finally { sign.mockRestore(); detach(); }
+            await vi.waitFor(() => expect(spy.mock.calls.some(([, method]) => method === 'device.state.resolve')).toBe(true));
+            expect((await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'cached preparation' } })).state).toBe('queued');
+        } finally { gate.resolve(); }
+        await refresh; spy.mockRestore();
+        const current = network.states.get(a.accountId)!;
+        const revoked = { ...current, certificates: [], revision: current.revision + 1 };
+        network.states.set(a.accountId, { ...revoked, accountSignature: signAccount(deviceStateInput(revoked, context), new Uint8Array(32).fill(21)) });
+        await a.device.refreshDeviceState();
+        const before = await a.store.read([{ collection: 'message_outbox' }]);
+        await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'revoked sender' } })).rejects.toThrow();
+        expect((await a.store.read([{ collection: 'message_outbox' }])).sets).toEqual(before.sets);
+    });
+
+    test.each(['own failure', 'peer failure', 'cancel', 'dispose'])('send preparation drains both queries without enqueueing on %s', async action => {
+        const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
+        const before = await a.store.read([{ collection: 'message_outbox' }]); const cleanup = deferred(); const caller = new AbortController();
+        const signals: AbortSignal[] = []; let complete = false; let settled = 0;
+        const state = a.device.getDeviceState.bind(a.device);
+        const spy = vi.spyOn(a.device, 'getDeviceState').mockImplementation(async (target, signal) => {
+            signals.push(signal!);
+            try {
+                if (action === (target === a.accountId ? 'own failure' : 'peer failure')) throw new Error(action);
+                await cleanup.promise; signal!.throwIfAborted(); return await state(target, signal);
+            } finally { settled++; }
+        });
+        const sending = a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'must not enqueue' } }, caller.signal)
+            .catch(error => error).then(result => { complete = true; return result; });
+        let disposal: Promise<void> | undefined;
+        try {
+            await vi.waitFor(() => expect(signals).toHaveLength(2));
+            if (action === 'cancel') caller.abort();
+            if (action === 'dispose') disposal = a.messages.dispose();
+            if (action === 'cancel' || action === 'dispose') expect(signals.every(signal => signal.aborted)).toBe(true);
+            else expect(settled).toBe(1);
+            expect(complete).toBe(false);
+        } finally { cleanup.resolve(); }
+        const error = await sending; await disposal; spy.mockRestore(); expect(settled).toBe(2);
+        expect(error).toMatchObject(action.endsWith('failure') ? { message: action } : { name: 'AbortError' });
+        expect((await a.store.read([{ collection: 'message_outbox' }])).sets).toEqual(before.sets);
+    });
+
+    test('uncertain encrypted sends recover after MessageManager/database restart without creating a new request', async () => {
+        const { a, network } = await fixture(); network.loseResponse = true; await a.messages.start();
+        const sent = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'recover me' } });
+        await network.until(async () => (await a.messages.getSendStatus(sent.messageId))?.state === 'submissionUnknown'); await a.dispose();
+        network.loseResponse = false; const resumed = await network.client(21, a.path); await resumed.messages.start();
+        await network.until(async () => (await resumed.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted');
+        const attempts = network.submissions.filter(value => value.envelope.messageId === sent.messageId); expect(attempts.length).toBeGreaterThanOrEqual(2);
+        expect(attempts.at(-1)).toEqual(attempts[0]); expect((await resumed.messages.getMessage({ sender: a.accountId, messageId: sent.messageId }))!.body!.text).toBe('recover me');
+    });
+
+    test('a protocol message with an unreadable local key box reports failure without starving later sends', async () => {
+        const { network, a, b } = await fixture(); const broken = await a.messages.addContact(b.accountId);
+        const rows = await a.store.read([{ collection: 'message_outbox', key: broken.messageId }]); const row = rows.sets[0]![0]!;
+        const request = messageSendRequestCodec.decode(row.value.request!); request.senderBoxes![0]!.sealedKey[15]! ^= 1;
+        await a.store.commit(rows.version, [{ kind: 'put', collection: 'message_outbox', key: row.key, value: { ...row.value, request: messageSendRequestCodec.encode(request) } }]);
+        network.clock.tick(); const valid = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'still deliver this' } });
+        const failures: string[] = []; a.messages.onLifecycle('backgroundError', value => { if (value.resource) failures.push(value.resource); });
+        await a.messages.start(); await network.until(async () => network.submissions.some(value => value.envelope.messageId === valid.messageId));
+        expect(failures).toContain(broken.messageId); expect((await a.messages.getSendStatus(broken.messageId))!.state).toBe('targetAccepted');
+        expect(network.submissions.some(value => value.envelope.messageId === broken.messageId)).toBe(true);
+        expect((await a.store.read([{ collection: 'contacts', key: b.accountId }])).sets[0]![0]?.value.confirmedGrantTo).toBeUndefined();
+    });
+});
+
+describe('Contact relationships and events', () => {
+    test('contact invitation, duplicate outgoing request, dismissal and queued request cancellation retain clear local state', async () => {
+        const { a, b } = await fixture(); const invitation = await b.messages.createInvite(1730003000);
+        const first = await a.messages.addContact(invitation, '通过邀请添加'); const duplicate = await a.messages.addContact(invitation, 'second note'); expect(duplicate.messageId).toBe(first.messageId);
+        expect((await all(a.messages.getContactRequests({ direction: 'outgoing' })))[0]).toMatchObject({ note: '通过邀请添加', sendState: 'queued' });
+        expect(await a.messages.cancelMessage(first.messageId)).toBe(true); expect(await all(a.messages.getContactRequests())).toEqual([]);
+        await a.messages.dismissContactRequest(b.accountId); await expect(a.messages.acceptContactRequest(b.accountId)).rejects.toThrow('no incoming');
+    });
+
+    test('contact request events distinguish additions and removals without phantom contact changes', async () => {
+        const { a, b } = await fixture(); const requests: MessageEvents['contactRequestChanged'][] = []; const contacts: MessageEvents['contactChanged'][] = [];
+        a.messages.on('contactRequestChanged', value => { requests.push(value); }); a.messages.on('contactChanged', value => { contacts.push(value); });
+        const request = await a.messages.addContact(b.accountId, 'one request'); await a.messages.addContact(b.accountId);
+        expect(requests).toEqual([{ accountId: b.accountId, direction: 'outgoing', kind: 'added', request }]);
+        await a.messages.cancelMessage(request.messageId); await a.messages.cancelMessage(request.messageId); await a.messages.dismissContactRequest(b.accountId);
+        expect(requests).toEqual([{ accountId: b.accountId, direction: 'outgoing', kind: 'added', request }, { accountId: b.accountId, direction: 'outgoing', kind: 'removed' }]);
+        expect(contacts).toEqual([]);
+    });
+
+    test('request delivery events retain each committed send state and dismiss only existing incoming requests', async () => {
+        const { a, b, network } = await fixture(); const outgoing: MessageEvents['contactRequestChanged'][] = []; const incoming: MessageEvents['contactRequestChanged'][] = [];
+        a.messages.on('contactRequestChanged', value => { outgoing.push(value); }); b.messages.on('contactRequestChanged', value => { incoming.push(value); });
+        const request = await a.messages.addContact(b.accountId, 'delivery snapshots'); await a.messages.start();
+        await network.until(async () => (await a.messages.getSendStatus(request.messageId))?.state === 'targetAccepted');
+        expect(outgoing.map(value => value.request?.sendState)).toEqual(['queued', 'submitting', 'targetAccepted']);
+        expect(outgoing).toMatchObject([{ kind: 'added' }, { kind: 'updated' }, { kind: 'updated' }]);
+        await b.messages.start(); await network.until(async () => incoming.length > 0); await b.messages.stop();
+        await b.messages.dismissContactRequest(a.accountId); await b.messages.dismissContactRequest(a.accountId);
+        expect(incoming).toEqual([{ accountId: a.accountId, direction: 'incoming', kind: 'added', request: expect.objectContaining({ messageId: request.messageId, note: 'delivery snapshots' }) },
+            { accountId: a.accountId, direction: 'incoming', kind: 'removed' }]);
+    });
+
+    test('contact events expose relationship, alias and deletion snapshots from successful transactions', async () => {
+        const f = await fixture(); const { a, b } = f; const changes: MessageEvents['contactChanged'][] = [];
+        a.messages.on('contactChanged', value => { changes.push(value); }); await connect(f); await a.messages.stop(); await b.messages.stop();
+        expect(changes).toContainEqual({ accountId: b.accountId, kinds: ['relationship', 'authorization'], contact: expect.objectContaining({ accountId: b.accountId, state: 'active', grantFromContact: 'valid', grantToContact: 'valid' }) });
+        changes.length = 0; await a.messages.setContactAlias(b.accountId, 'first'); await a.messages.setContactAlias(b.accountId, 'second'); await a.messages.removeContact(b.accountId);
+        expect(changes).toEqual([{ accountId: b.accountId, kinds: ['alias'], contact: expect.objectContaining({ alias: 'first' }) },
+            { accountId: b.accountId, kinds: ['alias'], contact: expect.objectContaining({ alias: 'second' }) }, { accountId: b.accountId, kinds: ['deleted'] }]);
+    });
+
+    test('failed and retried contact transactions never publish uncommitted or duplicate events', async () => {
+        const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
+        const changes: MessageEvents['contactChanged'][] = []; a.messages.on('contactChanged', value => { changes.push(value); });
+        const commit = a.store.commit.bind(a.store); let failures = 1; let conflict = false;
+        const spy = vi.spyOn(a.store, 'commit').mockImplementation(async (...args) => {
+            if (args[1].some(value => value.collection === 'contacts')) {
+                expect(changes).toEqual([]);
+                if (failures-- > 0) throw conflict ? new StateConflictError('contended store') : new Error('disk full');
+            }
+            return commit(...args);
+        });
+        try {
+            await expect(a.messages.setContactAlias(b.accountId, 'failed')).rejects.toThrow('disk full'); expect(changes).toEqual([]);
+            expect((await a.messages.getContact(b.accountId))!.alias).toBeUndefined();
+            conflict = true; failures = 1; await a.messages.setContactAlias(b.accountId, 'committed');
+            expect(changes).toEqual([{ accountId: b.accountId, kinds: ['alias'], contact: expect.objectContaining({ alias: 'committed' }) }]);
+        } finally { spy.mockRestore(); }
+    });
+
+    test('alias/removal persist and enqueue encrypted account synchronization atomically', async () => {
+        const f = await fixture(); await connect(f); const { a, b, network } = f; await a.messages.stop();
+        await a.messages.setContactAlias(b.accountId, '测试联系人'); expect((await a.messages.getContact(b.accountId))!.alias).toBe('测试联系人');
+        expect(await all(a.messages.getContacts('测试'))).toHaveLength(1);
+        const before = (await a.store.read([{ collection: 'message_outbox' }])).sets[0]!.length;
+        await a.messages.removeContact(b.accountId); expect(await a.messages.getContact(b.accountId)).toBeUndefined();
+        const rows = await a.store.read([{ collection: 'contacts', key: b.accountId }, { collection: 'message_outbox' }]);
+        expect(contactRecordCodec.decode(rows.sets[0]![0]!.value.record!).status).toBe('deleted'); expect(rows.sets[1]!.length).toBe(before + 1);
+        await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'removed contact' } })).rejects.toThrow('grant');
+        expect(network.submissions.length).toBeGreaterThan(0);
+    });
+
+    test('alias updates return contact snapshots including empty/cleared values and survive observer disposal', async () => {
+        const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
+        const first = await a.messages.setContactAlias(b.accountId, '私有别名 😀');
+        expect(first).toEqual(await a.messages.getContact(b.accountId));
+        expect(first).toMatchObject({ accountId: b.accountId, alias: '私有别名 😀', state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
+        const empty = await a.messages.setContactAlias(b.accountId, '');
+        expect(empty).toMatchObject({ alias: '' }); expect(first).toMatchObject({ alias: '私有别名 😀' });
+        const cleared = await a.messages.setContactAlias(b.accountId, null);
+        expect(cleared).toEqual(await a.messages.getContact(b.accountId)); expect(cleared).not.toHaveProperty('alias');
+        let disposal: Promise<void> | undefined;
+        a.messages.on('contactChanged', () => { disposal = a.messages.dispose(); return disposal; });
+        await expect(a.messages.setContactAlias(b.accountId, 'final')).resolves.toMatchObject({ accountId: b.accountId, alias: 'final', state: 'active' });
+        expect(disposal).toBeDefined(); await disposal; expect(a.messages.lifecycleState).toBe('disposed');
+    });
+
+    test('an unchanged contact alias returns its snapshot without writes, signing or duplicate sync', async () => {
+        const f = await fixture(); await connect(f); const { a, b } = f; await a.messages.stop(); await b.messages.stop();
+        for (const alias of ['same', '', null]) {
+            await a.messages.setContactAlias(b.accountId, alias);
+            const expected = await a.messages.getContact(b.accountId); const before = await a.store.read([]);
+            const changes: MessageEvents['contactChanged'][] = []; const detach = a.messages.on('contactChanged', value => { changes.push(value); });
+            const sign = vi.spyOn(a.device, 'sign');
+            try {
+                const actual = await a.messages.setContactAlias(b.accountId, alias);
+                expect((await a.store.read([])).version).toBe(before.version);
+                expect(sign).not.toHaveBeenCalled(); expect(changes).toEqual([]); expect(actual).toEqual(expected);
+            } finally { sign.mockRestore(); detach(); }
+        }
+    });
+});
+
+describe('Contact authorization maintenance', () => {
+    /** Observe durable notifications even when the outbox has not transmitted them yet. */
+    function observeDeviceNotifications(a: Awaited<ReturnType<MessagingNetwork['client']>>, recipient: string,
+        afterFirst?: () => Promise<void>) {
+        const revisions: number[] = []; const seen = new Set<string>(); const commit = a.store.commit.bind(a.store);
+        const spy = vi.spyOn(a.store, 'commit').mockImplementation(async (version, mutations, signal) => {
+            const result = await commit(version, mutations, signal);
+            for (const mutation of mutations) {
+                if (mutation.kind !== 'put' || mutation.collection !== 'message_outbox' || seen.has(mutation.key)) continue;
+                const request = messageSendRequestCodec.decode(mutation.value.request!);
+                if (request.envelope.to !== recipient) continue;
+                seen.add(mutation.key);
+                const box = request.senderBoxes?.find(value => value.deviceId === certificateId(a.device.certificate, context));
+                if (!box) continue;
+                const payload = await decryptMessage({ context, receiver: a.device, sender: a.device.certificate, envelope: request.envelope, keyBox: box });
+                if (payload['$type'] !== 'meshline.device.state.changed') continue;
+                revisions.push(payload.revision as number);
+                if (revisions.length === 1) await afterFirst?.();
+            }
+            return result;
+        });
+        return { revisions, spy };
     }
-});
 
-test('uncertain encrypted sends recover after MessageManager/database restart without creating a new request', async () => {
-    const { a, network } = await fixture(); network.loseResponse = true; await a.messages.start();
-    const sent = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'recover me' } });
-    await network.until(async () => (await a.messages.getSendStatus(sent.messageId))?.state === 'submissionUnknown'); await a.dispose();
-    network.loseResponse = false; const resumed = await network.client(21, a.path); await resumed.messages.start();
-    await network.until(async () => (await resumed.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted');
-    const attempts = network.submissions.filter(value => value.envelope.messageId === sent.messageId); expect(attempts.length).toBeGreaterThanOrEqual(2);
-    expect(attempts.at(-1)).toEqual(attempts[0]); expect((await resumed.messages.getMessage({ sender: a.accountId, messageId: sent.messageId }))!.body!.text).toBe('recover me');
-});
-
-test('runtime message observers can stop MessageManager without deadlocking shared relay cleanup', async () => {
-    const f = await fixture(); await connect(f); const { network, a, b } = f; let stopped = false;
-    b.messages.on('messageReceived', async () => { await b.messages.stop(); stopped = true; });
-    await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'stop after delivery' } });
-    await network.until(async () => stopped); expect(b.messages.lifecycleState).toBe('stopped');
-    expect(a.messages).toBeInstanceOf(MessageManager);
-});
-
-test('pending application route observers do not delay internal timeline recording and disposal drains its write', async () => {
-    const { a, network } = await fixture(); await a.messages.dispose();
-    let releaseObserver!: () => void; const observer = new Promise<void>(resolve => { releaseObserver = resolve; });
-    const detach = a.account.on('accountChanged', () => observer);
-    const messages = new MessageManager({ context, accountId: a.accountId, store: a.store, relayClients: a.pool, accountManager: a.account, deviceManager: a.device, clock: network.clock, secretProtector: a.protector });
-    network.resources.push(messages); await messages.initialize();
-    const timeline = { collection: 'message_timelines', key: network.descriptor.relayId };
-    await a.store.commit((await a.store.read([])).version, [{ ...timeline, kind: 'delete' }]);
-    let releaseWrite!: () => void; const writing = new Promise<void>(resolve => { releaseWrite = resolve; }); let entered = false;
-    const commit = a.store.commit.bind(a.store); const spy = vi.spyOn(a.store, 'commit').mockImplementation(async (...args) => {
-        if (args[1].some(value => value.collection === timeline.collection)) { entered = true; await writing; }
-        return commit(...args);
+    test('new devices supplement contact grants but cannot infer the complete issuance history of another device', async () => {
+        const f = await fixture(); await connect(f); const { network, a, b } = f; const oldId = certificateId(a.device.certificate, context);
+        await expect(a.device.removeDevice(oldId)).rejects.toMatchObject({ code: 'contact_grant_at_risk' });
+        const second = await network.client(21); const secondId = certificateId(second.device.certificate, context); await second.messages.start();
+        await network.until(async () => Boolean(await second.messages.getContact(b.accountId)));
+        await network.until(async () => {
+            const contact = (await second.store.read([{ collection: 'contacts', key: b.accountId }])).sets[0]![0]?.value;
+            if (!contact?.confirmedGrantTo) return false; return Boolean(contactGrantCodec.decode(contact.confirmedGrantTo).signatures[secondId]);
+        });
+        await a.messages.stop(); await expect(second.device.removeDevice(oldId)).rejects.toMatchObject({ code: 'contact_grant_at_risk' });
+        await a.device.getOwnDeviceState(network.descriptor.relayId); expect(a.device.getAuthorizationState(oldId)).toBe('authorized');
+        expect(network.states.get(a.accountId)!.certificates.map(value => certificateId(value, context))).toEqual([oldId, secondId]);
+        const sent = await second.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'after device replacement' } });
+        await network.until(async () => Boolean(await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId })));
+        expect((await second.messages.getContact(b.accountId))!.grantToContact).toBe('valid');
     });
-    let disposed = false; let disposal: Promise<void> | undefined;
-    const publication = a.account.publishRoute(network.descriptor.relayId, { validitySeconds: 3600 });
-    try {
-        await vi.waitFor(() => expect(entered).toBe(true)); await publication;
-        disposal = messages.dispose().then(() => { disposed = true; });
-        await Promise.resolve(); expect(disposed).toBe(false);
-        releaseWrite(); await disposal;
-        expect((await a.store.read([timeline])).sets[0]).toHaveLength(1);
-    } finally { releaseObserver(); releaseWrite(); detach(); spy.mockRestore(); await publication; await disposal; }
-});
 
-test('new devices obtain contact snapshots, supplement grants, and safely replace a previous device', async () => {
-    const f = await fixture(); await connect(f); const { network, a, b } = f; const oldId = certificateId(a.device.certificate, context);
-    await expect(a.device.removeDevice(oldId)).rejects.toThrow('invalidate a contact grant');
-    const second = await network.client(21); const secondId = certificateId(second.device.certificate, context); await second.messages.start();
-    await network.until(async () => Boolean(await second.messages.getContact(b.accountId)));
-    await network.until(async () => {
-        const contact = (await second.store.read([{ collection: 'contacts', key: b.accountId }])).sets[0]![0]?.value;
-        if (!contact?.confirmedGrantTo) return false; return Boolean(contactGrantCodec.decode(contact.confirmedGrantTo).signatures[secondId]);
+    test.each(['removeDevice', 'publishDeviceState'])('%s cannot erase the last contact signature merely because another device exists', async method => {
+        const f = await fixture(); await connect(f); const { network, a } = f; await a.messages.stop();
+        await network.client(21); const id = certificateId(a.device.certificate, context); const before = network.states.get(a.accountId)!.revision;
+        const current = await a.device.getOwnDeviceState(network.descriptor.relayId);
+        await expect(method === 'removeDevice' ? a.device.removeDevice(id)
+            : a.device.publishDeviceState(network.descriptor.relayId, { certificates: current!.certificates.filter(value => certificateId(value, context) !== id) }))
+            .rejects.toMatchObject({ code: 'contact_grant_at_risk' });
+        expect(network.states.get(a.accountId)!.revision).toBe(before);
     });
-    await a.messages.stop(); await second.device.removeDevice(oldId);
-    await a.device.getOwnDeviceState(network.descriptor.relayId); expect(a.device.getAuthorizationState(oldId)).toBe('notRegistered');
-    expect(network.states.get(a.accountId)!.certificates.map(value => certificateId(value, context))).toEqual([secondId]);
-    const sent = await second.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'after device replacement' } });
-    await network.until(async () => Boolean(await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId })));
-    expect((await second.messages.getContact(b.accountId))!.grantToContact).toBe('valid');
+
+    test('a consent reply retains source acceptance without treating it as confirmed target delivery', async () => {
+        const f = await fixture(); f.network.deliveryStatus = 'delivering'; await connect(f);
+        const contact = (await f.a.store.read([{ collection: 'contacts', key: f.b.accountId }])).sets[0]![0]!.value;
+        expect(contact.confirmedGrantTo).toBeUndefined();
+        expect((await f.a.store.read([{ collection: 'message_outbox' }])).sets[0]!.some(row => row.value.state === 'relayAccepted')).toBe(true);
+    });
+
+    test('a completed old maintenance pass cannot suppress notification of a newer device revision', async () => {
+        const f = await fixture(); await connect(f); const { a, b, network } = f;
+        await a.messages.stop(); await b.messages.stop();
+        const entered = deferred(); const release = deferred();
+        const observation = observeDeviceNotifications(a, b.accountId, async () => { entered.resolve(); await release.promise; });
+        try {
+            await a.messages.start(); await entered.promise;
+            const previous = a.device.deviceState!.revision;
+            await a.device.publishDeviceState(network.descriptor.relayId);
+            const revision = a.device.deviceState!.revision; expect(revision).toBeGreaterThan(previous);
+            release.resolve();
+            await vi.waitFor(() => expect(observation.revisions).toContain(revision));
+            expect(observation.revisions).toContain(previous);
+        } finally { release.resolve(); await a.messages.stop(); observation.spy.mockRestore(); }
+    });
+
+    test('restart clears per-pass notification successes even when another contact failed maintenance', async () => {
+        const f = await fixture(); await connect(f); const { a, b, network } = f;
+        await a.messages.stop(); await b.messages.stop();
+        const other = await network.client(23); const id = certificateId(a.device.certificate, context);
+        let grant = { grantor: a.accountId, grantee: other.accountId, signatures: {} };
+        grant = { ...grant, signatures: { [id]: await a.device.sign(contactGrantInput(grant, context)) } };
+        const snapshot = await a.store.read([]);
+        await a.store.commit(snapshot.version, [{ kind: 'put', collection: 'contacts', key: other.accountId, value: {
+            record: contactRecordCodec.encode({ account: other.accountId, status: 'active', updatedAt: network.clock.wall, grantToContact: grant }),
+        } }]);
+        const failed: string[] = []; const detach = a.messages.onLifecycle('backgroundError', value => { if (value.operation === 'maintain_contact') failed.push(value.resource!); });
+        const observation = observeDeviceNotifications(a, b.accountId);
+        try {
+            await a.messages.start();
+            await vi.waitFor(() => { expect(failed).toContain(other.accountId); expect(observation.revisions).toContain(a.device.deviceState!.revision); });
+            await a.messages.stop(); await a.device.publishDeviceState(network.descriptor.relayId);
+            const revision = a.device.deviceState!.revision;
+            await a.messages.start(); await vi.waitFor(() => expect(observation.revisions).toContain(revision));
+        } finally { await a.messages.stop(); observation.spy.mockRestore(); detach(); }
+    });
+
+    test.each([false, true])('one contact maintenance pass scans once and rechecks delivery retention (pruned: %s)', async prune => {
+        const f = await fixture(); await connect(f); const { a, b, network } = f;
+        const c = await network.client(23); await connect({ network, a, b: c });
+        await a.messages.stop(); await b.messages.stop(); await c.messages.stop();
+        const snapshot = await a.store.read([{ collection: 'contacts' }]);
+        await a.store.commit(snapshot.version, snapshot.sets[0]!.map(row => {
+            const { confirmedGrantTo, ...value } = row.value;
+            return { kind: 'put' as const, collection: row.collection, key: row.key, value };
+        }));
+        const prepareSend = vi.fn(async () => { throw new Error('A durable grant delivery should be reused'); });
+        const contacts = new MessageContacts({ context, accountId: a.accountId, store: a.store, clock: network.clock, device: a.device,
+            getState: async () => a.device.deviceState!, prepareSend, changed: () => undefined });
+        const outgoing = (await a.store.read([{ collection: 'message_outbox' }])).sets[0]!
+            .filter(row => messageSendRequestCodec.decode(row.value.request!).envelope.to === c.accountId);
+        const read = vi.spyOn(a.store, 'read');
+        try {
+            const pass = contacts.maintain([b, c].map(value => ({ account: value.accountId, notifyDeviceRevision: undefined })));
+            expect((await pass.next()).value).toEqual({ account: b.accountId, success: true });
+            if (prune) {
+                expect(outgoing.length).toBeGreaterThan(0);
+                const current = await a.store.read([]);
+                await a.store.commit(current.version, outgoing.map(row => ({ kind: 'delete', collection: row.collection, key: row.key })));
+            }
+            expect((await pass.next()).value).toMatchObject({ account: c.accountId, success: !prune });
+            expect((await pass.next()).done).toBe(true);
+            expect(prepareSend).toHaveBeenCalledTimes(prune ? 1 : 0);
+            expect(read.mock.calls.filter(([queries]) => queries.some(query => query.collection === 'message_outbox' && query.key === undefined))).toHaveLength(1);
+        } finally { read.mockRestore(); }
+    });
 });
 
-test('removal cannot erase the last contact signature merely because another device exists', async () => {
-    const f = await fixture(); await connect(f); const { network, a } = f; await a.messages.stop();
-    await network.client(21); const id = certificateId(a.device.certificate, context); const before = network.states.get(a.accountId)!.revision;
-    await expect(a.device.removeDevice(id)).rejects.toThrow('replacement signatures'); expect(network.states.get(a.accountId)!.revision).toBe(before);
-});
+describe('Runtime ownership', () => {
+    test('runtime message observers can stop MessageManager without deadlocking shared relay cleanup', async () => {
+        const f = await fixture(); await connect(f); const { network, a, b } = f; let stopped = false;
+        b.messages.on('messageReceived', async () => { await b.messages.stop(); stopped = true; });
+        await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'stop after delivery' } });
+        await network.until(async () => stopped); expect(b.messages.lifecycleState).toBe('stopped');
+        expect(a.messages).toBeInstanceOf(MessageManager);
+    });
 
-test('a consent reply retains source-relay acceptance evidence before final delivery status arrives', async () => {
-    const f = await fixture(); f.network.deliveryStatus = 'delivering'; await connect(f);
-    const contact = (await f.a.store.read([{ collection: 'contacts', key: f.b.accountId }])).sets[0]![0]!.value;
-    expect(contact.confirmedGrantTo).toEqual(contactGrantCodec.encode(contactRecordCodec.decode(contact.record!).grantToContact!));
-    expect(contactGrantCodec.decode(contact.confirmedGrantTo!).signatures[certificateId(f.a.device.certificate, context)]).toBeDefined();
-    expect((await f.a.store.read([{ collection: 'message_outbox' }])).sets[0]!.some(row => row.value.state === 'relayAccepted')).toBe(true);
-});
-
-test('a protocol message with an unreadable local key box reports failure without starving later sends', async () => {
-    const { network, a, b } = await fixture(); const broken = await a.messages.addContact(b.accountId);
-    const rows = await a.store.read([{ collection: 'message_outbox', key: broken.messageId }]); const row = rows.sets[0]![0]!;
-    const request = messageSendRequestCodec.decode(row.value.request!); request.senderBoxes![0]!.sealedKey[15]! ^= 1;
-    await a.store.commit(rows.version, [{ kind: 'put', collection: 'message_outbox', key: row.key, value: { ...row.value, request: messageSendRequestCodec.encode(request) } }]);
-    network.clock.tick(); const valid = await a.messages.sendMessage(a.accountId, { body: { contentType: 'text/plain', text: 'still deliver this' } });
-    const failures: string[] = []; a.messages.onLifecycle('backgroundError', value => { if (value.resource) failures.push(value.resource); });
-    await a.messages.start(); await network.until(async () => network.submissions.some(value => value.envelope.messageId === valid.messageId));
-    expect(failures).toContain(broken.messageId); expect((await a.messages.getSendStatus(broken.messageId))!.state).toBe('queued');
-    expect(network.submissions.some(value => value.envelope.messageId === broken.messageId)).toBe(false);
+    test('pending application route observers do not delay internal timeline recording and disposal drains its write', async () => {
+        const { a, network } = await fixture(); await a.messages.dispose();
+        let releaseObserver!: () => void; const observer = new Promise<void>(resolve => { releaseObserver = resolve; });
+        const detach = a.account.on('accountChanged', () => observer);
+        const messages = new MessageManager({ context, accountId: a.accountId, store: a.store, relayClients: a.pool, accountManager: a.account, deviceManager: a.device, clock: network.clock, secretProtector: a.protector });
+        network.resources.push(messages); await messages.initialize();
+        const timeline = { collection: 'message_timelines', key: network.descriptor.relayId };
+        await a.store.commit((await a.store.read([])).version, [{ ...timeline, kind: 'delete' }]);
+        let releaseWrite!: () => void; const writing = new Promise<void>(resolve => { releaseWrite = resolve; }); let entered = false;
+        const commit = a.store.commit.bind(a.store); const spy = vi.spyOn(a.store, 'commit').mockImplementation(async (...args) => {
+            if (args[1].some(value => value.collection === timeline.collection)) { entered = true; await writing; }
+            return commit(...args);
+        });
+        let disposed = false; let disposal: Promise<void> | undefined;
+        const publication = a.account.publishRoute(network.descriptor.relayId, { validitySeconds: 3600 });
+        try {
+            await vi.waitFor(() => expect(entered).toBe(true)); await publication;
+            disposal = messages.dispose().then(() => { disposed = true; });
+            await Promise.resolve(); expect(disposed).toBe(false);
+            releaseWrite(); await disposal;
+            expect((await a.store.read([timeline])).sets[0]).toHaveLength(1);
+        } finally { releaseObserver(); releaseWrite(); detach(); spy.mockRestore(); await publication; await disposal; }
+    });
 });

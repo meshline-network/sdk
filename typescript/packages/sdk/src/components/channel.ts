@@ -308,7 +308,12 @@ export class ChannelManager extends ClientComponent {
     }
     protected override async onStop(): Promise<void> {
         this.#readsStopping = true;
-        try { await Promise.all([...this.#jobs, ...[...this.#descriptors.values()].map(cache => cache.stop())]); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop(); this.#readsStopping = false; }
+        const results = await Promise.allSettled([...this.#jobs, ...[...this.#descriptors.values()].map(cache => cache.stop())]);
+        for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach();
+        results.push(...await Promise.allSettled([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())));
+        this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop(); this.#readsStopping = false;
+        const errors = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected').map(value => value.reason);
+        if (errors.length) throw new AggregateError(errors, 'Channel background processing failed.');
     }
     protected override async onDispose(): Promise<void> { await Promise.all([...this.#descriptors.values()].map(cache => cache.stop(true))); this.#descriptors.clear(); this.#syncStatus.stop(true); this.#events.clear(); }
 }

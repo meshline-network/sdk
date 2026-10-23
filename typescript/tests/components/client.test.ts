@@ -23,7 +23,7 @@ test('client initialization does no network I/O, establishes authorization, owns
 });
 
 test('failed startup rolls back all started children and a later authorized startup succeeds', async () => {
-    const f = await fixture(); await expect(f.client.start()).rejects.toThrow('Create and authorize'); expect(f.client.lifecycleState).toBe('stopped'); expect(children(f.client).every(value => value.lifecycleState === 'stopped')).toBe(true);
+    const f = await fixture(); await expect(f.client.start()).rejects.toMatchObject({ reason: 'authorizationNotYetEffective' }); expect(f.client.lifecycleState).toBe('stopped'); expect(children(f.client).every(value => value.lifecycleState === 'stopped')).toBe(true);
     await f.client.establishAccount(); await f.client.start(); expect(f.client.lifecycleState).toBe('running');
 });
 
@@ -53,7 +53,7 @@ test('a child running-state observer can stop the owning client while startup is
 });
 
 test.each(['device.state.publish', 'account.route.publish'])('interrupted establishment resumes after %s acknowledgement loss with the original local keys', async method => {
-    const f = await fixture(); f.network.loseAfter = method; await expect(f.client.establishAccount({ relayId: f.a })).rejects.toThrow('response lost'); const deviceId = certificateId(f.client.device!, context);
+    const f = await fixture(); f.network.loseAfter = method; await expect(f.client.establishAccount({ relayId: f.a })).rejects.toMatchObject({ reason: 'submissionOutcomeUnknown' }); const deviceId = certificateId(f.client.device!, context);
     const submitted = f.network.requests.filter(value => value.method === method)[0]!.body; expect((await f.store.read([operations])).sets[0]).toHaveLength(1);
     await f.dispose(); f.network.loseAfter = undefined; const resumed = await f.network.open(91, f.path); await resumed.client.establishAccount({ relayId: f.a });
     expect(certificateId(resumed.client.device!, context)).toBe(deviceId); expect(resumed.client.deviceState!.certificates).toHaveLength(1); expect((await resumed.store.read([operations])).sets[0]).toEqual([]);
@@ -62,15 +62,14 @@ test.each(['device.state.publish', 'account.route.publish'])('interrupted establ
 
 test('pending initial establishment fixes the selected relay and accepted device publication cannot silently establish a route', async () => {
     const f = await fixture(); f.network.acceptedInitial = true; await expect(f.client.establishAccount({ relayId: f.a })).rejects.toThrow('already considers');
-    await expect(f.client.establishAccount({ relayId: f.b })).rejects.toThrow('original relay'); expect(f.network.requests.filter(value => value.method === 'account.route.publish')).toEqual([]);
+    await expect(f.client.establishAccount({ relayId: f.b })).rejects.toMatchObject({ reason: 'relayMismatch' }); expect(f.network.requests.filter(value => value.method === 'account.route.publish')).toEqual([]);
     await f.client.recoverAccount({ relayId: f.a }); expect(f.client.route!.relayId).toBe(f.a); expect((await f.store.read([operations])).sets[0]).toEqual([]);
 });
 
-test('existing-account establishment refuses an unregistered device; explicit recovery preserves other authorized devices', async () => {
+test('existing-account establishment authorizes a new device while preserving the original route and other devices', async () => {
     const f = await fixture(); await f.client.establishAccount({ relayId: f.a }); const first = certificateId(f.client.device!, context); const next = await f.network.open();
-    await expect(next.client.establishAccount()).rejects.toThrow('explicitly recover'); expect(next.client.device).toBeUndefined();
-    await next.client.recoverAccount(); expect(next.client.deviceState!.certificates.map(value => certificateId(value, context))).toEqual([first, certificateId(next.client.device!, context)]);
-    expect(next.client.deviceState!.revision).toBeGreaterThanOrEqual(f.network.clock.wall * 1000); expect(next.client.route!.revision).toBeGreaterThanOrEqual(f.network.clock.wall * 1000);
+    await next.client.establishAccount(); expect(next.client.deviceState!.certificates.map(value => certificateId(value, context))).toEqual([first, certificateId(next.client.device!, context)]);
+    expect(next.client.deviceState!.revision).toBe(f.client.deviceState!.revision + 1); expect(next.client.route).toEqual(f.client.route);
 });
 
 test('foreign recovery snapshots and invalid validity settings fail before signing or creating a local device', async () => {

@@ -1,12 +1,26 @@
 import type {
-    AccountRecoveryOptions, BackgroundFailure, ChannelRef, ContactInvite,
+    AccountRecoveryOptions, BackgroundFailure, ChannelRef, ContactInvite, DeviceSelectionInfo,
     ConversationChange, GroupInvitation, GroupRef, MeshlineClient, QueryReader,
 } from '@meshline/sdk';
+import { AccountEstablishmentError } from '@meshline/sdk';
 
-/** Use only for initial establishment, after the platform helper has initialized the client. */
+/** Explicit first use or reauthorization, after initialization. Ordinary launches can start directly. */
 export async function establishAndStart(client: MeshlineClient, relayId: string) {
     await client.establishAccount({ relayId });
     await client.start();
+}
+
+/** The application presents this list; the SDK does not choose a replacement. */
+export async function establishOrSelectDevice(client: MeshlineClient): Promise<DeviceSelectionInfo | undefined> {
+    try { await client.establishAccount(); return undefined; }
+    catch (error) {
+        if (error instanceof AccountEstablishmentError && error.reason === 'deviceSelectionRequired') return error.deviceSelection;
+        throw error;
+    }
+}
+
+export async function replaceSelectedDevice(client: MeshlineClient, deviceId: string) {
+    await client.establishAccount({ replaceDeviceId: deviceId });
 }
 
 /** Ordinary restarts reuse the same database and secret protector. */

@@ -59,6 +59,9 @@ global controller. SDK-owned scopes preserve their cancellation reasons.
 
 | Error | How to handle it |
 | --- | --- |
+| `AccountEstablishmentError` | Inspect `reason`, plus `deviceSelection`, `keyIssue`, or `contactIssues` when present. UI and wallet prompts belong to the caller. |
+| `AccountRouteError` | Inspect `reason` and `cause` when calling `accountManager.ensureRoute` directly. Reconcile the saved publication before changing parameters. |
+| `SecretAccessError` | Protector adapters distinguish temporary unavailability, permanent loss, and unknown failure. None authorizes automatic deletion or replacement. |
 | `ProtocolError` with a code | Inspect invalid input, identity, authorization, or protocol state. |
 | `TypeError` / `RangeError` | Correct argument shape or range. |
 | `StateConflictError` | Refresh/reconcile state before choosing the next operation. |
@@ -80,7 +83,8 @@ timeout, or abort does not prove that a mutation failed remotely: reconcile the
 persisted operation before retrying. [Aborting a send wait](direct-messages.md#wait-for-an-acceptance-milestone)
 leaves the outgoing message active.
 
-See [transport configuration](transport.md#request-timeouts-and-cancellation) and
+See [account establishment](account-establishment.md) for setup failure reasons,
+[transport configuration](transport.md#request-timeouts-and-cancellation), and
 [symptom-based troubleshooting](troubleshooting.md).
 
 [All guides](../README.md)

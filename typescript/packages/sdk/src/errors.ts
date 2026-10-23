@@ -11,3 +11,10 @@ export class ProtocolError extends Error {
 export class StateConflictError extends Error {
     override readonly name = 'StateConflictError';
 }
+
+export type SecretAccessFailure = 'unknown' | 'temporarilyUnavailable' | 'permanentlyLost';
+/** A protector's diagnosis; even permanent loss never authorizes deleting retained SDK data. */
+export class SecretAccessError extends Error {
+    override readonly name = 'SecretAccessError';
+    constructor(readonly failure: SecretAccessFailure, message: string, options?: ErrorOptions) { super(message, options); }
+}

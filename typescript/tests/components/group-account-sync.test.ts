@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { accountDeviceStateCodec, accountGroupHistorySecretSyncCodec, accountGroupPrivateStateSyncCodec, certificateId, createIdentifier, deriveResourceId, encodeBase64Url, encryptionPublicKey, systemRandom,
+import { accountDeviceStateCodec, accountGroupHistorySecretSyncCodec, accountGroupPrivateStateSyncCodec, certificateId, createIdentifier, deriveResourceId, deviceStateInput, encodeBase64Url, encryptionPublicKey, signAccount, systemRandom,
     StateConflictError, type JsonObject, type MessageManager, type QueryReader, type SecretProtector } from '@meshline/sdk';
 import { GroupAccountSync } from '../../packages/sdk/dist/groups/account-sync.js';
 import { GroupSecrets } from '../../packages/sdk/dist/groups/secrets.js';
@@ -85,7 +85,10 @@ test('authorization is rechecked inside the key-and-cursor transaction after a c
     const commit = client.store.commit.bind(client.store); let revoke = true;
     vi.spyOn(client.store, 'commit').mockImplementation(async (version, mutations, signal) => {
         if (revoke && mutations.some(value => value.collection === 'group_account_meta')) {
-            revoke = false; await second.device.publishDeviceState(network.network.descriptor.relayId, { certificates: [second.device.certificate] });
+            revoke = false;
+            const previous = network.network.states.get(client.accountId)!;
+            const removed = { ...previous, certificates: [second.device.certificate], revision: previous.revision + 1 };
+            network.network.states.set(client.accountId, { ...removed, accountSignature: signAccount(deviceStateInput(removed, context), new Uint8Array(32).fill(80)) });
             const snapshot = await client.store.read([]); await commit(snapshot.version, [{ kind: 'put', collection: 'device_states', key: client.accountId, value: accountDeviceStateCodec.encode(network.network.states.get(client.accountId)!) }]);
             throw new StateConflictError('Concurrent authorization update');
         }
@@ -99,7 +102,10 @@ test('a historically delivered sync message from a now revoked device cannot res
     await sendGroupAccountPayload(client.messages, accountGroupPrivateStateSyncCodec.encode({ states: [candidate] }), [certificateId(second.device.certificate, context)]);
     await client.messages.start(); await second.messages.start(); await network.network.until(async () => (await second.messages.readTimeline(0, 100)).some(value => value.payload['$type'] === 'meshline.account.group.state.sync')); await second.messages.stop(); await client.messages.stop();
     const received = (await second.messages.readTimeline(0, 100)).find(value => value.payload['$type'] === 'meshline.account.group.state.sync')!;
-    await second.device.publishDeviceState(network.network.descriptor.relayId, { certificates: [second.device.certificate] }); await second.groups.start();
+    const previous = network.network.states.get(client.accountId)!;
+    const removed = { ...previous, certificates: [second.device.certificate], revision: previous.revision + 1 };
+    network.network.states.set(client.accountId, { ...removed, accountSignature: signAccount(deviceStateInput(removed, context), new Uint8Array(32).fill(80)) });
+    await second.device.refreshDeviceState(); await second.groups.start();
     await network.network.until(async () => (await second.store.read([{ collection: 'group_account_rejections' }])).sets[0]!.length === 1);
     expect((await second.store.read([{ collection: 'group_member_keys' }])).sets[0]).toEqual([]);
     expect((await second.store.read([{ collection: 'group_account_meta' }])).sets[0]![0]!.value.sequence).toBeGreaterThanOrEqual(received.localSequence);

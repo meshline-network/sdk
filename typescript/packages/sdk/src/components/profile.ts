@@ -15,6 +15,8 @@ import type { RelayClientPool } from '../transport/pool.js';
 import { RelayError } from '../transport/relay-error.js';
 import type { AccountManager } from './account.js';
 import { ClientComponent, type ClientOptions } from './component.js';
+import type { AccountInitialProfile } from '../client/account-establishment.js';
+import { SubmissionOutcomeError } from './authorization-error.js';
 
 /** Omitted fields are retained; null removes an optional field, including an existing empty string. */
 export interface ProfileUpdate { readonly nickname?: string | null; readonly bio?: string | null; readonly avatar?: ContentReference | null; readonly publicDiscovery?: boolean }
@@ -101,6 +103,15 @@ export class ProfileManager extends ClientComponent {
         }, scope), signal);
         if (changed) this.#changed(); return clone(result);
     }
+    /** @internal Initializes a missing profile without applying defaults over retained or remote values. */
+    initializeAccountProfile(initial: AccountInitialProfile | undefined, createIfMissing: boolean, signal: AbortSignal): Promise<void> {
+        const copied = copyUpdate(initial ?? {});
+        return this.runOperation(scope => this.#gate.run(async () => {
+            if (!createIfMissing) { await this.refreshProfile(undefined, scope); return; }
+            const published = await this.#publish(copied, undefined, scope, true);
+            if (this.#accept(published)) this.#changed();
+        }, scope), signal);
+    }
     /** Republish the newest known local/pending/supplied snapshot, including during home-relay migration. */
     async publishProfile(profile?: AccountProfile, signal?: AbortSignal): Promise<AccountProfile | undefined> {
         const supplied = profile && clone(profile);
@@ -131,7 +142,7 @@ export class ProfileManager extends ClientComponent {
         if (response === undefined) throw new ProtocolError('invalid_response', 'Profile resolution returned no document.');
         const result = profileResolveResultCodec.decode(response); validateProfileResult(result, this.context, account); return result;
     }
-    async #publish(update: ProfileUpdate, restored: AccountProfile | undefined, signal: AbortSignal): Promise<AccountProfile> {
+    async #publish(update: ProfileUpdate, restored: AccountProfile | undefined, signal: AbortSignal, initializeOnly = false): Promise<AccountProfile> {
         const certificate = deviceCertificateCodec.decode(deviceCertificateCodec.encode(this.#signer.certificate));
         if (certificate.account !== this.accountId) throw new ProtocolError('invalid_identity', 'Device signer belongs to another account.');
         const relayId = await this.#home(signal);
@@ -139,12 +150,19 @@ export class ProfileManager extends ClientComponent {
         const snapshot = await this.#store.read(queries, signal);
         const local = snapshot.sets[0]![0]?.value; const saved = snapshot.sets[1]![0]?.value;
         let signed = readSignedRequest(saved); let request: AccountProfile;
+        const initial = initializeOnly ? await this.#resolve(this.accountId, relayId, signal) : undefined;
+        if (initial) {
+            await this.#saveGate.run(() => this.#save(initial, signal), signal);
+            return initial.profile;
+        }
+        if (initializeOnly && local) throw new ProtocolError('profile_unavailable', 'A retained profile is unavailable remotely; initial values cannot replace it.');
+        if (initializeOnly && signed && !signed.pending && signed.relayId === relayId) { restored = accountProfileCodec.decode(signed.document); update = {}; }
         if (signed?.pending && (!restored || signed.relayId === relayId)) {
             request = accountProfileCodec.decode(signed.document);
-            if (signed.relayId !== relayId || accountProfileCodec.stringify(apply(update, request)) !== accountProfileCodec.stringify(request))
+            if (signed.relayId !== relayId || !initializeOnly && accountProfileCodec.stringify(apply(update, request)) !== accountProfileCodec.stringify(request))
                 throw new StateConflictError('A profile publication has an unknown result. Retry the original update or resolve it first.');
         } else {
-            const current = await this.#resolve(this.accountId, relayId, signal);
+            const current = initializeOnly ? undefined : await this.#resolve(this.accountId, relayId, signal);
             const cached = local && profileResolveResultCodec.decode(local).profile;
             let basis = current?.profile;
             if (basis && cached && basis.updatedAt < cached.updatedAt) throw new ProtocolError('stale_profile', 'Relay returned an older profile.');
@@ -175,6 +193,7 @@ export class ProfileManager extends ClientComponent {
                 try { await finishSignedRequest(this.#store, method, signed!); }
                 catch (storageError) { throw new AggregateError([error, storageError], 'Profile rejection could not be persisted.'); }
             }
+            if (initializeOnly && !(error instanceof RelayError && error.isDefinitiveRejection) && !signal.aborted) throw new SubmissionOutcomeError('Profile publication outcome is unknown.', { cause: error });
             throw error;
         }
         await this.#saveGate.run(async () => {

@@ -9,7 +9,12 @@ export class PortableClientNetwork {
     readonly clock = new MessagingClock(); readonly relays: Relay[]; readonly routes = new Map<string, sdk.AccountRoute>();
     readonly requests: { relay: string; method: string; body: sdk.JsonObject }[] = []; readonly resources: { dispose(): Promise<void> }[] = [];
     loseAfter: string | undefined; failBefore: string | undefined; unavailableRelay: string | undefined; stageSeconds = 300; acceptedInitial = false;
+    rejectBefore: { method: string; code: string } | undefined;
     beforeRoute: (() => Promise<void>) | undefined;
+    beforeDevice: ((state: sdk.AccountDeviceState) => Promise<void>) | undefined;
+    beforeSign: ((input: Uint8Array) => Promise<void>) | undefined;
+    beforeUnprotect: (() => Promise<void>) | undefined;
+    readonly signatures: sdk.JsonObject[] = [];
     constructor(readonly options: ClientNetworkOptions) {
         this.relays = [7, 8, 9].map((seed, index) => {
             const key = new Uint8Array(32).fill(seed); const publicKey = sdk.accountPublicKey(key); const relayId = sdk.getRelayId(publicKey); const host = `https://client-${index}.example`;
@@ -30,6 +35,7 @@ export class PortableClientNetwork {
         const method = address.pathname.replace(/^\/v1\/?/, '').replaceAll('/', '.'); const body = init.body ? sdk.requireObject(sdk.parseJson(init.body)) : Object.fromEntries(address.searchParams) as sdk.JsonObject;
         const response = (value?: unknown, status = value === undefined ? 204 : 200) => new Response(value === undefined ? null : JSON.stringify(value), { status, ...(value === undefined ? {} : { headers: { 'content-type': 'application/json' } }) });
         const absent = () => response({ code: 'not_found', message: 'Not found' }, 404); this.requests.push({ relay: relayId, method, body });
+        if (this.rejectBefore?.method === method) return response({ code: this.rejectBefore.code, message: 'Test rejection before acceptance' }, 401);
         if (this.failBefore === method) throw new TypeError('Test relay unavailable before request acceptance');
         const accepted = (value?: unknown) => { if (this.loseAfter === method) throw new TypeError('Test response lost after acceptance'); return response(value); };
         if (method === 'relay.descriptor') return response(sdk.relayDescriptorCodec.encode(relay.descriptor));
@@ -41,11 +47,13 @@ export class PortableClientNetwork {
         }
         if (method === 'auth.device.verify') {
             const proof = sdk.deviceAuthenticationCodec.decode(body); sdk.validateCertificate(proof.signerCertificate, context); const id = sdk.certificateId(proof.signerCertificate, context);
-            sdk.authorizedDevice(relay.states.get(proof.signerCertificate.account)!, id, context, this.clock.wall);
+            const current = relay.states.get(proof.signerCertificate.account);
+            if (!current?.certificates.some(value => sdk.certificateId(value, context) === id && value.notBefore <= this.clock.wall && value.expiresAt > this.clock.wall))
+                return response({ code: 'device_unknown', message: 'Device is not authorized' }, 401);
             if (!sdk.verifyDevice(sdk.deviceAuthenticationInput(proof, relayId, url, context), proof.deviceSignature, proof.signerCertificate.signingPublicKey)) throw new Error('Invalid device authentication');
             return response({ token: `device/${proof.signerCertificate.account}/${id}`, mode: 'device', expires_at: this.clock.wall + 3600 });
         }
-        if (method === 'account.route.resolve') { const route = this.routes.get(String(body.account)); return route ? response(sdk.accountRouteCodec.encode(route)) : absent(); }
+        if (method === 'account.route.resolve') { const route = this.routes.get(String(body.account)); return route && route.expiresAt > this.clock.wall ? response(sdk.accountRouteCodec.encode(route)) : absent(); }
         if (method === 'account.route.publish') {
             await this.beforeRoute?.(); sdk.throwIfAborted(init.signal); const proposed = sdk.accountRouteCodec.decode(body); sdk.validateRoute(proposed, context, this.clock.wall);
             if (proposed.relayId !== relayId) throw new Error('Wrong route receiver'); const previous = this.routes.get(proposed.account);
@@ -56,13 +64,18 @@ export class PortableClientNetwork {
         }
         if (method === 'device.state.publish') {
             const state = sdk.accountDeviceStateCodec.decode(body); sdk.validateDeviceState(state, context);
+            await this.beforeDevice?.(state); sdk.throwIfAborted(init.signal);
             const acceptedHere = this.routes.get(state.account)?.relayId === relayId || this.acceptedInitial;
             const previous = (acceptedHere ? relay.states : relay.staged).get(state.account);
             if (previous && (previous.revision > state.revision || previous.revision === state.revision && sdk.accountDeviceStateCodec.stringify(previous) !== sdk.accountDeviceStateCodec.stringify(state))) return response({ code: 'stale_state', message: 'Stale devices' }, 409);
             if (acceptedHere) { relay.states.set(state.account, state); return accepted({ status: 'accepted' }); }
             relay.staged.set(state.account, state); return accepted({ status: 'staged', staged_until: this.clock.wall + this.stageSeconds });
         }
-        if (method === 'device.state.resolve') { const value = relay.states.get(String(body.account)); return value ? response(sdk.accountDeviceStateCodec.encode(value)) : absent(); }
+        if (method === 'device.state.resolve') {
+            const route = this.routes.get(String(body.account));
+            if (!route || route.expiresAt <= this.clock.wall || route.relayId !== relayId) return response({ code: 'route_not_found', message: 'A valid original route is required' }, 404);
+            const value = relay.states.get(String(body.account)); return value ? response(sdk.accountDeviceStateCodec.encode(value)) : absent();
+        }
         if (method === 'profile.resolve') { const value = relay.profiles.get(String(body.account)); return value ? response(sdk.profileResolveResultCodec.encode(value)) : absent(); }
         if (method === 'profile.publish') {
             const profile = sdk.accountProfileCodec.decode(body); const id = init.headers['X-Meshline-Session']!.split('/')[2]!; const signerCertificate = sdk.authorizedDevice(relay.states.get(profile.account)!, id, context, this.clock.wall);
@@ -76,8 +89,8 @@ export class PortableClientNetwork {
     async open(seed = 91, path?: string, withSigner = true) {
         const created = await this.options.createStore(path); const store = created.store; path = created.path; this.resources.push(store); await store.migrate();
         const key = new Uint8Array(32).fill(seed); const publicKey = sdk.accountPublicKey(key); const accountId = sdk.getAccountId('neo:860833102', publicKey);
-        const signer: sdk.AccountSigner = { accountId, publicKey, sign: async input => sdk.signAccount(input, key, this.options.random) };
-        const protector: sdk.SecretProtector = { protect: async (bytes, purpose) => { const nonce = this.options.random.bytes(12); return sdk.concatBytes(nonce, sdk.encryptAes(key, nonce, bytes, sdk.encodeUtf8(purpose))); }, unprotect: async (bytes, purpose) => sdk.decryptAes(key, bytes.slice(0, 12), bytes.slice(12), sdk.encodeUtf8(purpose)) };
+        const signer: sdk.AccountSigner = { accountId, publicKey, sign: async input => { this.signatures.push(sdk.requireObject(sdk.parseJson(input))); await this.beforeSign?.(input); return sdk.signAccount(input, key, this.options.random); } };
+        const protector: sdk.SecretProtector = { protect: async (bytes, purpose) => { const nonce = this.options.random.bytes(12); return sdk.concatBytes(nonce, sdk.encryptAes(key, nonce, bytes, sdk.encodeUtf8(purpose))); }, unprotect: async (bytes, purpose) => { await this.beforeUnprotect?.(); return sdk.decryptAes(key, bytes.slice(0, 12), bytes.slice(12), sdk.encodeUtf8(purpose)); } };
         const pool = new sdk.RelayClientPool({ context, accountId, clock: this.clock, random: this.options.random, fetch: this.fetch }, this.registry); this.resources.push(pool);
         const client = new sdk.MeshlineClient({ context, accountId, store, relayClients: pool, secretProtector: protector, ...(withSigner ? { accountSigner: signer } : {}), clock: this.clock, random: this.options.random }); this.resources.push(client); await client.initialize();
         return { client, store, pool, signer, path, async dispose() { await client.dispose(); await pool.dispose(); await store.dispose(); } };

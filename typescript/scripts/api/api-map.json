@@ -712,12 +712,12 @@
   {
     "type": "Meshline.MeshlineClient",
     "path": "packages/sdk/src/client.ts",
-    "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+    "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
   },
   {
     "type": "Meshline.Models.Client.AccountEstablishmentOptions",
-    "path": "packages/sdk/src/client/account-operations.ts",
-    "notes": "TypeScript duration values use integer seconds; establishment requires staged initial device authorization."
+    "path": "packages/sdk/src/client/account-establishment.ts",
+    "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
   },
   {
     "type": "Meshline.Models.Client.AccountRecoveryOptions",
@@ -1128,5 +1128,60 @@
     "type": "Meshline.Models.Client.ResourceSyncBlockReason",
     "path": "packages/sdk/src/models/resource-sync.ts",
     "notes": "Runtime resource snapshots and synchronization events are produced by message, group, and channel managers. Completion timestamps use Unix seconds; runtime state resets on restart and retained account-history gaps remain independent of caughtUp."
+  },
+  {
+    "type": "Meshline.Components.AccountRouteException",
+    "path": "packages/sdk/src/components/account-route-error.ts",
+    "notes": "AccountRouteError preserves reason and cause; ensureRoute reconciles exact requests and original-relay renewal."
+  },
+  {
+    "type": "Meshline.Components.AccountRouteFailure",
+    "path": "packages/sdk/src/components/account-route-error.ts",
+    "notes": "Camel-case string union with no generic retry flag."
+  },
+  {
+    "type": "Meshline.Interactions.SecretAccessException",
+    "path": "packages/sdk/src/errors.ts",
+    "notes": "SecretAccessError reports the protector diagnosis without authorizing local-data deletion."
+  },
+  {
+    "type": "Meshline.Interactions.SecretAccessFailure",
+    "path": "packages/sdk/src/errors.ts",
+    "notes": "unknown, temporarilyUnavailable and permanentlyLost; all preserve retained local records."
+  },
+  {
+    "type": "Meshline.Models.Client.AccountDeviceInfo",
+    "path": "packages/sdk/src/client/account-establishment.ts",
+    "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+  },
+  {
+    "type": "Meshline.Models.Client.AccountEstablishmentException",
+    "path": "packages/sdk/src/client/account-establishment.ts",
+    "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+  },
+  {
+    "type": "Meshline.Models.Client.AccountEstablishmentReason",
+    "path": "packages/sdk/src/client/account-establishment.ts",
+    "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+  },
+  {
+    "type": "Meshline.Models.Client.AccountInitialProfile",
+    "path": "packages/sdk/src/client/account-establishment.ts",
+    "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+  },
+  {
+    "type": "Meshline.Models.Client.ContactAuthorizationIssue",
+    "path": "packages/sdk/src/client/account-establishment.ts",
+    "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+  },
+  {
+    "type": "Meshline.Models.Client.DeviceSelectionInfo",
+    "path": "packages/sdk/src/client/account-establishment.ts",
+    "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+  },
+  {
+    "type": "Meshline.Storage.Migrations.ResumableAccountEstablishment",
+    "path": "packages/sdk/src/storage/store.ts",
+    "notes": "TypeScript adapters use generic record collections with atomic CAS; workflow and preparation records need no physical-schema migration or intermediate-record compatibility. .NET database files are not interchangeable."
   }
 ]

@@ -28,7 +28,11 @@ export interface RelayRegistry {
     getRelays(signal?: AbortSignal): AsyncIterable<RelayEntry>;
 }
 
-/** Use OS-backed protection in the application adapter; never persist unprotected device secrets. */
+/**
+ * Use OS-backed protection; never persist unprotected device secrets. Implementations
+ * can throw SecretAccessError to distinguish unavailable, lost and undiagnosed keys.
+ * The SDK retains local data in every case; backup/restore must preserve it as a whole.
+ */
 export interface SecretProtector {
     protect(plaintext: Uint8Array, purpose: string, signal?: AbortSignal): Promise<Uint8Array>;
     unprotect(protectedData: Uint8Array, purpose: string, signal?: AbortSignal): Promise<Uint8Array>;

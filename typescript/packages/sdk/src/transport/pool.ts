@@ -2,7 +2,7 @@ import { createAbortController } from '../runtime/abort.js';
 import { ProtocolError } from '../errors.js';
 import { validateAccountId, validateRelayId } from '../identity/neo.js';
 import type { RelayRegistry } from '../interactions.js';
-import { certificateId } from '../models/identity.js';
+import { certificateId, deviceCertificateCodec, type DeviceCertificate } from '../models/identity.js';
 import type { NetworkContext } from '../protocol/context.js';
 import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
@@ -24,6 +24,7 @@ export class RelayClientPool {
     readonly #lifetime = createAbortController();
     readonly #options: RelayClientPoolOptions;
     #deviceId: string | undefined;
+    #deviceCertificate: string | undefined;
     #disposal: Promise<void> | undefined;
     #lastError: unknown;
     readonly context: NetworkContext;
@@ -53,9 +54,10 @@ export class RelayClientPool {
             const account = identity.mode === 'account' ? identity.signer.accountId : identity.signer.certificate.account;
             if (account !== this.accountId) throw new ProtocolError('invalid_identity', 'Signer belongs to another account.');
             if (identity.mode === 'device') {
-                const device = certificateId(identity.signer.certificate, this.context);
+                const certificate = identity.signer.certificate;
+                const device = certificateId(certificate, this.context);
                 if (this.#deviceId !== undefined && this.#deviceId !== device) throw new ProtocolError('invalid_identity', 'Pool is already bound to another device.');
-                this.#deviceId = device;
+                await this.rebindDevice(certificate);
             }
         }
         let entries = this.#entries.get(relayId);
@@ -103,6 +105,17 @@ export class RelayClientPool {
         throwIfAborted(this.#lifetime.signal);
         for (const entries of [...this.#entries.values()]) for (const entry of [...entries]) if (entry.mode === 'device') this.#retire(entry);
         this.#deviceId = undefined;
+        this.#deviceCertificate = undefined;
+        await this.#finishRetirements();
+    }
+    /** @internal Retire sessions only when the complete certificate changes, including renewal with the same keys. */
+    async rebindDevice(certificate: DeviceCertificate): Promise<void> {
+        throwIfAborted(this.#lifetime.signal);
+        if (certificate.account !== this.accountId) throw new ProtocolError('invalid_identity', 'Certificate belongs to another account.');
+        const encoded = deviceCertificateCodec.stringify(certificate);
+        if (encoded === this.#deviceCertificate) { if (this.#retirements.size) await this.#finishRetirements(); return; }
+        for (const entries of [...this.#entries.values()]) for (const entry of [...entries]) if (entry.mode === 'device') this.#retire(entry);
+        this.#deviceId = certificateId(certificate, this.context); this.#deviceCertificate = encoded;
         await this.#finishRetirements();
     }
     async #finishRetirements(): Promise<void> {

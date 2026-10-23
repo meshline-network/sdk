@@ -30,9 +30,10 @@ Supply a trusted `NetworkContext`, `accountId`, `RelayRegistry`,
 operations also require an `AccountSigner`; the SDK does not request account
 private keys.
 
-Migrate the store explicitly, initialize the client, establish or recover account
-authorization when needed, then start. Ordinary restarts reuse the same database
-and protector and do not require account recovery.
+Migrate the store explicitly and initialize the client. Use `establishAccount`
+for explicit setup, renewal, new-device authorization, or interrupted setup, then
+start separately. Ordinary restarts reuse the same database and protector and
+start directly when authorization remains valid.
 
 The client owns its managers; the application owns the store, pool, and signing/
 protection integrations. Dispose the client before the pool and store.

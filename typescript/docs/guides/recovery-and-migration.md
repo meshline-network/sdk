@@ -6,17 +6,24 @@ Choose the action deliberately; do not use recovery as a generic error fallback.
 | Situation | Action |
 | --- | --- |
 | Same local device after a normal restart | Reopen the same store, initialize, and start. |
-| Existing account without an authorized local device | Supply an account signer and call `recoverAccount(options)`. |
+| Existing account without an authorized local device | Supply an account signer and call `establishAccount(options)`. |
+| Expired retained certificate or route | Use `establishAccount()` to renew only the expired prerequisite. |
 | Move account authorization to another relay | Call `changeHomeRelay(nextRelayId)`. |
 | Account works but this device lacks group secrets | Use [group key synchronization or recovery](groups.md#recover-group-access). |
 
 ## Recover an account
 
-`recoverAccount` accepts the establishment options plus `previousDeviceState`,
+`recoverAccount` remains available for deliberate administrative recovery. It
+accepts `relayId`, the two validity durations, `previousDeviceState`,
 `deviceStateRevision`, and `routeRevision`. Recovery may change authoritative
 route and device-state revisions. Supply complete known previous device state
 when available; recovery preserves it rather than intentionally dropping other
 devices. Revision overrides must advance beyond known state.
+
+Use [unified establishment](account-establishment.md) for normal first use, new
+installations, renewal and explicit device reauthorization. Neither entry point
+restores missing old chat records. Preserve complete local backups together with
+their protection material.
 
 The `recover` function in [workflows.ts](../../examples/workflows.ts) calls recovery
 on an initialized client, then starts it. Keep user authorization and account

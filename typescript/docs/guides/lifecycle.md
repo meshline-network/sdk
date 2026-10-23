@@ -5,7 +5,7 @@ Construction performs no I/O. Open a session in this order:
 1. Create the platform store and relay pool.
 2. Call `store.migrate()` explicitly.
 3. Construct `MeshlineClient` and call `client.initialize()`.
-4. Establish or recover account authorization if needed.
+4. Explicitly call `establishAccount()` if authorization is needed; valid retained devices can start directly.
 5. Call `client.start()` to activate background work.
 
 The [platform helpers](../../examples/README.md) perform the first three steps
@@ -34,6 +34,15 @@ Call `await client.stop()` when suspending long-running SDK work. Resume the sam
 initialized instance with `await client.start()`. After process restart, reopen
 the original store with the original protector, initialize a new client, and start it.
 Do not automatically call account recovery on every launch.
+
+Startup reuses retained valid authorization and connects in the background. It
+does not resume unfinished establishment or request account signatures. A removed
+device or a definitive device authentication rejection stops synchronization and
+drains device connections. Use explicit setup to reauthorize. Network failures
+leave cached state intact and do not establish revocation.
+
+Keep one active client graph per database. Do not overlap explicit setup with
+standalone device mutations. See [account establishment](account-establishment.md).
 
 `dispose()` ends the client lifetime and disposes its managers. It retains
 caller-owned dependencies. Dispose the client before the relay pool and store;

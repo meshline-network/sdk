@@ -1,7 +1,7 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "8d5825e1ab86ee4781a05716b97ede50b0979dec333e3b5901f79cfcb7796c24",
-  "sdkBaseline": "18c7cc9a881c8603c3795b86940009e1c73d11a2",
+  "sourceSha256": "0df21150ca8458f91aec8faeaaa58f084625e194ca1a2a9c11dada4b3d21fac1",
+  "sdkBaseline": "f024be46d6ff288739d1555ef9e6607b914d571d",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
     {
@@ -156,7 +156,7 @@
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.ConversationChanged",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "E:Meshline.Transport.RelayClient.ErrorOccurred",
@@ -206,6 +206,55 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/transport/pool.ts",
       "notes": "get/clients/invalidateDevice/dispose and typed events. MeshlineClient now coordinates durable home migration."
+    },
+    {
+      "symbol": "F:Meshline.Components.AccountRouteFailure.OperationConflict",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md#Meshline.Components.AccountRouteFailure.OperationConflict",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
+    },
+    {
+      "symbol": "F:Meshline.Components.AccountRouteFailure.RelayMismatch",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md#Meshline.Components.AccountRouteFailure.RelayMismatch",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
+    },
+    {
+      "symbol": "F:Meshline.Components.AccountRouteFailure.SignatureDeclined",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md#Meshline.Components.AccountRouteFailure.SignatureDeclined",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
+    },
+    {
+      "symbol": "F:Meshline.Components.AccountRouteFailure.SignerRequired",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md#Meshline.Components.AccountRouteFailure.SignerRequired",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
+    },
+    {
+      "symbol": "F:Meshline.Components.AccountRouteFailure.StateConflict",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md#Meshline.Components.AccountRouteFailure.StateConflict",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
+    },
+    {
+      "symbol": "F:Meshline.Components.AccountRouteFailure.StateUnavailable",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md#Meshline.Components.AccountRouteFailure.StateUnavailable",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
+    },
+    {
+      "symbol": "F:Meshline.Components.AccountRouteFailure.SubmissionUnknown",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md#Meshline.Components.AccountRouteFailure.SubmissionUnknown",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
     },
     {
       "symbol": "F:Meshline.Components.AccountState.Established",
@@ -451,6 +500,104 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/groups/state.ts",
       "notes": "GroupChange.kinds represents properties, members, roles, bans, nickname and status. Verified management changes are combined per committed page."
+    },
+    {
+      "symbol": "F:Meshline.Interactions.SecretAccessFailure.PermanentlyLost",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.SecretAccessFailure.md#Meshline.Interactions.SecretAccessFailure.PermanentlyLost",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/errors.ts",
+      "notes": "unknown, temporarilyUnavailable and permanentlyLost; all preserve retained local records."
+    },
+    {
+      "symbol": "F:Meshline.Interactions.SecretAccessFailure.TemporarilyUnavailable",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.SecretAccessFailure.md#Meshline.Interactions.SecretAccessFailure.TemporarilyUnavailable",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/errors.ts",
+      "notes": "unknown, temporarilyUnavailable and permanentlyLost; all preserve retained local records."
+    },
+    {
+      "symbol": "F:Meshline.Interactions.SecretAccessFailure.Unknown",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.SecretAccessFailure.md#Meshline.Interactions.SecretAccessFailure.Unknown",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/errors.ts",
+      "notes": "unknown, temporarilyUnavailable and permanentlyLost; all preserve retained local records."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.AccountSignerRequired",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.AccountSignerRequired",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.AccountStateUnavailable",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.AccountStateUnavailable",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.AuthorizationNotYetEffective",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.AuthorizationNotYetEffective",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.ContactContinuityUnverifiable",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.ContactContinuityUnverifiable",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.DeviceSelectionRequired",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.DeviceSelectionRequired",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.LocalKeyAccessRequired",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.LocalKeyAccessRequired",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.OperationParametersConflict",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.OperationParametersConflict",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.RelayMismatch",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.RelayMismatch",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.SignatureDeclined",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.SignatureDeclined",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.StateConflict",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.StateConflict",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.AccountEstablishmentReason.SubmissionOutcomeUnknown",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md#Meshline.Models.Client.AccountEstablishmentReason.SubmissionOutcomeUnknown",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "F:Meshline.Models.Client.ContactGrantState.Expired",
@@ -1055,6 +1202,13 @@
       "notes": "getRoute and refreshRoute share verified discovery with one-hour freshness, one-minute failure cooldown and stop/disposal draining. Publication retains durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient forces discovery for establishment, recovery and migration."
     },
     {
+      "symbol": "M:Meshline.Components.AccountManager.EnsureRouteAsync(System.String,System.TimeSpan,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account.ts",
+      "notes": "getRoute and refreshRoute share verified discovery with one-hour freshness, one-minute failure cooldown and stop/disposal draining. Publication retains durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient forces discovery for establishment, recovery and migration."
+    },
+    {
       "symbol": "M:Meshline.Components.AccountManager.GetRouteAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.GetRouteAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1074,6 +1228,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
       "notes": "getRoute and refreshRoute share verified discovery with one-hour freshness, one-minute failure cooldown and stop/disposal draining. Publication retains durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient forces discovery for establishment, recovery and migration."
+    },
+    {
+      "symbol": "M:Meshline.Components.AccountRouteException.#ctor(Meshline.Components.AccountRouteFailure,System.String,System.Exception)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteException.md#Meshline.Components.AccountRouteException.AccountRouteException(Meshline.Components.AccountRouteFailure,string,System.Exception)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "AccountRouteError preserves reason and cause; ensureRoute reconciles exact requests and original-relay renewal."
     },
     {
       "symbol": "M:Meshline.Components.ChannelManager.#ctor(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Components.DeviceManager)",
@@ -2035,60 +2196,74 @@
       "notes": "Optional explicit Neo N3 JSON-RPC Registry adapter with network checks, pagination and bounded session cleanup."
     },
     {
+      "symbol": "M:Meshline.Interactions.SecretAccessException.#ctor(Meshline.Interactions.SecretAccessFailure,System.String,System.Exception)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.SecretAccessException.md#Meshline.Interactions.SecretAccessException.SecretAccessException(Meshline.Interactions.SecretAccessFailure,string,System.Exception)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/errors.ts",
+      "notes": "SecretAccessError reports the protector diagnosis without authorizing local-data deletion."
+    },
+    {
       "symbol": "M:Meshline.MeshlineClient.#ctor(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Interactions.ISecretProtector,Meshline.Interactions.IAccountSigner)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.MeshlineClient(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Interactions.ISecretProtector,Meshline.Interactions.IAccountSigner)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "M:Meshline.MeshlineClient.ChangeHomeRelayAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.ChangeHomeRelayAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "M:Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "M:Meshline.MeshlineClient.GetConversationAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.GetConversationAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "M:Meshline.MeshlineClient.GetConversationsAsync(Meshline.Models.Client.ConversationQuery,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.GetConversationsAsync(Meshline.Models.Client.ConversationQuery,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "M:Meshline.MeshlineClient.MarkReadAsync(System.String,System.Int64,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "M:Meshline.MeshlineClient.MarkReadAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.MarkReadAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "M:Meshline.MeshlineClient.RecoverAccountAsync(Meshline.Models.Client.AccountRecoveryOptions,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.RecoverAccountAsync(Meshline.Models.Client.AccountRecoveryOptions,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
+    },
+    {
+      "symbol": "M:Meshline.Models.Client.AccountEstablishmentException.#ctor(Meshline.Models.Client.AccountEstablishmentReason,System.String,System.Exception)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentException.md#Meshline.Models.Client.AccountEstablishmentException.AccountEstablishmentException(Meshline.Models.Client.AccountEstablishmentReason,string,System.Exception)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "M:Meshline.Models.Client.ClientOptions.Validate",
@@ -3344,6 +3519,27 @@
       "notes": "EF Core Up/Down/model-builder hooks are CLR infrastructure, not TypeScript exports. Each adapter owns its schema/migrate implementation; .NET migration and database compatibility are not supported."
     },
     {
+      "symbol": "M:Meshline.Storage.Migrations.ResumableAccountEstablishment.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ResumableAccountEstablishment.md#Meshline.Storage.Migrations.ResumableAccountEstablishment.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/storage/store.ts",
+      "notes": "TypeScript adapters use generic record collections with atomic CAS; workflow and preparation records need no physical-schema migration or intermediate-record compatibility. .NET database files are not interchangeable."
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.ResumableAccountEstablishment.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ResumableAccountEstablishment.md#Meshline.Storage.Migrations.ResumableAccountEstablishment.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/storage/store.ts",
+      "notes": "TypeScript adapters use generic record collections with atomic CAS; workflow and preparation records need no physical-schema migration or intermediate-record compatibility. .NET database files are not interchangeable."
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.ResumableAccountEstablishment.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ResumableAccountEstablishment.md#Meshline.Storage.Migrations.ResumableAccountEstablishment.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/storage/store.ts",
+      "notes": "TypeScript adapters use generic record collections with atomic CAS; workflow and preparation records need no physical-schema migration or intermediate-record compatibility. .NET database files are not interchangeable."
+    },
+    {
       "symbol": "M:Meshline.Storage.QueryReader`1.DisposeAsync",
       "documentation": "../../../dotnet/docs/api/Meshline.Storage.QueryReader_T_.md#Meshline.Storage.QueryReader_T_.DisposeAsync()",
       "status": "mapped-requires-behavior-review",
@@ -3468,6 +3664,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/account.ts",
       "notes": "getRoute and refreshRoute share verified discovery with one-hour freshness, one-minute failure cooldown and stop/disposal draining. Publication retains durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient forces discovery for establishment, recovery and migration."
+    },
+    {
+      "symbol": "P:Meshline.Components.AccountRouteException.Failure",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteException.md#Meshline.Components.AccountRouteException.Failure",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "AccountRouteError preserves reason and cause; ensureRoute reconciles exact requests and original-relay renewal."
     },
     {
       "symbol": "P:Meshline.Components.BackgroundErrorEventArgs.Error",
@@ -3841,95 +4044,186 @@
       "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
     },
     {
+      "symbol": "P:Meshline.Interactions.SecretAccessException.Failure",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.SecretAccessException.md#Meshline.Interactions.SecretAccessException.Failure",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/errors.ts",
+      "notes": "SecretAccessError reports the protector diagnosis without authorizing local-data deletion."
+    },
+    {
       "symbol": "P:Meshline.MeshlineClient.AccountManager",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.AccountManager",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.ChannelManager",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.ChannelManager",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.Device",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.Device",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.DeviceManager",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.DeviceManager",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.DeviceState",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.DeviceState",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.GroupManager",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.GroupManager",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.MessageManager",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.MessageManager",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.Profile",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.Profile",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.ProfileManager",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.ProfileManager",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
       "symbol": "P:Meshline.MeshlineClient.Route",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.Route",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountDeviceInfo.Certificate",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountDeviceInfo.md#Meshline.Models.Client.AccountDeviceInfo.Certificate",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountDeviceInfo.DeviceId",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountDeviceInfo.md#Meshline.Models.Client.AccountDeviceInfo.DeviceId",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountEstablishmentException.ContactIssues",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentException.md#Meshline.Models.Client.AccountEstablishmentException.ContactIssues",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountEstablishmentException.DeviceSelection",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentException.md#Meshline.Models.Client.AccountEstablishmentException.DeviceSelection",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountEstablishmentException.KeyIssue",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentException.md#Meshline.Models.Client.AccountEstablishmentException.KeyIssue",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountEstablishmentException.Reason",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentException.md#Meshline.Models.Client.AccountEstablishmentException.Reason",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "P:Meshline.Models.Client.AccountEstablishmentOptions.CertificateValidity",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md#Meshline.Models.Client.AccountEstablishmentOptions.CertificateValidity",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/client/account-operations.ts",
-      "notes": "TypeScript duration values use integer seconds; establishment requires staged initial device authorization."
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountEstablishmentOptions.InitialProfile",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md#Meshline.Models.Client.AccountEstablishmentOptions.InitialProfile",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
     },
     {
       "symbol": "P:Meshline.Models.Client.AccountEstablishmentOptions.RelayId",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md#Meshline.Models.Client.AccountEstablishmentOptions.RelayId",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/client/account-operations.ts",
-      "notes": "TypeScript duration values use integer seconds; establishment requires staged initial device authorization."
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountEstablishmentOptions.ReplaceDeviceId",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md#Meshline.Models.Client.AccountEstablishmentOptions.ReplaceDeviceId",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
     },
     {
       "symbol": "P:Meshline.Models.Client.AccountEstablishmentOptions.RouteValidity",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md#Meshline.Models.Client.AccountEstablishmentOptions.RouteValidity",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/client/account-operations.ts",
-      "notes": "TypeScript duration values use integer seconds; establishment requires staged initial device authorization."
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountInitialProfile.Avatar",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountInitialProfile.md#Meshline.Models.Client.AccountInitialProfile.Avatar",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountInitialProfile.Bio",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountInitialProfile.md#Meshline.Models.Client.AccountInitialProfile.Bio",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountInitialProfile.Nickname",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountInitialProfile.md#Meshline.Models.Client.AccountInitialProfile.Nickname",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountInitialProfile.PublicDiscovery",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountInitialProfile.md#Meshline.Models.Client.AccountInitialProfile.PublicDiscovery",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "P:Meshline.Models.Client.AccountRecoveryOptions.CertificateValidity",
@@ -4135,6 +4429,20 @@
       "notes": "ClientOptions retains context/accountId and adds an injectable clock. Constructors validate arguments; no separate options.Validate method is exposed."
     },
     {
+      "symbol": "P:Meshline.Models.Client.ContactAuthorizationIssue.AccountId",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ContactAuthorizationIssue.md#Meshline.Models.Client.ContactAuthorizationIssue.AccountId",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ContactAuthorizationIssue.Code",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ContactAuthorizationIssue.md#Meshline.Models.Client.ContactAuthorizationIssue.Code",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
       "symbol": "P:Meshline.Models.Client.ContactInfo.AccountId",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ContactInfo.md#Meshline.Models.Client.ContactInfo.AccountId",
       "status": "mapped-requires-behavior-review",
@@ -4294,6 +4602,34 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client/conversations.ts",
       "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceSelectionInfo.DeviceLimit",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceSelectionInfo.md#Meshline.Models.Client.DeviceSelectionInfo.DeviceLimit",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceSelectionInfo.Devices",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceSelectionInfo.md#Meshline.Models.Client.DeviceSelectionInfo.Devices",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceSelectionInfo.PreviousLocalDeviceId",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceSelectionInfo.md#Meshline.Models.Client.DeviceSelectionInfo.PreviousLocalDeviceId",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceSelectionInfo.Revision",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceSelectionInfo.md#Meshline.Models.Client.DeviceSelectionInfo.Revision",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "P:Meshline.Models.Client.DeviceStatePublishOptions.IsRecovery",
@@ -7565,6 +7901,20 @@
       "notes": "getRoute and refreshRoute share verified discovery with one-hour freshness, one-minute failure cooldown and stop/disposal draining. Publication retains durable requests, relay acknowledgement verification and CAS persistence. MeshlineClient forces discovery for establishment, recovery and migration."
     },
     {
+      "symbol": "T:Meshline.Components.AccountRouteException",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteException.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "AccountRouteError preserves reason and cause; ensureRoute reconciles exact requests and original-relay renewal."
+    },
+    {
+      "symbol": "T:Meshline.Components.AccountRouteFailure",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountRouteFailure.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/account-route-error.ts",
+      "notes": "Camel-case string union with no generic retry flag."
+    },
+    {
       "symbol": "T:Meshline.Components.AccountState",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.AccountState.md",
       "status": "mapped-requires-behavior-review",
@@ -7845,18 +8195,60 @@
       "notes": "Trusted context, RPC URL, timeout and page size; TypeScript also accepts platform fetch and cleanup diagnostics."
     },
     {
+      "symbol": "T:Meshline.Interactions.SecretAccessException",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.SecretAccessException.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/errors.ts",
+      "notes": "SecretAccessError reports the protector diagnosis without authorizing local-data deletion."
+    },
+    {
+      "symbol": "T:Meshline.Interactions.SecretAccessFailure",
+      "documentation": "../../../dotnet/docs/api/Meshline.Interactions.SecretAccessFailure.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/errors.ts",
+      "notes": "unknown, temporarilyUnavailable and permanentlyLost; all preserve retained local records."
+    },
+    {
       "symbol": "T:Meshline.MeshlineClient",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
-      "notes": "Six-manager ownership, startup rollback, explicit establishment/recovery, durable home migration and conversations/read positions. Full cross-language workflow acceptance remains pending."
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.AccountDeviceInfo",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountDeviceInfo.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.AccountEstablishmentException",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentException.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "T:Meshline.Models.Client.AccountEstablishmentOptions",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/client/account-operations.ts",
-      "notes": "TypeScript duration values use integer seconds; establishment requires staged initial device authorization."
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.AccountEstablishmentReason",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentReason.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.AccountInitialProfile",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountInitialProfile.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "T:Meshline.Models.Client.AccountRecoveryOptions",
@@ -7922,6 +8314,13 @@
       "notes": "ClientOptions retains context/accountId and adds an injectable clock. Constructors validate arguments; no separate options.Validate method is exposed."
     },
     {
+      "symbol": "T:Meshline.Models.Client.ContactAuthorizationIssue",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ContactAuthorizationIssue.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
       "symbol": "T:Meshline.Models.Client.ContactGrantState",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ContactGrantState.md",
       "status": "mapped-requires-behavior-review",
@@ -7976,6 +8375,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client/conversations.ts",
       "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.DeviceSelectionInfo",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceSelectionInfo.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
     },
     {
       "symbol": "T:Meshline.Models.Client.DeviceStatePublishOptions",
@@ -9082,6 +9488,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/storage-node/src/index.ts",
       "notes": "EF Core Up/Down/model-builder hooks are CLR infrastructure, not TypeScript exports. Each adapter owns its schema/migrate implementation; .NET migration and database compatibility are not supported."
+    },
+    {
+      "symbol": "T:Meshline.Storage.Migrations.ResumableAccountEstablishment",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ResumableAccountEstablishment.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/storage/store.ts",
+      "notes": "TypeScript adapters use generic record collections with atomic CAS; workflow and preparation records need no physical-schema migration or intermediate-record compatibility. .NET database files are not interchangeable."
     },
     {
       "symbol": "T:Meshline.Storage.QueryReader`1",

@@ -49,7 +49,7 @@ account, and local device; retain the same database and protector on restart.
 
 ## Establish or resume
 
-For initial account establishment, use this function from
+For explicit account establishment or device reauthorization, use this function from
 [workflows.ts](../../examples/workflows.ts) on the initialized client.
 Types in these excerpts are imported from `@meshline/sdk`; the source
 file includes the imports.
@@ -61,10 +61,12 @@ export async function establishAndStart(client: MeshlineClient, relayId: string)
 }
 ```
 
-Omit `relayId` from the establishment options if the SDK should select a verified
-active relay. On an ordinary restart, call `client.start()` after initialization.
-An existing account route with no authorized local device requires deliberate
-[recovery](recovery-and-migration.md), not a second automatic establishment.
+Omit `relayId` to retain an existing route or select a verified active relay for a
+new account. `establishAccount` also authorizes a fresh installation and resumes
+interrupted setup; it preserves other devices and existing profile settings.
+On an ordinary restart with valid retained local data, call `client.start()`
+after initialization. See [account establishment](account-establishment.md) for
+device selection, explicit reauthorization, and structured failures.
 
 Starting activates synchronization, outgoing delivery, subscriptions, and polling.
 Use the managers on `client` for application actions. Start with

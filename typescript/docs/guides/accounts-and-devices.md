@@ -8,15 +8,18 @@ identity and protected secrets. Create a separate database for another device.
 
 After initialization, call `client.establishAccount({ relayId })` and then
 `client.start()`. The SDK coordinates local device creation, authorization, and
-route publication. Omitting `relayId` selects a verified active relay.
+route publication and missing-profile initialization. Existing accounts use the
+same entry point. Omitting `relayId` selects a verified active relay only for a new
+account; established accounts keep their original relay.
 
 `certificateValiditySeconds` and `routeValiditySeconds` are positive integer
 durations. Both default to 365 days; certificate validity is capped at 720 days
 and route validity at 3650 days. These values are seconds, not milliseconds.
 
 An interrupted establishment retains its original relay. Preserve the store so
-the SDK can reconcile the original signed requests. If the account already has a
-route but this local device is unauthorized, use [explicit recovery](recovery-and-migration.md).
+the SDK can reconcile the original signed requests. Read the
+[account establishment contract](account-establishment.md) for retained keys,
+renewal, explicit replacement, structured errors and recovery limits.
 
 ## Read account and device state
 
@@ -25,6 +28,7 @@ route but this local device is unauthorized, use [explicit recovery](recovery-an
 | `client.route`, `client.device`, `client.deviceState`, `client.profile` | Current local snapshots; may be `undefined`. |
 | `accountManager.getRoute(accountId?)` | Read a verified route, discovering it when the cache has no usable entry. |
 | `accountManager.refreshRoute(accountId?)` | Await discovery, bypassing freshness and failure cooldown. |
+| `accountManager.ensureRoute(relayId, validitySeconds)` | Reconcile or renew the original route, preserving unresolved signed requests. |
 | `deviceManager.getDeviceState(target?)` | Resolve own or contact-authorized device state. |
 | `deviceManager.refreshDeviceState(target?)` | Await an update, retaining the one-minute failure cooldown. |
 | `deviceManager.getOwnDeviceState(relayId)` | Await current work, then query the specified relay for account administration. |
@@ -70,7 +74,8 @@ normal setup; they coordinate route and device publication together.
 
 Creating or renewing a local certificate and publishing accepted authorization
 are distinct steps. Do not treat a staged certificate as relay-authorized.
-`removeDevice(deviceId)` coordinates removal with contact authorization updates.
+`removeDevice(deviceId)` checks contact continuity without sending authorization
+updates itself. Message synchronization performs those updates in the background.
 Subscribe to `deviceChanged` and `deviceStateChanged` to refresh the UI.
 
 If loading an existing identity fails, surface the error. Replacing its database

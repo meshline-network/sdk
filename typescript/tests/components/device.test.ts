@@ -150,12 +150,12 @@ test('partial/tampered persisted bindings fail initialization instead of generat
     expect(resumed.manager.lifecycleState).toBe('uninitialized');
 });
 
-test('staged publication settles delivery without declaring devices authoritative; acceptance publishes state atomically', async () => {
+test('staged publication stays pending until relay acceptance confirms authoritative device state', async () => {
     const f = await fixture(); await f.manager.initialize(); const certificate = await f.manager.createDevice(3600); const id = certificateId(certificate, context);
     f.behavior = 'staged'; const staged = await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [certificate] });
-    expect(staged.status).toBe('staged'); expect(f.manager.deviceState).toBeUndefined(); expect(f.manager.getAuthorizationState(id)).toBe('unknown'); expect((await f.pending())!.pending).toBe(false);
+    expect(staged.status).toBe('staged'); expect(f.manager.deviceState).toBeUndefined(); expect(f.manager.getAuthorizationState(id)).toBe('unknown'); expect((await f.pending())!.pending).toBe(true);
     f.behavior = 'accepted'; const accepted = await f.manager.publishDeviceState(f.descriptor.relayId);
-    expect(accepted.deviceState.revision).toBe(staged.deviceState.revision + 1); expect(f.manager.getAuthorizationState(id)).toBe('authorized');
+    expect(accepted.deviceState.revision).toBe(staged.deviceState.revision); expect(f.manager.getAuthorizationState(id)).toBe('authorized');
     const snapshot = await f.store.read([{ collection: 'device_states' }, { collection: 'signed_requests' }]);
     expect(snapshot.sets[0]![0]!.revision).toBe(snapshot.sets[1]![0]!.revision);
     f.clock.wall = certificate.expiresAt; expect(f.manager.getAuthorizationState(id)).toBe('expired');
@@ -165,7 +165,7 @@ test('staged device removal remains visibly incomplete and does not change autho
     const f = await fixture(); await f.manager.initialize(); const certificate = await f.manager.createDevice(3600); const id = certificateId(certificate, context);
     await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [certificate] }); const before = f.manager.deviceState;
     f.behavior = 'staged'; await expect(f.manager.removeDevice(id)).rejects.toThrow('not yet authoritative');
-    expect(f.manager.deviceState).toEqual(before); expect(f.manager.getAuthorizationState(id)).toBe('authorized'); expect((await f.pending())!.pending).toBe(false);
+    expect(f.manager.deviceState).toEqual(before); expect(f.manager.getAuthorizationState(id)).toBe('authorized'); expect((await f.pending())!.pending).toBe(true);
     f.behavior = 'accepted'; await f.manager.removeDevice(id); expect(f.manager.getAuthorizationState(id)).toBe('notRegistered');
     const count = f.requests.length; await f.manager.removeDevice(id); expect(f.requests).toHaveLength(count);
 });
@@ -285,10 +285,10 @@ test('different signing certificates do not share forced device queries', async 
     const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(7200);
     await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
     const gate = deferred(); f.resolveHook = signal => awaitWithSignal(gate.promise, signal);
-    const old = f.manager.refreshDeviceState(); await vi.waitFor(() => expect(f.modes).toHaveLength(1));
+    const old = f.manager.refreshDeviceState().catch(error => error); await vi.waitFor(() => expect(f.modes).toHaveLength(1));
     await f.manager.renewDevice(10800); const fresh = f.manager.refreshDeviceState();
     try { await vi.waitFor(() => expect(f.modes).toHaveLength(2)); } finally { gate.resolve(); }
-    await Promise.all([old, fresh]);
+    expect(await old).toMatchObject({ name: 'AbortError' }); await fresh;
 });
 
 test('component instances isolate queries and restart reuses persisted verified states', async () => {

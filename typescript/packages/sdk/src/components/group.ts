@@ -584,6 +584,14 @@ export class GroupManager extends ClientComponent {
             } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'refresh_groups', error }); }
         } } catch (error) { if (!signal.aborted) throw error; }
     }
-    protected override async onStop(): Promise<void> { this.#detachMessages?.(); this.#detachMessages = undefined; try { await Promise.all(this.#jobs); } finally { for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach(); await Promise.all([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())); this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop(); } }
+    protected override async onStop(): Promise<void> {
+        this.#detachMessages?.(); this.#detachMessages = undefined;
+        const results = await Promise.allSettled(this.#jobs);
+        for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach();
+        results.push(...await Promise.allSettled([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())));
+        this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop();
+        const errors = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected').map(value => value.reason);
+        if (errors.length) throw new AggregateError(errors, 'Group background processing failed.');
+    }
     protected override async onDispose(): Promise<void> { this.#syncStatus.stop(true); this.#events.clear(); }
 }

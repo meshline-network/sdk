@@ -66,6 +66,7 @@ export class MessageManager extends ClientComponent {
     readonly #pendingRoutes = new Set<string>(); #routeRecording = Promise.resolve(); #removeRouteListener: (() => void) | undefined;
     #sendPulse: AsyncPulse | undefined; #syncPulse: AsyncPulse | undefined; #maintenancePulse: AsyncPulse | undefined; #runtimeJobs: Promise<void>[] = [];
     #pendingDeviceRevision: number | undefined; #deviceListeners: (() => void)[] = [];
+    #maintenanceRetry = false; readonly #notifiedContacts = new Set<string>();
     constructor(options: MessageManagerOptions) {
         super(options);
         for (const dependency of [options.relayClients, options.accountManager, options.deviceManager]) if (dependency.accountId !== this.accountId || dependency.context.toString() !== this.context.toString())
@@ -144,10 +145,8 @@ export class MessageManager extends ClientComponent {
         const remote = self ? own : accountDeviceStateCodec.decode(snapshot.sets[2]![0]?.value!); const now = this.clock.nowSeconds();
         validateDeviceState(own, this.context); validateDeviceState(remote, this.context);
         const pendingState = readSignedRequest(snapshot.sets.at(-1)![0]?.value);
-        if (pendingState?.pending) {
-            const proposed = accountDeviceStateCodec.decode(pendingState.document); const ids = new Set(proposed.certificates.map(value => certificateId(value, this.context)));
-            if (own.certificates.some(value => !ids.has(certificateId(value, this.context)))) throw new ProtocolError('device_removal_pending', 'Resolve the pending device removal before preparing new messages or grants.');
-        }
+        if (pendingState?.pending && ['meshline.contact.consent', 'meshline.contact.grant'].includes(String(payload['$type'])))
+            throw new ProtocolError('device_publication_pending', 'Reconcile pending device authorization before issuing contact grants.');
         if (route.account !== this.accountId || own.account !== this.accountId || remote.account !== recipient || route.expiresAt <= now) throw new ProtocolError('invalid_authorization', 'Message routing or device state is outside its account scope or validity.');
         authorizedDevice(own, certificateId(this.#device.certificate, this.context), this.context, now);
         if (authorization) { if ('grantor' in authorization) verifyContactGrant(authorization, remote, this.context, now); else verifyContactInvite(authorization, remote, this.context, now); }
@@ -235,25 +234,30 @@ export class MessageManager extends ClientComponent {
         const initial = await this.#prepareSend(this.accountId, accountContactSyncCodec.encode({ records: [], requestSnapshot: true }), undefined, undefined, signal);
         await this.#repository.enqueue(initial.outbox, undefined, initial.guards, undefined, signal);
         this.#sendPulse = new AsyncPulse(); this.#syncPulse = new AsyncPulse(); this.#maintenancePulse = new AsyncPulse(); this.#pendingDeviceRevision = own.revision;
+        this.#notifiedContacts.clear(); this.#maintenanceRetry = false;
         this.#deviceListeners = [this.#device.on('deviceChanged', () => { this.#maintenancePulse?.pulse(); }), this.#device.on('deviceStateChanged', value => {
-            if (value.account === this.accountId) { this.#pendingDeviceRevision = Math.max(value.revision, this.#pendingDeviceRevision ?? -1); this.#maintenancePulse?.pulse(); }
+            if (value.account === this.accountId) { this.#pendingDeviceRevision = Math.max(value.revision, this.#pendingDeviceRevision ?? -1); this.#notifiedContacts.clear(); this.#maintenancePulse?.pulse(); }
         })];
         this.#runtimeJobs = [this.#sendLoop(this.runtimeSignal), this.#syncLoop(this.runtimeSignal), this.#poll(this.runtimeSignal), this.#maintainContacts(this.runtimeSignal)];
         for (const job of this.#runtimeJobs) job.catch(() => undefined); this.#sendPulse.pulse(); this.#syncPulse.pulse(); this.#maintenancePulse.pulse();
     }
-    async #poll(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(15_000, signal); this.#sendPulse?.pulse(); this.#syncPulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
+    async #poll(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(15_000, signal); this.#sendPulse?.pulse(); this.#syncPulse?.pulse(); if (this.#maintenanceRetry) this.#maintenancePulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
     async #maintainContacts(signal: AbortSignal): Promise<void> {
         try { for (;;) {
             await this.#maintenancePulse!.wait(signal); const revision = this.#pendingDeviceRevision; let failed = false;
             try {
                 const rows = await this.#store.read([{ collection: 'contacts' }], signal);
-                for (const row of rows.sets[0]!) {
-                    if (readContact(row.value)?.record.status !== 'active') continue;
-                    try { await this.#contacts.maintain(row.key, revision, signal); }
-                    catch (error) { throwIfAborted(signal); failed = true; this.notifyBackgroundError({ operation: 'maintain_contact', resource: row.key, error }); }
+                const requests = rows.sets[0]!.filter(row => readContact(row.value)?.record.status === 'active')
+                    .map(row => ({ account: row.key, notifyDeviceRevision: this.#notifiedContacts.has(row.key) ? undefined : revision }));
+                for await (const result of this.#contacts.maintain(requests, signal)) {
+                    if (result.success) {
+                        // A completed older pass cannot mark the newer revision's notifications as sent.
+                        if (this.#pendingDeviceRevision === revision) this.#notifiedContacts.add(result.account);
+                    } else { failed = true; this.notifyBackgroundError({ operation: 'maintain_contact', resource: result.account, error: result.error }); }
                 }
-                if (!failed && this.#pendingDeviceRevision === revision) this.#pendingDeviceRevision = undefined;
-            } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'maintain_contacts', error }); }
+                if (!failed && this.#pendingDeviceRevision === revision) { this.#pendingDeviceRevision = undefined; this.#notifiedContacts.clear(); }
+            } catch (error) { throwIfAborted(signal); failed = true; this.notifyBackgroundError({ operation: 'maintain_contacts', error }); }
+            this.#maintenanceRetry = failed;
         } } catch (error) { if (!signal.aborted) throw error; }
     }
     async #sendLoop(signal: AbortSignal): Promise<void> {
@@ -264,10 +268,12 @@ export class MessageManager extends ClientComponent {
                 const record = await this.#outbox.get(messageId, signal); if (!record) continue;
                 if (!record.isDirect && record.request.envelope.to !== this.accountId) {
                     const box = record.request.senderBoxes?.find(value => value.deviceId === certificateId(this.#device.certificate, this.context));
-                    if (!box) throw new ProtocolError('missing_key_box', 'Outgoing protocol message has no local sender key box.');
-                    const payload = await decryptMessage({ context: this.context, receiver: this.#device, sender: this.#device.certificate, envelope: record.request.envelope, keyBox: box, signal });
-                    const grant = payload['$type'] === 'meshline.contact.consent' ? contactConsentCodec.decode(payload).grant : payload['$type'] === 'meshline.contact.grant' ? contactGrantCodec.decode(payload) : undefined;
-                    if (grant) this.#deliveryGrants.set(messageId, grant);
+                    try {
+                        if (!box || record.request.envelope.fromDeviceId !== certificateId(this.#device.certificate, this.context)) throw new ProtocolError('missing_key_box', 'Outgoing protocol grant contents are unavailable for the current device.');
+                        const payload = await decryptMessage({ context: this.context, receiver: this.#device, sender: this.#device.certificate, envelope: record.request.envelope, keyBox: box, signal });
+                        const grant = payload['$type'] === 'meshline.contact.consent' ? contactConsentCodec.decode(payload).grant : payload['$type'] === 'meshline.contact.grant' ? contactGrantCodec.decode(payload) : undefined;
+                        if (grant) this.#deliveryGrants.set(messageId, grant);
+                    } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'read_outgoing_grant', resource: messageId, error }); }
                 }
                 const result = await this.#outbox.process(messageId, signal); await this.#sendChanges(result.changes); if (result.error && !signal.aborted) this.notifyBackgroundError({ operation: 'send_message', resource: messageId, error: result.error });
                 } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'send_message', resource: messageId, error }); }
@@ -321,7 +327,8 @@ export class MessageManager extends ClientComponent {
     protected override async onStop(): Promise<void> {
         try { const results = await Promise.allSettled(this.#runtimeJobs); const failures = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected'); if (failures.length) throw new AggregateError(failures.map(value => value.reason), 'Message runtime failed.'); }
         finally { for (const observed of this.#observed.values()) for (const remove of observed.detach) remove(); this.#observed.clear();
-            for (const remove of this.#deviceListeners) remove(); this.#deviceListeners = []; this.#runtimeJobs = []; this.#sendPulse = this.#syncPulse = this.#maintenancePulse = undefined; this.#pendingDeviceRevision = undefined; this.#syncStatus.stop(); }
+            for (const remove of this.#deviceListeners) remove(); this.#deviceListeners = []; this.#runtimeJobs = []; this.#sendPulse = this.#syncPulse = this.#maintenancePulse = undefined;
+            this.#pendingDeviceRevision = undefined; this.#notifiedContacts.clear(); this.#maintenanceRetry = false; this.#syncStatus.stop(); }
     }
     protected override async onDispose(): Promise<void> { this.#removeRouteListener?.(); this.#removeRouteListener = undefined; await this.#routeRecording; if (this.#pendingRoutes.size) throw new Error('Some observed message timelines could not be persisted.'); this.#syncStatus.stop(true); this.#events.clear(); }
 }

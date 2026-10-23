@@ -115,6 +115,67 @@ test('definitive rejection retires the pending request and the next publication 
     expect(f.routeSigns).toBe(2);
 });
 
+test('ensureRoute reuses a confirmed unexpired route without discovery or signing', async () => {
+    const f = await fixture(); await f.manager.initialize();
+    const route = await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 });
+    const lookups = f.lookups; const signatures = f.routeSigns;
+    expect(await f.manager.ensureRoute(f.descriptor.relayId, 7200)).toEqual(route);
+    expect(f.lookups).toBe(lookups); expect(f.routeSigns).toBe(signatures);
+});
+
+test.each([true, false])('ensureRoute reconciles an unknown successor while an older route is valid (accepted=%s)', async accepted => {
+    const f = await fixture(); await f.manager.initialize();
+    const old = await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 });
+    f.clock.wall++; f.behavior = 'lost';
+    await expect(f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 })).rejects.toThrow('Response lost');
+    const request = f.requests[1]; const signatures = f.routeSigns;
+    if (!accepted) f.route = old;
+    f.behavior = 'ok';
+    const result = await f.manager.ensureRoute(f.descriptor.relayId, 3600);
+    expect(result.revision).toBe(1); expect(f.routeSigns).toBe(signatures);
+    expect(f.requests).toHaveLength(accepted ? 2 : 3);
+    if (!accepted) expect(f.requests[2]).toBe(request);
+    expect((await f.pending())!.pending).toBe(false);
+});
+
+test('ensureRoute preserves an expired initial request without original-route evidence', async () => {
+    const f = await fixture(); await f.manager.initialize(); f.behavior = 'lost';
+    await expect(f.manager.ensureRoute(f.descriptor.relayId, 1)).rejects.toMatchObject({ reason: 'submissionOutcomeUnknown' });
+    const pending = await f.pending(); f.route = undefined; f.clock.wall += 2;
+    await expect(f.manager.ensureRoute(f.descriptor.relayId, 1)).rejects.toMatchObject({ reason: 'stateConflict' });
+    expect(await f.pending()).toEqual(pending); expect(f.requests).toHaveLength(1);
+});
+
+test('ensureRoute renews above an expired unknown successor using the retained original route', async () => {
+    const f = await fixture(); await f.manager.initialize();
+    const original = await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 1 });
+    f.behavior = 'lost'; await expect(f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 1 })).rejects.toThrow('Response lost');
+    const previous = accountRouteCodec.decode((await f.pending())!.document!);
+    f.clock.wall += 2; f.route = undefined; f.behavior = 'ok';
+    const renewed = await f.manager.ensureRoute(f.descriptor.relayId, 1);
+    expect(renewed.revision).toBe(previous.revision + 1); expect(renewed.relayId).toBe(original.relayId);
+    expect((await f.pending())!.pending).toBe(false);
+});
+
+test('ensureRoute discovery does not hold the publication gate or overwrite a concurrently confirmed route', async () => {
+    const f = await fixture(); await f.manager.initialize(); await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 1 });
+    f.clock.wall += 2; const entered = deferred(); const release = deferred();
+    f.resolveHook = async () => { entered.resolve(); await release.promise; return undefined; };
+    const ensuring = f.manager.ensureRoute(f.descriptor.relayId, 3600); await entered.promise;
+    let published: AccountRoute;
+    try { published = await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 7200 }); }
+    finally { release.resolve(); }
+    expect(await ensuring).toEqual(published!); expect(f.requests).toHaveLength(2);
+});
+
+test('ensureRoute retries a definitively rejected initial request exactly after corrected preconditions', async () => {
+    const f = await fixture(); await f.manager.initialize(); f.behavior = 'reject';
+    await expect(f.manager.ensureRoute(f.descriptor.relayId, 3600)).rejects.toMatchObject({ reason: 'stateUnavailable' });
+    const request = f.requests[0]; const signatures = f.routeSigns;
+    f.behavior = 'ok'; expect((await f.manager.ensureRoute(f.descriptor.relayId, 3600)).revision).toBe(0);
+    expect(f.requests).toEqual([request, request]); expect(f.routeSigns).toBe(signatures);
+});
+
 test.each(['tamper', 'forged', 'malformed'] as const)('%s acknowledgement cannot clear durable pending state', async behavior => {
     const f = await fixture(); await f.manager.initialize(); f.behavior = behavior;
     await expect(f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 })).rejects.toThrow();

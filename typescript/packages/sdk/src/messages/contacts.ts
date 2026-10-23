@@ -10,9 +10,12 @@ import { deviceStateChangedCodec, validateDeviceStateChanged, type MessageTimeli
 import type { NetworkContext } from '../protocol/context.js';
 import { encodeUtf8 } from '../protocol/encoding.js';
 import { canonicalJson, requireSafeInteger, type JsonObject } from '../protocol/json.js';
-import type { RuntimeClock } from '../runtime/clock.js';
+import { throwIfAborted, type RuntimeClock } from '../runtime/clock.js';
 import type { MeshlineStore, QueryReader, RecordKey, StoreMutation, StoreSnapshot } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
+import { readSignedRequest, requestKey } from '../storage/signed-request.js';
+import { decryptMessage, type MessageDecryptor } from '../crypto/messages.js';
+import { equalBytes } from '../protocol/encoding.js';
 import { decodeOutbox, encodeOutbox, outboxKey, type MessageSendState, type OutboxEffects, type OutboxRecord } from './outbox.js';
 import { snapshotReader, type MessageEffects, type RecordGuard } from './repository.js';
 
@@ -28,8 +31,9 @@ export interface ContactChanges { readonly contacts: readonly ContactChange[]; r
 export interface StoredContact { readonly record: ContactRecord; readonly confirmedGrantTo?: ContactGrant; readonly requiredDeviceRevision?: number }
 export interface StoredContactRequest extends ContactRequestInfo { readonly consent: ContactConsent }
 export interface PreparedContactSend { readonly outbox: OutboxRecord; readonly guards: readonly RecordGuard[] }
+interface ContactMaintenancePass { deliveries?: Promise<Map<string, OutboxRecord[]>> }
 export interface ContactHost {
-    readonly store: MeshlineStore; readonly context: NetworkContext; readonly accountId: string; readonly device: DeviceSigner; readonly clock: RuntimeClock;
+    readonly store: MeshlineStore; readonly context: NetworkContext; readonly accountId: string; readonly device: DeviceSigner & MessageDecryptor; readonly clock: RuntimeClock;
     getState(target: string | ContactAuthorization, signal?: AbortSignal, refresh?: boolean): Promise<AccountDeviceState>;
     prepareSend(recipient: string, payload: JsonObject, authorization: ContactAuthorization | undefined, recipientDevices: readonly string[] | undefined, signal?: AbortSignal): Promise<PreparedContactSend>;
     changed(changes: ContactChanges): void;
@@ -91,8 +95,31 @@ export class MessageContacts {
         for (const mutation of mutations) { queries.set(recordId(mutation), { collection: mutation.collection, key: mutation.key });
             if (mutation.collection === 'contacts') { const key = cachedDeviceStateKey(mutation.key); queries.set(recordId(key), key); } }
         const own = cachedDeviceStateKey(this.host.accountId); queries.set(recordId(own), own);
+        const publication = requestKey('device.state.publish'); queries.set(recordId(publication), publication);
         return { queries: [...queries.values()], committed: (snapshot, changes) => this.host.changed(this.#changes(snapshot, changes, kinds)), plan: snapshot => {
             for (let index = 0; index < unique.length; index++) if (fingerprint(snapshot.sets[index]![0]?.value) !== fingerprint(unique[index]!.value)) throw new StateConflictError('Contact state changed while preparing signed messages.');
+            const rows = new Map(snapshot.sets.flat().map(row => [recordId(row), row.value]));
+            const grants: ContactGrant[] = [];
+            for (const mutation of mutations) if (mutation.kind === 'put') {
+                if (mutation.collection === 'contacts') {
+                    const next = readContact(mutation.value)!; const previous = readContact(rows.get(recordId(mutation)));
+                    if (next.record.status === 'active' && next.record.grantToContact
+                        && contactGrantCodec.stringify(next.record.grantToContact) !== (previous?.record.grantToContact && contactGrantCodec.stringify(previous.record.grantToContact))) grants.push(next.record.grantToContact);
+                } else if (mutation.collection === 'contact_requests') {
+                    const next = readContactRequest(mutation.value)!;
+                    const previous = readContactRequest(rows.get(recordId(mutation)));
+                    if (next.direction === 'outgoing' && (next.messageId !== previous?.messageId
+                        || contactConsentCodec.stringify(next.consent) !== (previous && contactConsentCodec.stringify(previous.consent)))) grants.push(next.consent.grant);
+                }
+            }
+            if (grants.length) {
+                if (readSignedRequest(rows.get(recordId(publication)))?.pending) throw new ProtocolError('device_publication_pending', 'Reconcile pending device authorization before issuing contact grants.');
+                const current = state(rows.get(recordId(own)));
+                if (!current) throw new ProtocolError('device_state_required', 'Current own device state is unavailable.');
+                for (const grant of grants) if ((grant.expiresAt ?? Infinity) > this.host.clock.nowSeconds()
+                    && !Object.keys(filterContactGrantSignatures(grant, current, this.host.context, this.host.clock.nowSeconds()).signatures).length)
+                    throw new StateConflictError('Device authorization changed while preparing a contact grant.');
+            }
             return [...mutations, ...prepared.map(value => put(outboxKey(value.outbox.request.envelope.messageId), encodeOutbox(value.outbox)))];
         } };
     }
@@ -305,7 +332,7 @@ export class MessageContacts {
         const previous = readContact(guards[0]!.value); const waiting = readContactRequest(guards[2]!.value); const cached = state(guards[3]!.value);
         const waitingDelivery = waiting ? (await this.host.store.read([outboxKey(waiting.messageId)], signal)).sets[0]![0] : undefined;
         if (waiting) guards.push({ query: outboxKey(waiting.messageId), value: waitingDelivery?.value });
-        const accepted = waiting?.sendState === 'targetAccepted' || waitingDelivery !== undefined && decodeOutbox(waitingDelivery).acceptedAt !== undefined;
+        const accepted = waiting?.sendState === 'targetAccepted' || waitingDelivery !== undefined && decodeOutbox(waitingDelivery).state === 'targetAccepted';
         if (cached && (cached.revision > consent.deviceState.revision || cached.revision === consent.deviceState.revision && accountDeviceStateCodec.stringify(cached) !== accountDeviceStateCodec.stringify(consent.deviceState))) reject('stale_state', 'Consent contains an older or conflicting device state.');
         const mutations: StoreMutation[] = [put(cachedDeviceStateKey(account), accountDeviceStateCodec.encode(consent.deviceState))];
         if (previous?.record.status === 'active' || waiting && waiting.sendState !== 'canceled') {
@@ -358,13 +385,22 @@ export class MessageContacts {
             const requestRow = snapshot.sets[1]!.find(row => row.key === key.key); const request = readContactRequest(requestRow?.value);
             if (request?.messageId === envelope.messageId) mutations.push(record.state === 'canceled' ? { kind: 'delete', ...key } : put(key, encodeContactRequest({ ...request, sendState: record.state })));
             const contact = readContact(snapshot.sets[2]!.find(row => row.key === envelope.to)?.value); const own = state(snapshot.sets[3]![0]?.value); const grant = grants.get(envelope.messageId);
-            if (record.acceptedAt !== undefined && contact?.record.status === 'active' && own && grant)
+            if (record.state === 'targetAccepted' && contact?.record.status === 'active' && own && grant)
                 mutations.push(put(contactKey(envelope.to), encodeContact({ ...contact, confirmedGrantTo: this.#merge(contact.confirmedGrantTo, grant, own) })));
             return mutations;
         } };
     }
-    /** Repairs local grant signatures and acknowledges peer device-state revisions with durable outgoing messages. */
-    async maintain(account: string, notifyDeviceRevision: number | undefined, signal?: AbortSignal): Promise<void> {
+    /** A pass shares one lazy outbox scan; each contact still commits against its own current authorization. */
+    async *maintain(requests: readonly { account: string; notifyDeviceRevision: number | undefined }[], signal?: AbortSignal):
+        AsyncGenerator<{ account: string; success: true } | { account: string; success: false; error: unknown }> {
+        const pass: ContactMaintenancePass = {};
+        for (const { account, notifyDeviceRevision } of requests) {
+            throwIfAborted(signal);
+            try { await this.#maintain(account, notifyDeviceRevision, pass, signal); yield { account, success: true }; }
+            catch (error) { throwIfAborted(signal); yield { account, success: false, error }; }
+        }
+    }
+    async #maintain(account: string, notifyDeviceRevision: number | undefined, pass: ContactMaintenancePass, signal?: AbortSignal): Promise<void> {
         const guards = await this.#snapshot([contactKey(account)], signal); const saved = readContact(guards[0]!.value);
         if (!saved || saved.record.status !== 'active') return;
         const now = this.host.clock.nowSeconds(); const own = await this.host.getState(this.host.accountId, signal);
@@ -378,13 +414,47 @@ export class MessageContacts {
         const issued = saved.record.grantToContact; let supplemented: ContactGrant | undefined;
         if (issued && (issued.expiresAt ?? Infinity) > now) supplemented = await this.#signGrant(filterContactGrantSignatures(issued, own, this.host.context, now), signal);
         const changedGrant = supplemented !== undefined && contactGrantCodec.stringify(supplemented) !== contactGrantCodec.stringify(issued!);
+        const needsDelivery = supplemented !== undefined && !this.#containsLocalSignature(saved.confirmedGrantTo, supplemented)
+            && !await this.#hasGrantDelivery(account, supplemented, pass, signal);
+        if (needsDelivery && !incoming) throw new ProtocolError('contact_grant_required', 'The incoming contact grant is missing or expired; authorization delivery remains pending.');
         const { requiredDeviceRevision, ...withoutRevision } = saved;
         const current: StoredContact = { ...(revisionResolved ? withoutRevision : saved), record: { ...saved.record, ...(changedGrant ? { grantToContact: supplemented!, updatedAt: this.#nextTime(saved.record.updatedAt) } : {}) } };
         const prepared: PreparedContactSend[] = [];
-        if (changedGrant) { prepared.push(await this.#sync(current, signal)); if (incoming) prepared.push(await this.host.prepareSend(account, contactGrantCodec.encode(supplemented!), incoming, undefined, signal)); }
+        if (changedGrant) prepared.push(await this.#sync(current, signal));
+        if (needsDelivery) prepared.push(await this.host.prepareSend(account, contactGrantCodec.encode(supplemented!), incoming, undefined, signal));
         if (notifyDeviceRevision !== undefined && incoming) prepared.push(await this.host.prepareSend(account, deviceStateChangedCodec.encode({ revision: own.revision }), incoming, undefined, signal));
         const mutations = changedGrant || revisionResolved ? [put(contactKey(account), encodeContact(current))] : [];
         if (mutations.length || prepared.length) await this.#commit(this.#effect(guards, mutations, prepared, ['authorization']), signal);
+    }
+    #containsLocalSignature(candidate: ContactGrant | undefined, issued: ContactGrant): boolean {
+        const id = certificateId(this.host.device.certificate, this.host.context);
+        return candidate !== undefined && candidate.signatures[id] !== undefined && issued.signatures[id] !== undefined
+            && equalBytes(candidate.signatures[id]!, issued.signatures[id]!) && equalBytes(contactGrantInput(candidate, this.host.context), contactGrantInput(issued, this.host.context));
+    }
+    async #hasGrantDelivery(account: string, issued: ContactGrant, pass: ContactMaintenancePass, signal?: AbortSignal): Promise<boolean> {
+        const local = this.host.device.certificate; const id = certificateId(local, this.host.context);
+        pass.deliveries ??= this.host.store.read([{ collection: 'message_outbox' }], signal).then(snapshot => {
+            const grouped = new Map<string, OutboxRecord[]>();
+            for (const row of snapshot.sets[0]!) {
+                const delivery = decodeOutbox(row);
+                if (delivery.isDirect || delivery.state === 'canceled' || delivery.request.envelope.fromDeviceId !== id) continue;
+                const recipient = delivery.request.envelope.to;
+                const entries = grouped.get(recipient) ?? []; entries.push(delivery); grouped.set(recipient, entries);
+            }
+            return grouped;
+        });
+        for (const delivery of (await pass.deliveries).get(account) ?? []) {
+            const box = delivery.request.senderBoxes?.find(value => value.deviceId === id);
+            if (!box) throw new ProtocolError('missing_key_box', 'Cannot inspect an outgoing grant without the local sender key box.');
+            const payload = await decryptMessage({ context: this.host.context, receiver: this.host.device, sender: local, envelope: delivery.request.envelope, keyBox: box, ...(signal ? { signal } : {}) });
+            const grant = payload['$type'] === 'meshline.contact.grant' ? contactGrantCodec.decode(payload) : payload['$type'] === 'meshline.contact.consent' ? contactConsentCodec.decode(payload).grant : undefined;
+            if (this.#containsLocalSignature(grant, issued)) {
+                // The request is immutable, but cancellation/pruning can occur after the shared scan.
+                const current = (await this.host.store.read([outboxKey(delivery.request.envelope.messageId)], signal)).sets[0]![0];
+                if (current && decodeOutbox(current).state !== 'canceled') return true;
+            }
+        }
+        return false;
     }
 }
 function state(value: JsonObject | undefined): AccountDeviceState | undefined { return value && accountDeviceStateCodec.decode(value); }

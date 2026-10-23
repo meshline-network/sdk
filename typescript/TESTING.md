@@ -45,6 +45,28 @@ Share preparation, not assertions or mutable state. Each test owns fresh resourc
 
 Use the fixture clock for SDK timers and an explicit handshake for concurrent work. Real timeouts bound a hung test; they should not determine operation order. Internal tracker tests use `MessagingClock` directly and do not construct a client network.
 
+## Account establishment coverage
+
+| Test file | Coverage |
+| --- | --- |
+| `components/account-establishment.test.ts` | Suites for establishment/renewal, prerequisites, device selection/continuity, interrupted operations/conflicts, and startup/authorization loss. |
+| `components/account.test.ts` | Route reconciliation, exact replay, original-relay preservation, expired publication evidence and cache/publication concurrency. |
+| `components/device.test.ts` | Device-state acceptance, complete-state publication and atomic publication/grant guards. |
+| `components/message.test.ts` | Contact authorization maintenance, target acceptance, overlapping notification revisions, stop/start retries and shared outbox scans with delivery-retention checks. |
+| `transport/pool.test.ts` | Session reuse with unchanged certificates and device-session retirement after renewal, preserving account sessions. |
+| `browser/managers.spec.ts` | IndexedDB reopen after a lost acknowledgement and a fresh installation preserving devices and profile. |
+
+The supported persistence cases are a complete retained installation or a fresh
+installation. Secret-protector failures preserve retained data. Test wallets and
+relays expose explicit interruption hooks; assertions verify keys, exact signed
+requests, and authoritative state across reopen, not only successful completion.
+
+Run the account lifecycle and its supporting components together after a build:
+
+```sh
+npx vitest run tests/components/account-establishment.test.ts tests/components/account.test.ts tests/components/device.test.ts tests/components/message.test.ts tests/components/client.test.ts tests/transport/pool.test.ts
+```
+
 ## Outgoing-message coverage
 
 - `message-outbox.test.ts`: durable submission, retries, acceptance evidence, retention and storage contention.

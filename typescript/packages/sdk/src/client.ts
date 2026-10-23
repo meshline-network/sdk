@@ -8,9 +8,13 @@ import { MessageManager } from './components/message.js';
 import { ProfileManager } from './components/profile.js';
 import { ClientAccountOperations, type AccountEstablishmentOptions, type AccountRecoveryOptions } from './client/account-operations.js';
 import { ClientConversations, type ConversationChange, type ConversationQuery } from './client/conversations.js';
-import type { RandomSource } from './crypto/primitives.js';
+import { systemRandom, type RandomSource } from './crypto/primitives.js';
 import type { AccountSigner, SecretProtector } from './interactions.js';
-import { accountDeviceStateCodec } from './models/identity.js';
+import { accountDeviceStateCodec, authorizedDevice, certificateId, deviceCertificateCodec } from './models/identity.js';
+import { contentReferenceCodec } from './models/content.js';
+import { AccountEstablishmentError } from './client/account-establishment.js';
+import { RelayError } from './transport/relay-error.js';
+import { abortScope, awaitWithSignal, throwIfAborted } from './runtime/clock.js';
 import { AsyncGate } from './runtime/async-gate.js';
 import { AsyncPulse } from './runtime/async-pulse.js';
 import { EventHub, type EventListener } from './runtime/events.js';
@@ -34,8 +38,13 @@ export class MeshlineClient extends ClientComponent {
     readonly #conversations: ClientConversations; readonly #events = new EventHub<MeshlineClientEvents>();
     readonly #conversationLifetime = createAbortController(); readonly #conversationPulse = new AsyncPulse(); readonly #pendingConversations = new Set<string>();
     #conversationIds: ReadonlySet<string> = new Set(); #conversationJob: Promise<void> | undefined;
+    readonly #store: MeshlineStore; readonly #pool: RelayClientPool;
+    #starting: AbortController | undefined; #startJob: Promise<void> | undefined;
+    #suspension: Promise<void> | undefined; #authorizationWatch: Promise<void> = Promise.resolve();
+    #runtimeReserved = false;
     constructor(options: MeshlineClientOptions) {
         super(options);
+        this.#store = options.store; this.#pool = options.relayClients;
         this.accountManager = new AccountManager(options);
         this.deviceManager = new DeviceManager({ ...options, accountManager: this.accountManager });
         this.profileManager = new ProfileManager({ ...options, accountManager: this.accountManager, deviceSigner: this.deviceManager });
@@ -45,8 +54,18 @@ export class MeshlineClient extends ClientComponent {
         this.#components = [this.accountManager, this.deviceManager, this.profileManager, this.messageManager, this.channelManager, this.groupManager];
         for (const component of this.#components) this.#detach.push(component.onLifecycle('backgroundError', error => this.notifyBackgroundError(error)));
         this.#accountOperations = new ClientAccountOperations({ store: options.store, pool: options.relayClients, account: this.accountManager, device: this.deviceManager, profile: this.profileManager,
-            context: this.context, accountId: this.accountId, clock: this.clock, report: failure => this.notifyBackgroundError(failure) });
+            context: this.context, accountId: this.accountId, clock: this.clock, random: options.random ?? systemRandom, report: failure => this.notifyBackgroundError(failure),
+            canChangeAuthorization: () => !this.#runtimeReserved && this.lifecycleState === 'stopped' });
         this.#conversations = new ClientConversations(options.store, this.accountId);
+        this.#detach.push(this.deviceManager.on('deviceStateChanged', state => {
+            if (state.account !== this.accountId || !this.device) return;
+            try { authorizedDevice(state, certificateId(this.device, this.context), this.context, this.clock.nowSeconds()); }
+            catch (error) { this.#suspend(error); }
+        }), this.deviceManager.onLifecycle('backgroundError', failure => {
+            const error = failure.error;
+            if (error instanceof RelayError && (failure.resource === this.accountId && ['unauthorized', 'device_unknown'].includes(error.code)
+                || failure.operation === 'connect' && error.code === 'device_unknown')) this.#suspend(error);
+        }));
         this.#detach.push(this.messageManager.on('messageReceived', messages => { for (const message of messages) this.#queueConversation(message.key.sender === this.accountId ? message.recipient : message.key.sender); }),
             this.messageManager.on('sendStatusChanged', status => { if (status.state === 'queued') this.#queueConversation(status.recipient); }),
             this.channelManager.on('timelineChanged', value => this.#queueConversation(value.channel.channelId)), this.channelManager.on('followChanged', value => this.#queueConversation(value.channel.channelId)),
@@ -85,8 +104,15 @@ export class MeshlineClient extends ClientComponent {
             const next = new Set(this.#conversationIds); for (const id of pending) { if (present.has(id)) next.add(id); else next.delete(id); } this.#conversationIds = next;
         } } catch (error) { if (!signal.aborted) this.notifyBackgroundError({ operation: 'observe_conversations', error }); }
     }
+    /**
+     * Explicit, resumable setup that preserves existing devices, relay and profile.
+     * Stop synchronization before authorization changes; healthy authorization is reused.
+     * Call start() separately after setup succeeds.
+     */
     establishAccount(options: AccountEstablishmentOptions = {}, signal?: AbortSignal): Promise<void> {
-        const copy = { ...options }; return this.runOperation(scope => this.#accountGate.run(() => this.#accountOperations.establish(copy, scope), scope), signal);
+        const copy = { ...options, ...(options.initialProfile ? { initialProfile: { ...options.initialProfile,
+            ...(options.initialProfile.avatar ? { avatar: contentReferenceCodec.decode(contentReferenceCodec.encode(options.initialProfile.avatar)) } : {}) } } : {}) };
+        return this.runOperation(scope => this.#accountGate.run(() => this.#accountOperations.establish(copy, scope), scope), signal);
     }
     recoverAccount(options: AccountRecoveryOptions = {}, signal?: AbortSignal): Promise<void> {
         const copy = { ...options, ...(options.previousDeviceState ? { previousDeviceState: accountDeviceStateCodec.decode(accountDeviceStateCodec.encode(options.previousDeviceState)) } : {}) };
@@ -98,12 +124,52 @@ export class MeshlineClient extends ClientComponent {
         this.#conversationIds = await this.#conversations.ids(signal); this.#conversationJob ??= this.#observeConversations();
     }
     protected override async onStart(signal: AbortSignal): Promise<void> {
-        await this.accountManager.start(signal);
-        await this.#accountGate.run(() => this.#accountOperations.resumeMigration(signal), signal);
-        for (const component of this.#components.slice(1)) await component.start(signal);
+        await this.#accountGate.run(async () => {
+            this.#runtimeReserved = true;
+            if ((await this.#store.read([{ collection: 'client_account_operations', key: 'establishment' }], signal)).sets[0]!.length)
+                throw new AccountEstablishmentError('authorizationNotYetEffective', 'Explicitly resume account setup before starting synchronization.');
+            await this.#accountOperations.resumeMigration(signal);
+            if (!this.device || !this.deviceState || !this.route || this.route.expiresAt <= this.clock.nowSeconds())
+                throw new AccountEstablishmentError('authorizationNotYetEffective', 'Explicit account setup is required before startup.');
+            const certificate = authorizedDevice(this.deviceState, certificateId(this.device, this.context), this.context, this.clock.nowSeconds());
+            if (deviceCertificateCodec.stringify(certificate) !== deviceCertificateCodec.stringify(this.device))
+                throw new AccountEstablishmentError('authorizationNotYetEffective', 'The retained certificate is not yet published.');
+            await this.deviceManager.inspectAuthorization({}, signal);
+            for (const component of this.#components) { throwIfAborted(signal); await component.start(signal); }
+            this.#authorizationWatch = this.#watchAuthorization(this.runtimeSignal);
+        }, signal);
+    }
+    override start(signal?: AbortSignal): Promise<void> {
+        if (this.#startJob) return awaitWithSignal(this.#startJob, signal);
+        this.#starting = createAbortController();
+        const scope = abortScope([signal, this.#starting.signal]);
+        this.#startJob = Promise.resolve().then(async () => { await this.#suspension; await super.start(scope.signal); })
+            .finally(() => { scope.dispose(); this.#starting = undefined; this.#startJob = undefined; });
+        return this.#startJob;
+    }
+    #suspend(error: unknown): void {
+        if ((!this.#starting && this.lifecycleState !== 'running') || this.#suspension) return;
+        this.#starting?.abort(error);
+        this.notifyBackgroundError({ operation: 'device_authorization', error });
+        this.#suspension = Promise.resolve().then(() => this.stop()).catch(failure => { this.notifyBackgroundError({ operation: 'stop', error: failure }); })
+            .finally(() => { this.#suspension = undefined; });
+    }
+    async #watchAuthorization(signal: AbortSignal): Promise<void> {
+        try {
+            for (;;) {
+                const expires = Math.min(this.device?.expiresAt ?? 0, this.route?.expiresAt ?? 0);
+                if (expires <= this.clock.nowSeconds()) { this.#suspend(new AccountEstablishmentError('authorizationNotYetEffective', 'Authorization expired; explicit setup is required.')); return; }
+                await this.clock.delay(Math.min(2147483647, (expires - this.clock.nowSeconds()) * 1000), signal);
+            }
+        } catch (error) { if (!signal.aborted) { this.notifyBackgroundError({ operation: 'watch_authorization', error }); this.#suspend(error); } }
     }
     protected override async onStop(): Promise<void> {
+        // A canceled start waiting behind setup has not acquired any child runtime.
+        if (this.#starting && !this.#runtimeReserved) return;
         const errors: unknown[] = []; for (const component of [...this.#components].reverse()) { try { await component.stop(); } catch (error) { errors.push(error); } }
+        await this.#authorizationWatch;
+        try { await this.#pool.invalidateDevice(); } catch (error) { errors.push(error); }
+        this.#runtimeReserved = false;
         if (errors.length) throw new AggregateError(errors, 'One or more client components failed to stop.');
     }
     protected override async onDispose(): Promise<void> {

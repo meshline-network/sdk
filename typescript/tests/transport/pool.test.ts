@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import {
     NetworkContext, RelayClient, RelayAuthenticator, RelayClientPool, RelayError, accountAuthenticationCodec, accountAuthenticationInput, deviceAuthenticationCodec,
-    deviceAuthenticationInput, deviceCertificateCodec, decodeBase64Url, relayDescriptorCodec, signAccount, signDevice,
+    deviceAuthenticationInput, deviceCertificateCodec, certificateAccountInput, certificateDeviceInput, decodeBase64Url, relayDescriptorCodec, signAccount, signDevice,
     verifyAccount, verifyDevice, rpcErrorCodes, type AuthenticationIdentity, type JsonObject, type RelayFetch,
 } from '@meshline/sdk';
 import { createNodeRelayFetch, createNodeSocketFactory } from '../../packages/transport-node/src/index.js';
@@ -69,6 +69,32 @@ test('account and device clients use separate tokens and invalidation only retir
     expect(device.isDisposed).toBe(true); expect(account.isDisposed).toBe(false); expect(pool.clients).toEqual([account]);
     const replacement = await pool.get(relay.descriptor.relayId, deviceIdentity);
     expect(replacement).not.toBe(device); await pool.dispose();
+});
+
+test('equal certificates reuse sessions and concurrent renewed acquisitions drain the original device session once', async () => {
+    const relay = fakeRelay(); const pool = new RelayClientPool({ context, accountId, fetch: relay.fetch, clock: relay.clock }, relay.registry);
+    const account = await pool.get(relay.descriptor.relayId, accountIdentity);
+    const original = await pool.get(relay.descriptor.relayId, deviceIdentity);
+    const clone = deviceCertificateCodec.decode(deviceCertificateCodec.encode(certificate));
+    const signer = { ...deviceIdentity.signer, certificate: clone };
+    expect(await pool.get(relay.descriptor.relayId, { mode: 'device', signer })).toBe(original);
+    let renewed = { ...clone, notBefore: clone.notBefore + 1, expiresAt: clone.expiresAt + 1 };
+    renewed = { ...renewed, deviceSignature: signDevice(certificateDeviceInput(renewed, context), decodeBase64Url(fixture.device_private_key)) };
+    renewed = { ...renewed, accountSignature: signAccount(certificateAccountInput(renewed, context), decodeBase64Url(fixture.private_key)) };
+    let release!: () => void; let entered!: () => void;
+    const ready = new Promise<void>(resolve => { entered = resolve; }); const wait = new Promise<void>(resolve => { release = resolve; });
+    const dispose = original.dispose.bind(original);
+    const retirement = vi.spyOn(original, 'dispose').mockImplementation(async () => { entered(); await wait; await dispose(); });
+    const identity = { mode: 'device' as const, signer: { ...signer, certificate: renewed } };
+    let completed = false;
+    const first = pool.get(relay.descriptor.relayId, identity); await ready;
+    const second = pool.get(relay.descriptor.relayId, identity).then(value => { completed = true; return value; });
+    try { await Promise.resolve(); expect(completed).toBe(false); }
+    finally { release(); }
+    const [one, two] = await Promise.all([first, second]);
+    expect(one).toBe(two); expect(one).not.toBe(original); expect(retirement).toHaveBeenCalledTimes(1);
+    expect(original.isDisposed).toBe(true); expect(account.isDisposed).toBe(false);
+    await pool.dispose();
 });
 
 test('unauthorized business response is returned without replay and the next call refreshes', async () => {

@@ -18,6 +18,7 @@ Check [platform requirements and limits](platforms.md) before selecting a runtim
 | [Application integrations](guides/integrations.md) | Configure a network, account signer, relay registry, and secret protector. |
 | [Lifecycle and ownership](guides/lifecycle.md) | Initialize, start, stop, and dispose the client and its dependencies. |
 | [Accounts and devices](guides/accounts-and-devices.md) | Establish an account, resolve routes, and manage device authorization. |
+| [Idempotent account establishment](guides/account-establishment.md) | Authorize, renew, replace explicitly, and resume interrupted setup. |
 
 ## Everyday application work
 

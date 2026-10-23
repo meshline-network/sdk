@@ -54,5 +54,7 @@ export type { ContactInfo, ContactGrantState, ContactRequestInfo, ContactRequest
 export * from './components/group.js';
 export type { GroupMessageInfo } from './groups/messages.js';
 export * from './client.js';
+export * from './client/account-establishment.js';
+export * from './components/account-route-error.js';
 
 export * from './integrations/cached-relay-registry.js';

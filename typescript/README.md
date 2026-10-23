@@ -64,8 +64,9 @@ try {
 ```
 
 Here `session` comes from the platform helper and `runApplication` is your own
-asynchronous application loop. For initial establishment or recovery, follow the
-quick start before starting. Explore all [topic guides](docs/README.md),
+asynchronous application loop. For explicit setup or device reauthorization, follow
+[account establishment](docs/guides/account-establishment.md) before starting.
+Explore all [topic guides](docs/README.md),
 [type-checked examples](examples/README.md), and [testing scope](TESTING.md).
 
 Wire formats and interoperability rules are defined by the

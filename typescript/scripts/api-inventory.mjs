@@ -25,7 +25,7 @@ const inventory = Object.entries(coverage.symbols).map(([symbol, documentation])
 for (const type of mappingTypes) if (!usedMappings.has(type)) throw new Error(`API mapping matches no current .NET documentation symbol: ${type}`);
 const output = JSON.stringify({
     source: '../../../dotnet/docs/api/coverage.json', sourceSha256: createHash('sha256').update(bytes).digest('hex'),
-    sdkBaseline: '18c7cc9a881c8603c3795b86940009e1c73d11a2',
+    sdkBaseline: 'f024be46d6ff288739d1555ef9e6607b914d571d',
     note: 'Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.',
     symbols: inventory,
 }, null, 2) + '\n';

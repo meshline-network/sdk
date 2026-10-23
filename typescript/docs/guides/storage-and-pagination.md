@@ -24,6 +24,41 @@ protector available when reopening.
 The database format belongs to each adapter. The TypeScript SQLite format is
 not compatible with the .NET SDK's database; neither should be opened as the other.
 
+## Account setup persistence
+
+One `MeshlineClient` component graph owns a database at a time. Retain the complete
+installation and its protection material together. The
+[account establishment contract](account-establishment.md#local-data-and-ownership)
+defines the ownership and concurrency requirements.
+
+| Records | Owner | Durable responsibility |
+| --- | --- | --- |
+| `client_account_operations` | Client | Original setup parameters, internal operation ID and next workflow step; also explicit migration progress. |
+| `device_preparation` | Device manager | Protected draft keys and certificate before authorization; an activation receipt after those keys become the local device. |
+| `local_device`, `identity_binding/device` | Device manager | Current certificate, protected keys and device binding. |
+| `signed_requests` | Publishing manager | Exact account, device or profile request, its revision and whether its outcome is pending. Device requests also associate the operation with its explicit replacement choice. |
+| `contacts`, `contact_requests`, `message_outbox` | Message manager | Issued grants, target-acceptance evidence and outgoing messages used to resume authorization maintenance. |
+
+The client checkpoints a step after its manager confirms completion. On retry,
+each manager reconciles its own effects before repeating work. For example, the
+device manager determines whether a saved publication matches the intended
+replacement and whether authorization is effective. Internal operation IDs are
+stored by the SDK; applications do not supply them.
+
+These records use the adapter's existing compare-and-commit contract. Wallet
+signing and network I/O stay outside transactions, and setup requires no separate
+schema migration. A settled signed request may have been rejected: successful
+setup additionally requires verified, effective authorization.
+
+Background contact maintenance reconstructs work from grants and outgoing
+messages. Each pass shares one lazy outbox scan and rechecks matching delivery
+records before reuse. Notification completion is tracked by device revision and
+reset when synchronization stops, so an older pass cannot suppress a newer
+notification.
+
+Reauthorizing a device does not restore messages or decryption keys from a lost
+installation.
+
 ## Read local snapshots
 
 Query methods such as `getMessageHistory`, `getConversations`, `getPosts`,
