@@ -69,7 +69,7 @@ sealed partial class ProfileManager
     }
 
     /// <summary>Awaits profile refresh, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
-    /// <inheritdoc cref="GetProfileAsync" path="param|returns|exception"/>
+    /// <inheritdoc cref="GetProfileAsync" path="/*[self::param or self::returns or self::exception]"/>
     public async Task<AccountProfile?> RefreshProfileAsync(string? accountId = null, CancellationToken cancellationToken = default)
     {
         EnsureInitialized(); using var operation = BeginOperation(ref cancellationToken);

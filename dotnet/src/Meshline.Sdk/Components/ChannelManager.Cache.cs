@@ -55,7 +55,7 @@ sealed partial class ChannelManager
     }
 
     /// <summary>Awaits channel descriptor refresh, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
-    /// <inheritdoc cref="GetChannelAsync" path="param|returns|exception"/>
+    /// <inheritdoc cref="GetChannelAsync" path="/*[self::param or self::returns or self::exception]"/>
     public async Task<ChannelInfo> RefreshChannelAsync(ChannelRef channel, CancellationToken cancellationToken = default)
     {
         EnsureInitialized(); using var operation = BeginOperation(ref cancellationToken);

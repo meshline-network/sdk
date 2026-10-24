@@ -89,7 +89,16 @@ function Get-ApiBaseMemberId([Reflection.MemberInfo]$Member) {
 }
 
 function Merge-ApiComments([Xml.XmlElement]$Target, [Xml.XmlElement]$Source, [string]$Path) {
-    $nodes = if ($Path) { $Source.SelectNodes($Path) } else { $Source.ChildNodes }
+    $nodes = $Source.ChildNodes
+    if ($Path) {
+        # Match Roslyn: evaluate against a standalone member document, with a
+        # leading slash selecting within its root rather than the package XML.
+        $document = [Xml.XmlDocument]::new()
+        [void]$document.AppendChild($document.ImportNode($Source, $true))
+        $xpath = if ($Path.StartsWith('/', [StringComparison]::Ordinal)) { '/*' + $Path } else { $Path }
+        $nodes = $document.SelectNodes($xpath)
+        if ($nodes.Count -eq 0) { throw "Inherited API path selects no content for $($Target.GetAttribute('name')): $Path" }
+    }
     foreach ($inherited in $nodes) {
         if ($inherited -isnot [Xml.XmlElement] -or $inherited.LocalName -ceq 'inheritdoc') { continue }
         $key = if ($inherited.HasAttribute('name')) { $inherited.GetAttribute('name') } else { $inherited.GetAttribute('cref') }

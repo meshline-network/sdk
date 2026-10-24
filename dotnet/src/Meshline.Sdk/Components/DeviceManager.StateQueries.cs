@@ -146,7 +146,7 @@ sealed partial class DeviceManager
     }
 
     /// <summary>Awaits device-state refresh, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
-    /// <inheritdoc cref="GetDeviceStateAsync(string, CancellationToken)" path="param|returns|exception"/>
+    /// <inheritdoc cref="GetDeviceStateAsync(string, CancellationToken)" path="/*[self::param or self::returns or self::exception]"/>
     public async Task<AccountDeviceState?> RefreshDeviceStateAsync(string? accountId = null, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();
@@ -155,7 +155,7 @@ sealed partial class DeviceManager
     }
 
     /// <summary>Awaits device-state refresh with the supplied grant, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
-    /// <inheritdoc cref="GetDeviceStateAsync(ContactGrant, CancellationToken)" path="param|returns|exception"/>
+    /// <inheritdoc cref="GetDeviceStateAsync(ContactGrant, CancellationToken)" path="/*[self::param or self::returns or self::exception]"/>
     public async Task<AccountDeviceState?> RefreshDeviceStateAsync(ContactGrant grant, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();
@@ -164,7 +164,7 @@ sealed partial class DeviceManager
     }
 
     /// <summary>Awaits device-state refresh with the supplied invitation, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
-    /// <inheritdoc cref="GetDeviceStateAsync(ContactInvite, CancellationToken)" path="param|returns|exception"/>
+    /// <inheritdoc cref="GetDeviceStateAsync(ContactInvite, CancellationToken)" path="/*[self::param or self::returns or self::exception]"/>
     public async Task<AccountDeviceState?> RefreshDeviceStateAsync(ContactInvite invite, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();

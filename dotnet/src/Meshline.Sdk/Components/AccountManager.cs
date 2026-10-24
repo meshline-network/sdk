@@ -110,7 +110,7 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
     /// Failures propagate to this caller and leave unexpired cached routes available to ordinary reads.
     /// A not-found result returns null without invalidating an unexpired signed route. Concurrent newer local publication takes precedence.
     /// </remarks>
-    /// <inheritdoc cref="GetRouteAsync" path="param|returns|exception"/>
+    /// <inheritdoc cref="GetRouteAsync" path="/*[self::param or self::returns or self::exception]"/>
     public Task<AccountRoute?> RefreshRouteAsync(string? accountId = null, CancellationToken cancellationToken = default) =>
         ReadRouteAsync(accountId ?? AccountId, forceRefresh: true, cancellationToken);
 
