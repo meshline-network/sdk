@@ -2,6 +2,7 @@ using Meshline.Components;
 using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Tests.Support;
+using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
@@ -118,16 +119,30 @@ public sealed class ResourceSyncTests
         await manager.LoadChannelHistoryAsync(channel, cancellationToken: Token);
         Assert.Equal(ResourceSyncState.Idle, (await manager.GetSyncStatusAsync(channel.ChannelId, Token)).State);
         await manager.FollowAsync(channel, Token);
+        var errors = new ConcurrentQueue<Exception>();
+        manager.BackgroundError += (_, error) => errors.Enqueue(error.Error);
         var fail = true;
         fixture.Relay.Handler = (request, _) => Task.FromResult(fail && request.Method == "channel.read" ? OfflineRelay.Error("forbidden") : host.Respond(request));
         await manager.StartAsync(Token);
-        await AsyncTest.UntilAsync(async () => (await manager.GetSyncStatusAsync(channel.ChannelId, Token)).State == ResourceSyncState.Blocked);
-        Assert.Equal(ResourceSyncBlockReason.Permission, (await manager.GetSyncStatusAsync(channel.ChannelId, Token)).BlockReason);
+        ResourceSyncStatus? blocked = null;
+        await AsyncTest.UntilAsync(async () => (blocked = await manager.GetSyncStatusAsync(channel.ChannelId, Token)).State == ResourceSyncState.Blocked);
+        Assert.NotNull(blocked);
+        Assert.Equal(ResourceSyncBlockReason.Permission, blocked.BlockReason);
+        Assert.NotNull(blocked.Error);
+        Assert.Null(blocked.LastSynchronizedAt);
         fail = false;
-        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(60));
-        await AsyncTest.UntilAsync(async () => (await manager.GetSyncStatusAsync(channel.ChannelId, Token)).State == ResourceSyncState.CaughtUp);
+        // Wake one polling pass without expiring concurrent 60-second request deadlines.
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(30));
+        ResourceSyncStatus? recovered = null;
+        await AsyncTest.UntilAsync(async () => (recovered = await manager.GetSyncStatusAsync(channel.ChannelId, Token)).State == ResourceSyncState.CaughtUp);
+        Assert.NotNull(recovered);
+        Assert.Null(recovered.BlockReason);
+        Assert.Null(recovered.Error);
+        Assert.NotNull(recovered.LastSynchronizedAt);
         await manager.StopAsync(Token);
         Assert.Equal(ResourceSyncState.Idle, (await manager.GetSyncStatusAsync(channel.ChannelId, Token)).State);
+        Assert.NotEmpty(errors);
+        Assert.All(errors, error => Assert.Equal("forbidden", Assert.IsType<RelayException>(error).Error.Code));
     }
 
 }
