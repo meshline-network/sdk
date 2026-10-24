@@ -1,6 +1,6 @@
 {
   "name": "@meshline/expo",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.5",
   "description": "Expo native adapters for the Meshline TypeScript SDK",
   "license": "MIT",
   "type": "module",
@@ -25,7 +25,7 @@
     }
   },
   "peerDependencies": {
-    "@meshline/sdk": "0.1.0-alpha.4",
+    "@meshline/sdk": "0.1.0-alpha.5",
     "expo": "57.0.25",
     "expo-crypto": "^57.0.3",
     "expo-file-system": "^57.0.7",
