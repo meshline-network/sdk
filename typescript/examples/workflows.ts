@@ -2,7 +2,22 @@ import type {
     AccountRecoveryOptions, BackgroundFailure, ChannelRef, ContactInvite, DeviceSelectionInfo,
     ConversationChange, GroupInvitation, GroupRef, MeshlineClient, QueryReader,
 } from '@meshline/sdk';
-import { AccountEstablishmentError } from '@meshline/sdk';
+import { AccountEstablishmentError, FieldUpdate } from '@meshline/sdk';
+
+/** Configure the application's callback only when creating a new device. */
+export async function establishPushEnabledAccount(client: MeshlineClient, pushGateway: string, signal?: AbortSignal) {
+    await client.establishAccount({ pushGateway }, signal);
+}
+
+/** Use an initialized, stopped client with an account signer. Resume setup if publication fails. */
+export async function renewDeviceWithGateway(client: MeshlineClient, pushGateway: FieldUpdate<string>, validitySeconds = 365 * 86400, signal?: AbortSignal) {
+    await client.deviceManager.renewDevice({ validitySeconds, pushGateway }, signal);
+    await client.establishAccount({}, signal);
+}
+
+export async function removePushGateway(client: MeshlineClient, signal?: AbortSignal) {
+    await renewDeviceWithGateway(client, FieldUpdate.delete, 365 * 86400, signal);
+}
 
 /** Explicit first use or reauthorization, after initialization. Ordinary launches can start directly. */
 export async function establishAndStart(client: MeshlineClient, relayId: string) {

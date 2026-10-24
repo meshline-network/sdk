@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { MeshlineClient, NetworkContext, RelayClientPool, accountPublicKey, concatBytes, decryptAes, encodeUtf8, encryptAes, getAccountId, signAccount, systemRandom, verifyDevice } from '@meshline/sdk';
+import { FieldUpdate, MeshlineClient, NetworkContext, RelayClientPool, accountPublicKey, certificateId, concatBytes, decryptAes, encodeUtf8, encryptAes, getAccountId, signAccount, systemRandom, verifyDevice } from '@meshline/sdk';
 import { NodeSqliteStore } from '@meshline/storage-node';
 import { IndexedDbStore } from '@meshline/storage-browser';
 import { createNodeRelayFetch, createNodeSocketFactory } from '@meshline/transport-node';
@@ -21,13 +21,24 @@ async function open() {
 }
 assert.equal(typeof IndexedDbStore, 'function');
 const first = await open(); let certificate;
-try { certificate = await first.client.deviceManager.createDevice(3600); assert.equal(first.client.deviceState, undefined); }
+const pushGateway = 'https://PUSH.example.com:443/callback?app=chat';
+try {
+    certificate = await first.client.deviceManager.createDevice({ validitySeconds: 3600, pushGateway });
+    assert.equal((await first.client.deviceManager.renewDevice(3600)).pushGateway, pushGateway);
+    assert.equal(first.client.deviceState, undefined);
+}
 finally { await first.dispose(); }
 const second = await open();
 try {
     const input = encodeUtf8('installed tarball restart test'); assert.deepEqual(second.client.device.signingPublicKey, certificate.signingPublicKey);
+    assert.equal(second.client.device.pushGateway, pushGateway);
     assert.equal(verifyDevice(input, await second.client.deviceManager.sign(input), certificate.signingPublicKey), true);
     const query = await second.client.getConversations(); try { assert.deepEqual(await query.readNext(10), []); } finally { await query.dispose(); }
     const rows = await second.store.read([{ collection: 'local_device', key: 'current' }]); assert.equal(typeof rows.sets[0][0].value.protectedSigningKey, 'string');
-} finally { await second.dispose(); key.fill(0); }
-console.log('Installed Node packages: exports, SQLite migration, protected device restart and conversation query passed.');
+    const removed = await second.client.deviceManager.renewDevice({ pushGateway: FieldUpdate.delete });
+    assert.equal(removed.pushGateway, undefined); assert.equal(certificateId(removed, context), certificateId(certificate, context));
+} finally { await second.dispose(); }
+const third = await open();
+try { assert.equal(third.client.device.pushGateway, undefined); assert.equal(certificateId(third.client.device, context), certificateId(certificate, context)); }
+finally { await third.dispose(); key.fill(0); }
+console.log('Installed Node packages: exports, SQLite migration, protected device restart, push gateway renewal/removal and conversation query passed.');

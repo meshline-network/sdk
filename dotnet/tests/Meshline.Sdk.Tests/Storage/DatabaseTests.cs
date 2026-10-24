@@ -96,6 +96,60 @@ public sealed class DatabaseTests
         Assert.Equal(upgraded.Database.GetMigrations(), await upgraded.Database.GetAppliedMigrationsAsync(token));
     }
 
+    [Fact]
+    public async Task Gateway_intent_migration_preserves_unfinished_setup_draft_and_publication()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = new TestDatabase();
+        Directory.CreateDirectory(Path.GetDirectoryName(database.Options.Path)!);
+        var operationId = Guid.NewGuid();
+        var draft = new DevicePreparationRecord
+        {
+            OperationId = operationId,
+            DraftCertificateJson = "retained-draft",
+            ProtectedSigningKey = [1, 2, 3],
+            ProtectedEncryptionKey = [4, 5, 6]
+        };
+        await using (var previous = new MeshlineDbContext(database.Options, SqliteOpenMode.ReadWriteCreate))
+        {
+            await previous.GetService<IMigrator>().MigrateAsync("20261022102400_ResumableAccountEstablishment", token);
+            await previous.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO AccountEstablishment (Id, RelayId, OperationId, Step, CertificateValiditySeconds, RouteValiditySeconds, IsInitialState, DeviceAuthorizationConfirmed) VALUES ({1}, {"relay"}, {operationId}, {0}, {86400}, {172800}, {true}, {false})", token);
+            previous.DevicePreparations.Add(draft);
+            previous.SignedRequests.Add(new SignedRequestRecord
+            {
+                Method = "device.state.publish",
+                RelayId = "relay",
+                DocumentJson = "exact-signed-publication",
+                Revision = 7,
+                Pending = true,
+                OperationKey = operationId.ToString("N")
+            });
+            await previous.SaveChangesAsync(token);
+        }
+
+        await MeshlineDatabase.MigrateAsync(database.Options, token);
+
+        await using var upgraded = database.Open();
+        var setup = await upgraded.AccountEstablishments.SingleAsync(token);
+        Assert.Equal(operationId, setup.OperationId);
+        Assert.Equal(86400, setup.CertificateValiditySeconds);
+        Assert.Equal(172800, setup.RouteValiditySeconds);
+        Assert.Null(setup.InitialPushGateway);
+        var retained = await upgraded.DevicePreparations.SingleAsync(token);
+        Assert.Equal(draft.OperationId, retained.OperationId);
+        Assert.Equal(draft.DraftCertificateJson, retained.DraftCertificateJson);
+        Assert.Equal(draft.ProtectedSigningKey, retained.ProtectedSigningKey);
+        Assert.Equal(draft.ProtectedEncryptionKey, retained.ProtectedEncryptionKey);
+        var publication = await upgraded.SignedRequests.SingleAsync(token);
+        Assert.Equal("exact-signed-publication", publication.DocumentJson);
+        Assert.Equal(operationId.ToString("N"), publication.OperationKey);
+        Assert.True(publication.Pending);
+        setup.InitialPushGateway = "https://push.example.com/callback";
+        await upgraded.SaveChangesAsync(token);
+        await using var reopened = database.Open();
+        Assert.Equal(setup.InitialPushGateway, (await reopened.AccountEstablishments.SingleAsync(token)).InitialPushGateway);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

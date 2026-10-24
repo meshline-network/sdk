@@ -1,0 +1,1413 @@
+{
+  "$type": "meshline.protocol.test-vectors",
+  "protocol_version": "1.0",
+  "network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+  "signing_algorithm": "ECDSA-P256-SHA256-RFC6979",
+  "keys": {
+    "certificate_account_private_key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+    "certificate_device_private_key": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A",
+    "relay_private_key": "gYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6A",
+    "relay_public_key": "A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U",
+    "relay_id": "0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6",
+    "recipient_account_public_key": "A71XFLnCBABBHx5R2_9jZH8F0dcLVfwgDGytEML0YU3B",
+    "recipient_device_identity": {
+      "$type": "meshline.device.identity",
+      "account": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z",
+      "signing_public_key": "C0eCPnEJXdWb54rCccV27zifh7ZFYasHz5pOvNAtIEE",
+      "encryption_public_key": "ZLEBsdC-WocEvQePmJUAH8A-jp-VIvGI3RKNmEbUhGY"
+    },
+    "recipient_device_id": "dev_pmSs6DDic6JCO-BHRIqhnw",
+    "group_identity": {
+      "$type": "meshline.group.identity",
+      "creator": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+      "nonce": "AAECAwQFBgcICQoLDA0ODw",
+      "relay_id": "0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6"
+    },
+    "group_id": "grp_-piQrubTOtDkXcaBycD1oA"
+  },
+  "device_certificates": [
+    {
+      "name": "without_gateway",
+      "object": {
+        "$type": "meshline.device.certificate",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk",
+        "not_before": 1729990000,
+        "expires_at": 1792198000,
+        "device_signature": "PGtQXsbhFoSpm6RRMis4NGdOpGQJJEqn4CxW9PsVpEjVi9v0CrOTtBZpl6MpZkCQg2Sb0hDvhyfNNbiRaqO0Bg",
+        "account_signature": "mo-mvcl2j1RwgZOYVYxao1W8xZhmFIGvX-8GVHkMJHJhlnQSqNaLnZSmEhavG2XlwcTS8jBSQJzb0TVXZZHjSg"
+      },
+      "device_identity": {
+        "$type": "meshline.device.identity",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk"
+      },
+      "device_id": "dev_nhv09l2lqfqD_WeF_UWsHg",
+      "device_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:volDvn4WAx1pkEdUt6kWTi4WDEFG7jlinnHBcsyLH5E"
+      },
+      "account_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"device_signature\":\"PGtQXsbhFoSpm6RRMis4NGdOpGQJJEqn4CxW9PsVpEjVi9v0CrOTtBZpl6MpZkCQg2Sb0hDvhyfNNbiRaqO0Bg\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226465766963655f7369676e6174757265223a225047745158736268466f53706d3652524d6973344e47644f7047514a4a45716e344378573950735670456a566939763043724f5474425a706c364d705a6b435167325362306844766879664e4e62695261714f304267222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:8bypCbZ8mEz-79SLxr7pGnNwfmXP1RA7MzMgaaVYWAI"
+      }
+    },
+    {
+      "name": "with_gateway",
+      "object": {
+        "$type": "meshline.device.certificate",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk",
+        "not_before": 1729990000,
+        "expires_at": 1792198000,
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "device_signature": "HH_lwreyHUjWYbUjGt1iT09_tuJTwPu8W7wWc7XMz6R4Ud1rLW9cIn_-P1_fhDNbyfBhPuSvwrc4nMQJZkQjAg",
+        "account_signature": "0Xj519WdhQwU9uMD_Gq6NIzTfDWImWQ6WeemOtDYwJCqU2XUb3tPPGv-lT9hVen4hnqoQ1AHk5gNdgH77XO2dw"
+      },
+      "device_identity": {
+        "$type": "meshline.device.identity",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk"
+      },
+      "device_id": "dev_nhv09l2lqfqD_WeF_UWsHg",
+      "device_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:7YpK6EX7_SxrRNeTpNZVyWtEkhU03XCnMsz_fJv3Byc"
+      },
+      "account_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"device_signature\":\"HH_lwreyHUjWYbUjGt1iT09_tuJTwPu8W7wWc7XMz6R4Ud1rLW9cIn_-P1_fhDNbyfBhPuSvwrc4nMQJZkQjAg\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226465766963655f7369676e6174757265223a2248485f6c7772657948556a575962556a477431695430395f74754a5477507538573777576337584d7a365234556431724c573963496e5f2d50315f6668444e627966426850755376777263346e4d514a5a6b516a4167222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:l0SietfYbnPBMV-QtO_elxNE5tP4l_XDQ3DY-l8IfMI"
+      }
+    },
+    {
+      "name": "changed_gateway",
+      "object": {
+        "$type": "meshline.device.certificate",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk",
+        "not_before": 1729990000,
+        "expires_at": 1792198000,
+        "push_gateway": "https://push-next.example.com/api/push/notifications",
+        "device_signature": "ByfL3aFfaD-AgeEsC9nl_LgcbNjkAOP4XD0hlwH8UvZ8gdFPXC7EcdU00nOba01i7oZ5itqQY0vxRRjf2vDtCQ",
+        "account_signature": "qFyeWDLeYWY4cjNjaPWiw0UuV2unb83Lf61oZ8xOIcnJUf435fJBas_mZuOsM7Wr38HAR_0ghk0VZWJNefzkCw"
+      },
+      "device_identity": {
+        "$type": "meshline.device.identity",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk"
+      },
+      "device_id": "dev_nhv09l2lqfqD_WeF_UWsHg",
+      "device_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"push_gateway\":\"https://push-next.example.com/api/push/notifications\",\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c22707573685f67617465776179223a2268747470733a2f2f707573682d6e6578742e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:eRvM9cEE4Tv9HRi7M6BtYJKGO716wXix0BqlV5zy3P8"
+      },
+      "account_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"device_signature\":\"ByfL3aFfaD-AgeEsC9nl_LgcbNjkAOP4XD0hlwH8UvZ8gdFPXC7EcdU00nOba01i7oZ5itqQY0vxRRjf2vDtCQ\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"expires_at\":1792198000,\"not_before\":1729990000,\"push_gateway\":\"https://push-next.example.com/api/push/notifications\",\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226465766963655f7369676e6174757265223a224279664c3361466661442d416765457343396e6c5f4c6763624e6a6b414f5034584430686c77483855765a38676446505843374563645530306e4f6261303169376f5a35697471515930767852526a66327644744351222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c22707573685f67617465776179223a2268747470733a2f2f707573682d6e6578742e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:4pFQtO0SATKcyR-IJI50UaUw-WLeF3WYkcqkU9SeXiw"
+      }
+    },
+    {
+      "name": "with_signed_extension",
+      "object": {
+        "$type": "meshline.device.certificate",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "account_public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk",
+        "not_before": 1729990000,
+        "expires_at": 1792198000,
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "example_extension": {
+          "label": "通知",
+          "flags": [
+            true,
+            false
+          ]
+        },
+        "device_signature": "_hfmG9UUqMZ7l9snG3yjhFLcAbBo9Z19NjeSXW1BimLlFjVRiNeE2r2Ub-s53TPKwBxu9KnQdd1TEV1Ta7wZAw",
+        "account_signature": "plmhqDFZm-W9Lx6CrcqMcYND2H9O0oOX5JirYd4GvZRM9rtGdYUvtjRoxCinvXRnMta8-cDE702IN6YDOEfYog"
+      },
+      "device_identity": {
+        "$type": "meshline.device.identity",
+        "account": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "signing_public_key": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc",
+        "encryption_public_key": "JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk"
+      },
+      "device_id": "dev_nhv09l2lqfqD_WeF_UWsHg",
+      "device_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"example_extension\":{\"flags\":[true,false],\"label\":\"通知\"},\"expires_at\":1792198000,\"not_before\":1729990000,\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c226578616d706c655f657874656e73696f6e223a7b22666c616773223a5b747275652c66616c73655d2c226c6162656c223a22e9809ae79fa5227d2c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:R_mHGS1MhrCguJdoXIY4pUG1EAPy4Q11feOLP0uW8C4"
+      },
+      "account_signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.device.certificate\",\"account\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"account_public_key\":\"AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf\",\"device_signature\":\"_hfmG9UUqMZ7l9snG3yjhFLcAbBo9Z19NjeSXW1BimLlFjVRiNeE2r2Ub-s53TPKwBxu9KnQdd1TEV1Ta7wZAw\",\"encryption_public_key\":\"JE_juWPomd0pW6_84kjTUw86mnR5ugYwAmgOv-etrUk\",\"example_extension\":{\"flags\":[true,false],\"label\":\"通知\"},\"expires_at\":1792198000,\"not_before\":1729990000,\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"signing_public_key\":\"rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6465766963652e6365727469666963617465222c226163636f756e74223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226163636f756e745f7075626c69635f6b6579223a22416c46635057363534356135424e502d796e39555f63304d77656d58767a6464796c4661304b624474414e66222c226465766963655f7369676e6174757265223a225f68666d47395555714d5a376c39736e4733796a68464c634162426f395a31394e6a655358573142696d4c6c466a5652694e654532723255622d73353354504b77427875394b6e5164643154455631546137775a4177222c22656e6372797074696f6e5f7075626c69635f6b6579223a224a455f6a7557506f6d64307057365f38346b6a54557738366d6e523575675977416d674f762d657472556b222c226578616d706c655f657874656e73696f6e223a7b22666c616773223a5b747275652c66616c73655d2c226c6162656c223a22e9809ae79fa5227d2c22657870697265735f6174223a313739323139383030302c226e6f745f6265666f7265223a313732393939303030302c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c227369676e696e675f7075626c69635f6b6579223a2272634641456667744846625a567170506e58505968594e6870675945685358673049786a6a636464324d63227d",
+        "sha256": "sha256:9cLmO86kA9mIQudlik5lTd00NzewOsFlDlvZjWPb-q8"
+      }
+    }
+  ],
+  "certificate_tampering": [
+    {
+      "name": "changed_gateway_without_resigning",
+      "certificate_ref": "/device_certificates/1/object",
+      "set": {
+        "push_gateway": "https://push-next.example.com/api/push/notifications"
+      },
+      "remove": [],
+      "expected_device_signature_valid": false,
+      "expected_account_signature_valid": false
+    },
+    {
+      "name": "removed_gateway_without_resigning",
+      "certificate_ref": "/device_certificates/1/object",
+      "set": {},
+      "remove": [
+        "push_gateway"
+      ],
+      "expected_device_signature_valid": false,
+      "expected_account_signature_valid": false
+    },
+    {
+      "name": "added_gateway_without_resigning",
+      "certificate_ref": "/device_certificates/0/object",
+      "set": {
+        "push_gateway": "https://push.example.com/api/push/notifications"
+      },
+      "remove": [],
+      "expected_device_signature_valid": false,
+      "expected_account_signature_valid": false
+    },
+    {
+      "name": "removed_unknown_signed_field",
+      "certificate_ref": "/device_certificates/3/object",
+      "set": {},
+      "remove": [
+        "example_extension"
+      ],
+      "expected_device_signature_valid": false,
+      "expected_account_signature_valid": false
+    }
+  ],
+  "notifications": [
+    {
+      "name": "direct",
+      "object": {
+        "$type": "meshline.push.notification",
+        "network": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "relay_id": "0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6",
+        "public_key": "A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U",
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "issued_at": 1730000010,
+        "message_type": "meshline.message.envelope",
+        "to": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z",
+        "to_device_id": "dev_pmSs6DDic6JCO-BHRIqhnw",
+        "message_id": "msg_AAECAwQFBgcICQoLDA0ODw",
+        "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "accepted_at": 1730000005,
+        "sequence": 7,
+        "sender_nickname": "Alice 通知",
+        "relay_signature": "ZsoxG5t8bnGAMvoXgWJPHFe3DO12PXQ9ABjY1Gi5g3LbUtVB2xJyzNUYJCxhoCLXoenrKJiwL59oOkUyyybuyw"
+      },
+      "signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.push.notification\",\"accepted_at\":1730000005,\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"issued_at\":1730000010,\"message_id\":\"msg_AAECAwQFBgcICQoLDA0ODw\",\"message_type\":\"meshline.message.envelope\",\"network\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"public_key\":\"A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U\",\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"relay_id\":\"0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6\",\"sender_nickname\":\"Alice 通知\",\"sequence\":7,\"to\":\"neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z\",\"to_device_id\":\"dev_pmSs6DDic6JCO-BHRIqhnw\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e707573682e6e6f74696669636174696f6e222c2261636365707465645f6174223a313733303030303030352c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226973737565645f6174223a313733303030303031302c226d6573736167655f6964223a226d73675f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f74797065223a226d6573686c696e652e6d6573736167652e656e76656c6f7065222c226e6574776f726b223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c227075626c69635f6b6579223a22412d79326f76687365435875636441697770756669714e5a6356494f775f6c7a6d46566a5632587130623055222c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c2272656c61795f6964223a22307863366139353261653066383739326432353137623166306561633733623266383232623037336636222c2273656e6465725f6e69636b6e616d65223a22416c69636520e9809ae79fa5222c2273657175656e6365223a372c22746f223a226e656f3a3836303833333130323a4e59727172436f5672466450674e664a50346d353368755742594547674e4d50355a222c22746f5f6465766963655f6964223a226465765f706d53733644446963364a434f2d4248524971686e77227d",
+        "sha256": "sha256:MHaeMmCvTGpyZncSCtYr1aW7t0adnvmJ_xfH3B6TzrI"
+      },
+      "request_utf8_bytes": 732
+    },
+    {
+      "name": "group",
+      "object": {
+        "$type": "meshline.push.notification",
+        "network": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "relay_id": "0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6",
+        "public_key": "A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U",
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "issued_at": 1730000010,
+        "message_type": "meshline.group.message",
+        "to": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z",
+        "to_device_id": "dev_pmSs6DDic6JCO-BHRIqhnw",
+        "message_id": "msg_EBESExQVFhcYGRobHB0eHw",
+        "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "accepted_at": 1730000005,
+        "sequence": 12,
+        "sender_nickname": "Alice 通知",
+        "subject_id": "grp_-piQrubTOtDkXcaBycD1oA",
+        "subject_name": "Meshline 讨论组",
+        "relay_signature": "KjZGqofPqggNBIxM3B3hCLoRoPDbW7Bny8wWUd0ymUJm6RFdDyETuqFuBjxJvNEvNselp6cIRtVT_avP91dRJg"
+      },
+      "signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.push.notification\",\"accepted_at\":1730000005,\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"issued_at\":1730000010,\"message_id\":\"msg_EBESExQVFhcYGRobHB0eHw\",\"message_type\":\"meshline.group.message\",\"network\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"public_key\":\"A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U\",\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"relay_id\":\"0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6\",\"sender_nickname\":\"Alice 通知\",\"sequence\":12,\"subject_id\":\"grp_-piQrubTOtDkXcaBycD1oA\",\"subject_name\":\"Meshline 讨论组\",\"to\":\"neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z\",\"to_device_id\":\"dev_pmSs6DDic6JCO-BHRIqhnw\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e707573682e6e6f74696669636174696f6e222c2261636365707465645f6174223a313733303030303030352c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226973737565645f6174223a313733303030303031302c226d6573736167655f6964223a226d73675f45424553457851564668635947526f62484230654877222c226d6573736167655f74797065223a226d6573686c696e652e67726f75702e6d657373616765222c226e6574776f726b223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c227075626c69635f6b6579223a22412d79326f76687365435875636441697770756669714e5a6356494f775f6c7a6d46566a5632587130623055222c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c2272656c61795f6964223a22307863366139353261653066383739326432353137623166306561633733623266383232623037336636222c2273656e6465725f6e69636b6e616d65223a22416c69636520e9809ae79fa5222c2273657175656e6365223a31322c227375626a6563745f6964223a226772705f2d706951727562544f74446b58636142796344316f41222c227375626a6563745f6e616d65223a224d6573686c696e6520e8aea8e8aebae7bb84222c22746f223a226e656f3a3836303833333130323a4e59727172436f5672466450674e664a50346d353368755742594547674e4d50355a222c22746f5f6465766963655f6964223a226465765f706d53733644446963364a434f2d4248524971686e77227d",
+        "sha256": "sha256:v9nCKu9mXa8foIkqUWhuvEQW5Ta64ArMBRvaVdFtpwI"
+      },
+      "request_utf8_bytes": 808
+    },
+    {
+      "name": "direct_with_signed_extension",
+      "object": {
+        "$type": "meshline.push.notification",
+        "network": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "relay_id": "0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6",
+        "public_key": "A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U",
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "issued_at": 1730000010,
+        "message_type": "meshline.message.envelope",
+        "to": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z",
+        "to_device_id": "dev_pmSs6DDic6JCO-BHRIqhnw",
+        "message_id": "msg_AAECAwQFBgcICQoLDA0ODw",
+        "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "accepted_at": 1730000005,
+        "sequence": 7,
+        "sender_nickname": "Alice 通知",
+        "example_extension": {
+          "label": "通知",
+          "count": 2
+        },
+        "relay_signature": "Npqwzy0lwnzocpeBeSEUl6BVe2-ErL6C-lWRW0JWWGLKJMsOZmB1JjRsKNrFr-rogJMlJyPAA7uL2zNtYLQTQw"
+      },
+      "signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.push.notification\",\"accepted_at\":1730000005,\"example_extension\":{\"count\":2,\"label\":\"通知\"},\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"issued_at\":1730000010,\"message_id\":\"msg_AAECAwQFBgcICQoLDA0ODw\",\"message_type\":\"meshline.message.envelope\",\"network\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"public_key\":\"A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U\",\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"relay_id\":\"0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6\",\"sender_nickname\":\"Alice 通知\",\"sequence\":7,\"to\":\"neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z\",\"to_device_id\":\"dev_pmSs6DDic6JCO-BHRIqhnw\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e707573682e6e6f74696669636174696f6e222c2261636365707465645f6174223a313733303030303030352c226578616d706c655f657874656e73696f6e223a7b22636f756e74223a322c226c6162656c223a22e9809ae79fa5227d2c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226973737565645f6174223a313733303030303031302c226d6573736167655f6964223a226d73675f41414543417751464267634943516f4c4441304f4477222c226d6573736167655f74797065223a226d6573686c696e652e6d6573736167652e656e76656c6f7065222c226e6574776f726b223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c227075626c69635f6b6579223a22412d79326f76687365435875636441697770756669714e5a6356494f775f6c7a6d46566a5632587130623055222c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c2272656c61795f6964223a22307863366139353261653066383739326432353137623166306561633733623266383232623037336636222c2273656e6465725f6e69636b6e616d65223a22416c69636520e9809ae79fa5222c2273657175656e6365223a372c22746f223a226e656f3a3836303833333130323a4e59727172436f5672466450674e664a50346d353368755742594547674e4d50355a222c22746f5f6465766963655f6964223a226465765f706d53733644446963364a434f2d4248524971686e77227d",
+        "sha256": "sha256:DnPDO-tHGc8TYfNBYJZaZI5x3P5Qq_q_0-LRRB13CwM"
+      },
+      "request_utf8_bytes": 781
+    },
+    {
+      "name": "unrecognized_message_type",
+      "object": {
+        "$type": "meshline.push.notification",
+        "network": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "relay_id": "0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6",
+        "public_key": "A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U",
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "issued_at": 1730000010,
+        "message_type": "example.message.custom",
+        "to": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z",
+        "to_device_id": "dev_pmSs6DDic6JCO-BHRIqhnw",
+        "message_id": "msg_ICEiIyQlJicoKSorLC0uLw",
+        "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "accepted_at": 1730000005,
+        "sequence": 7,
+        "sender_nickname": "Alice 通知",
+        "subject_id": "example-subject-1",
+        "subject_name": "示例对象",
+        "relay_signature": "xx0VnevK2xTv09Y5Y9WagXKmSZjjRcWrbjau9DlE1MghowQ2euglmCLD5KCAFshy16wLse4aIW749hur1O_iEA"
+      },
+      "signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.push.notification\",\"accepted_at\":1730000005,\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"issued_at\":1730000010,\"message_id\":\"msg_ICEiIyQlJicoKSorLC0uLw\",\"message_type\":\"example.message.custom\",\"network\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"public_key\":\"A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U\",\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"relay_id\":\"0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6\",\"sender_nickname\":\"Alice 通知\",\"sequence\":7,\"subject_id\":\"example-subject-1\",\"subject_name\":\"示例对象\",\"to\":\"neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z\",\"to_device_id\":\"dev_pmSs6DDic6JCO-BHRIqhnw\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e707573682e6e6f74696669636174696f6e222c2261636365707465645f6174223a313733303030303030352c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226973737565645f6174223a313733303030303031302c226d6573736167655f6964223a226d73675f494345694979516c4a69636f4b536f724c4330754c77222c226d6573736167655f74797065223a226578616d706c652e6d6573736167652e637573746f6d222c226e6574776f726b223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c227075626c69635f6b6579223a22412d79326f76687365435875636441697770756669714e5a6356494f775f6c7a6d46566a5632587130623055222c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c2272656c61795f6964223a22307863366139353261653066383739326432353137623166306561633733623266383232623037336636222c2273656e6465725f6e69636b6e616d65223a22416c69636520e9809ae79fa5222c2273657175656e6365223a372c227375626a6563745f6964223a226578616d706c652d7375626a6563742d31222c227375626a6563745f6e616d65223a22e7a4bae4be8be5afb9e8b1a1222c22746f223a226e656f3a3836303833333130323a4e59727172436f5672466450674e664a50346d353368755742594547674e4d50355a222c22746f5f6465766963655f6964223a226465765f706d53733644446963364a434f2d4248524971686e77227d",
+        "sha256": "sha256:86Xj6-5enOTnaesoAcLVzAnvvQgXi9JF0hJff6ZTcZQ"
+      },
+      "request_utf8_bytes": 792
+    },
+    {
+      "name": "group_without_optional_metadata",
+      "object": {
+        "$type": "meshline.push.notification",
+        "network": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+        "relay_id": "0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6",
+        "public_key": "A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U",
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "issued_at": 1730000010,
+        "message_type": "meshline.group.message",
+        "to": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z",
+        "to_device_id": "dev_pmSs6DDic6JCO-BHRIqhnw",
+        "message_id": "msg_EBESExQVFhcYGRobHB0eHw",
+        "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+        "accepted_at": 1730000005,
+        "sequence": 12,
+        "sender_nickname": "Alice 通知",
+        "relay_signature": "ocQaYiz4kGdyUeMrL7gCp-4rHgz2AznRB6paFQSvyjktF7had1pOZkTMtLC1QAO1Iuo-UyzK-6ZOxt2JBahdaw"
+      },
+      "signing_input": {
+        "canonical_json": "{\"$context\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"$type\":\"meshline.push.notification\",\"accepted_at\":1730000005,\"from\":\"neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp\",\"issued_at\":1730000010,\"message_id\":\"msg_EBESExQVFhcYGRobHB0eHw\",\"message_type\":\"meshline.group.message\",\"network\":\"neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70\",\"public_key\":\"A-y2ovhseCXucdAiwpufiqNZcVIOw_lzmFVjV2Xq0b0U\",\"push_gateway\":\"https://push.example.com/api/push/notifications\",\"relay_id\":\"0xc6a952ae0f8792d2517b1f0eac73b2f822b073f6\",\"sender_nickname\":\"Alice 通知\",\"sequence\":12,\"to\":\"neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z\",\"to_device_id\":\"dev_pmSs6DDic6JCO-BHRIqhnw\"}",
+        "utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e707573682e6e6f74696669636174696f6e222c2261636365707465645f6174223a313733303030303030352c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c226973737565645f6174223a313733303030303031302c226d6573736167655f6964223a226d73675f45424553457851564668635947526f62484230654877222c226d6573736167655f74797065223a226d6573686c696e652e67726f75702e6d657373616765222c226e6574776f726b223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c227075626c69635f6b6579223a22412d79326f76687365435875636441697770756669714e5a6356494f775f6c7a6d46566a5632587130623055222c22707573685f67617465776179223a2268747470733a2f2f707573682e6578616d706c652e636f6d2f6170692f707573682f6e6f74696669636174696f6e73222c2272656c61795f6964223a22307863366139353261653066383739326432353137623166306561633733623266383232623037336636222c2273656e6465725f6e69636b6e616d65223a22416c69636520e9809ae79fa5222c2273657175656e6365223a31322c22746f223a226e656f3a3836303833333130323a4e59727172436f5672466450674e664a50346d353368755742594547674e4d50355a222c22746f5f6465766963655f6964223a226465765f706d53733644446963364a434f2d4248524971686e77227d",
+        "sha256": "sha256:k_zctUgw8g01P9ZKYyp-uJMZL7LjH1dlvHyD4e7cVQw"
+      },
+      "request_utf8_bytes": 730
+    }
+  ],
+  "deduplication_keys": [
+    {
+      "name": "gateway_does_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "push_gateway": "https://push-next.example.com/api/push/notifications"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "relay_does_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "relay_id": "0x321344861b95ee75470a09a4f20c0c1dc6f0c1e2",
+        "public_key": "AlFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANf"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "time_and_sequence_do_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "issued_at": 1730000090,
+        "accepted_at": 1730000020,
+        "sequence": 900
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "display_does_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "sender_nickname": "新昵称"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "extension_does_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "example_extension": {
+          "a": 1
+        }
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "missing_nickname_does_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {},
+      "remove": [
+        "sender_nickname"
+      ],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "recipient_device_changes_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "to_device_id": "dev_nhv09l2lqfqD_WeF_UWsHg"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": false
+    },
+    {
+      "name": "recipient_account_changes_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "to": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": false
+    },
+    {
+      "name": "sender_account_changes_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "from": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": false
+    },
+    {
+      "name": "message_changes_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "message_id": "msg_AQEBAQEBAQEBAQEBAQEBAQ"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": false
+    },
+    {
+      "name": "message_type_and_subject_do_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "message_type": "meshline.group.message",
+        "subject_id": "grp_-piQrubTOtDkXcaBycD1oA"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "subject_id_does_not_change_key",
+      "notification_ref": "/notifications/1/object",
+      "set": {
+        "subject_id": "grp_AQEBAQEBAQEBAQEBAQEBAQ"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "subject_name_does_not_change_key",
+      "notification_ref": "/notifications/1/object",
+      "set": {
+        "subject_name": "另一个群名"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    },
+    {
+      "name": "registry_changes_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {},
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x6979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": false
+    },
+    {
+      "name": "network_magic_changes_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {},
+      "remove": [],
+      "candidate_network_context": "neo:894710606:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": false
+    },
+    {
+      "name": "unrecognized_message_type_does_not_change_key",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "message_type": "example.message.custom"
+      },
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x5979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_same_key": true
+    }
+  ],
+  "signature_tampering": [
+    {
+      "name": "gateway",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "push_gateway": "https://push-next.example.com/api/push/notifications"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "gateway_query",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "push_gateway": "https://push.example.com/api/push/notifications?app=meshline"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "recipient",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "to_device_id": "dev_nhv09l2lqfqD_WeF_UWsHg"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "sender",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "from": "neo:860833102:NYrqrCoVrFdPgNfJP4m53huWBYEGgNMP5Z"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "message",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "message_id": "msg_AQEBAQEBAQEBAQEBAQEBAQ"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "sequence",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "sequence": 8
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "issued_at",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "issued_at": 1730000011
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "accepted_at",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "accepted_at": 1730000006
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "nickname",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "sender_nickname": "篡改"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "unknown_field",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "unexpected": true
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "network_field",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "network": "neo:860833102:0x6979ba79431672a38a18a32cdc48fd7317818b70"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "relay_identity",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "relay_id": "0x321344861b95ee75470a09a4f20c0c1dc6f0c1e2"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "removed_signed_extension",
+      "notification_ref": "/notifications/2/object",
+      "set": {},
+      "remove": [
+        "example_extension"
+      ],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "changed_subject_id",
+      "notification_ref": "/notifications/1/object",
+      "set": {
+        "subject_id": "grp_AQEBAQEBAQEBAQEBAQEBAQ"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    },
+    {
+      "name": "changed_expected_registry",
+      "notification_ref": "/notifications/0/object",
+      "set": {},
+      "remove": [],
+      "candidate_network_context": "neo:860833102:0x6979ba79431672a38a18a32cdc48fd7317818b70",
+      "expected_signature_valid": false
+    },
+    {
+      "name": "message_type",
+      "notification_ref": "/notifications/0/object",
+      "set": {
+        "message_type": "example.message.custom"
+      },
+      "remove": [],
+      "expected_signature_valid": false
+    }
+  ],
+  "gateway_urls": [
+    {
+      "name": "full_callback",
+      "value": "https://push.example.com/api/push/notifications",
+      "expected_format_valid": true
+    },
+    {
+      "name": "nondefault_port",
+      "value": "https://push.example.com:8443/callback",
+      "expected_format_valid": true
+    },
+    {
+      "name": "512_bytes",
+      "value": "https://push.example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_format_valid": true
+    },
+    {
+      "name": "513_bytes",
+      "value": "https://push.example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_format_valid": false
+    },
+    {
+      "name": "empty",
+      "value": "",
+      "expected_format_valid": false
+    },
+    {
+      "name": "null",
+      "value": null,
+      "expected_format_valid": false
+    },
+    {
+      "name": "http",
+      "value": "http://push.example.com/callback",
+      "expected_format_valid": false
+    },
+    {
+      "name": "relative",
+      "value": "/callback",
+      "expected_format_valid": false
+    },
+    {
+      "name": "missing_host",
+      "value": "https:///callback",
+      "expected_format_valid": false
+    },
+    {
+      "name": "userinfo",
+      "value": "https://user@push.example.com/callback",
+      "expected_format_valid": false
+    },
+    {
+      "name": "query",
+      "value": "https://push.example.com/api/push/notifications?app=meshline&route=chat",
+      "expected_format_valid": true
+    },
+    {
+      "name": "empty_query",
+      "value": "https://push.example.com/api/push/notifications?",
+      "expected_format_valid": true
+    },
+    {
+      "name": "query_without_path",
+      "value": "https://push.example.com?route=chat@meshline",
+      "expected_format_valid": true
+    },
+    {
+      "name": "fragment",
+      "value": "https://push.example.com/api/push/notifications#part",
+      "expected_format_valid": false
+    },
+    {
+      "name": "empty_fragment",
+      "value": "https://push.example.com/api/push/notifications#",
+      "expected_format_valid": false
+    },
+    {
+      "name": "whitespace",
+      "value": "https://push.example.com/api/push/notifications ",
+      "expected_format_valid": false
+    },
+    {
+      "name": "backslash",
+      "value": "https://push.example.com\\callback",
+      "expected_format_valid": false
+    },
+    {
+      "name": "private_ip_is_syntactically_valid",
+      "value": "https://127.0.0.1/callback",
+      "expected_format_valid": true
+    }
+  ],
+  "gateway_confirmation": {
+    "requests": [
+      {
+        "name": "complete_endpoint",
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "expected_request": {
+          "method": "OPTIONS",
+          "url": "https://push.example.com/api/push/notifications",
+          "body_utf8_bytes": 0
+        }
+      },
+      {
+        "name": "query_preserved",
+        "push_gateway": "https://push.example.com/api/push/notifications?app=meshline&route=a%2Fb",
+        "expected_request": {
+          "method": "OPTIONS",
+          "url": "https://push.example.com/api/push/notifications?app=meshline&route=a%2Fb",
+          "body_utf8_bytes": 0
+        }
+      }
+    ],
+    "responses": [
+      {
+        "name": "supported",
+        "response": {
+          "http_status": 204,
+          "headers": {
+            "Meshline-Push": "push.notify.v1"
+          }
+        },
+        "expected_confirmed": true
+      },
+      {
+        "name": "header_name_case_insensitive",
+        "response": {
+          "http_status": 204,
+          "headers": {
+            "meshline-push": "push.notify.v1"
+          }
+        },
+        "expected_confirmed": true
+      },
+      {
+        "name": "missing_marker",
+        "response": {
+          "http_status": 204,
+          "headers": {
+            "Allow": "OPTIONS, POST"
+          }
+        },
+        "expected_confirmed": false
+      },
+      {
+        "name": "empty_marker",
+        "response": {
+          "http_status": 204,
+          "headers": {
+            "Meshline-Push": ""
+          }
+        },
+        "expected_confirmed": false
+      },
+      {
+        "name": "unsupported_capability",
+        "response": {
+          "http_status": 204,
+          "headers": {
+            "Meshline-Push": "push.notify.v2"
+          }
+        },
+        "expected_confirmed": false
+      },
+      {
+        "name": "marker_value_case_sensitive",
+        "response": {
+          "http_status": 204,
+          "headers": {
+            "Meshline-Push": "PUSH.NOTIFY.V1"
+          }
+        },
+        "expected_confirmed": false
+      },
+      {
+        "name": "marker_is_not_a_list",
+        "response": {
+          "http_status": 204,
+          "headers": {
+            "Meshline-Push": "push.notify.v1, push.notify.v2"
+          }
+        },
+        "expected_confirmed": false
+      },
+      {
+        "name": "wrong_success_status",
+        "response": {
+          "http_status": 200,
+          "headers": {
+            "Meshline-Push": "push.notify.v1"
+          }
+        },
+        "expected_confirmed": false
+      },
+      {
+        "name": "redirect_not_followed",
+        "response": {
+          "http_status": 302,
+          "headers": {
+            "Meshline-Push": "push.notify.v1",
+            "Location": "https://push-next.example.com/api/push/notifications"
+          }
+        },
+        "expected_confirmed": false,
+        "expected_follow_redirect": false
+      },
+      {
+        "name": "error_with_marker",
+        "response": {
+          "http_status": 503,
+          "headers": {
+            "Meshline-Push": "push.notify.v1"
+          }
+        },
+        "expected_confirmed": false
+      },
+      {
+        "name": "no_response",
+        "response": null,
+        "expected_confirmed": false
+      },
+      {
+        "name": "ordinary_web_page",
+        "response": {
+          "http_status": 200,
+          "headers": {
+            "Content-Type": "text/html"
+          },
+          "body": "<!doctype html><title>Example</title>"
+        },
+        "expected_confirmed": false
+      }
+    ],
+    "bindings": [
+      {
+        "name": "not_confirmed",
+        "confirmed_url": null,
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "expected_applies": false
+      },
+      {
+        "name": "same_complete_url",
+        "confirmed_url": "https://push.example.com/api/push/notifications",
+        "push_gateway": "https://push.example.com/api/push/notifications",
+        "expected_applies": true
+      },
+      {
+        "name": "host_changed",
+        "confirmed_url": "https://push.example.com/api/push/notifications",
+        "push_gateway": "https://push-next.example.com/api/push/notifications",
+        "expected_applies": false
+      },
+      {
+        "name": "path_changed",
+        "confirmed_url": "https://push.example.com/api/push/notifications",
+        "push_gateway": "https://push.example.com/other/notifications",
+        "expected_applies": false
+      },
+      {
+        "name": "query_changed",
+        "confirmed_url": "https://push.example.com/api/push/notifications",
+        "push_gateway": "https://push.example.com/api/push/notifications?app=meshline&route=a%2Fb",
+        "expected_applies": false
+      },
+      {
+        "name": "equivalent_host_case_is_not_identical",
+        "confirmed_url": "https://push.example.com/api/push/notifications",
+        "push_gateway": "https://PUSH.example.com/api/push/notifications",
+        "expected_applies": false
+      }
+    ]
+  },
+  "device_status": [
+    {
+      "name": "active_with_gateway",
+      "certificate_ref": "/device_certificates/1/object",
+      "active": true,
+      "expected": {
+        "status": "active",
+        "expires_at": 1792198000
+      }
+    },
+    {
+      "name": "active_after_gateway_change",
+      "certificate_ref": "/device_certificates/2/object",
+      "active": true,
+      "expected": {
+        "status": "active",
+        "expires_at": 1792198000
+      }
+    },
+    {
+      "name": "active_without_gateway",
+      "certificate_ref": "/device_certificates/0/object",
+      "active": true,
+      "expected": {
+        "status": "active",
+        "expires_at": 1792198000
+      }
+    },
+    {
+      "name": "inactive_omits_expiry",
+      "certificate_ref": "/device_certificates/1/object",
+      "active": false,
+      "expected": {
+        "status": "inactive"
+      }
+    }
+  ],
+  "gateway_state": [
+    {
+      "name": "adopting_certificate_sets_address",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        }
+      ]
+    },
+    {
+      "name": "adopting_certificate_updates_address",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "authorization_checked",
+          "status": "active",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/2/object",
+          "expected_gateway": "https://push-next.example.com/api/push/notifications"
+        }
+      ]
+    },
+    {
+      "name": "adopting_certificate_without_gateway_clears_address",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/0/object",
+          "expected_gateway": null
+        }
+      ]
+    },
+    {
+      "name": "failed_authentication_preserves_address",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "device_authentication_failed",
+          "certificate_ref": "/device_certificates/2/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "device_authentication_failed",
+          "certificate_ref": "/device_certificates/0/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        }
+      ]
+    },
+    {
+      "name": "failed_authentication_with_inactive_authorization",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "authorization_checked",
+          "status": "inactive",
+          "expected_gateway": null
+        },
+        {
+          "event": "device_authentication_failed",
+          "certificate_ref": "/device_certificates/2/object",
+          "expected_gateway": null
+        },
+        {
+          "event": "authorization_checked",
+          "status": "active",
+          "expected_gateway": null
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/2/object",
+          "expected_gateway": "https://push-next.example.com/api/push/notifications"
+        }
+      ]
+    },
+    {
+      "name": "session_end_and_restart_with_available_address",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "session_ended",
+          "reason": "closed",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "session_ended",
+          "reason": "expired",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "relay_restarted",
+          "gateway_state_available": true,
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        }
+      ]
+    },
+    {
+      "name": "restart_without_address_requires_certificate",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "relay_restarted",
+          "gateway_state_available": false,
+          "expected_gateway": null
+        },
+        {
+          "event": "authorization_checked",
+          "status": "active",
+          "expected_gateway": null
+        },
+        {
+          "event": "historical_certificate_read",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": null
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        }
+      ]
+    },
+    {
+      "name": "restored_authorization_requires_certificate",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "authorization_checked",
+          "status": "unavailable",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "authorization_checked",
+          "status": "inactive",
+          "expected_gateway": null
+        },
+        {
+          "event": "authorization_checked",
+          "status": "active",
+          "expected_gateway": null
+        },
+        {
+          "event": "historical_certificate_read",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": null
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/2/object",
+          "expected_gateway": "https://push-next.example.com/api/push/notifications"
+        }
+      ]
+    },
+    {
+      "name": "historical_certificate_does_not_set_address",
+      "steps": [
+        {
+          "event": "historical_certificate_read",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": null
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/0/object",
+          "expected_gateway": null
+        }
+      ]
+    },
+    {
+      "name": "latest_adopted_certificate_wins",
+      "steps": [
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/2/object",
+          "expected_gateway": "https://push-next.example.com/api/push/notifications"
+        },
+        {
+          "event": "certificate_adopted",
+          "certificate_ref": "/device_certificates/1/object",
+          "expected_gateway": "https://push.example.com/api/push/notifications"
+        }
+      ]
+    }
+  ],
+  "deduplication": [
+    {
+      "name": "accepted_then_duplicate",
+      "deduplication_available": true,
+      "requests": [
+        0,
+        0
+      ],
+      "initial_decision": "accepted",
+      "expected_statuses": [
+        "accepted",
+        "duplicate"
+      ],
+      "expected_new_tasks": 1
+    },
+    {
+      "name": "skipped_then_duplicate",
+      "deduplication_available": true,
+      "requests": [
+        0,
+        0
+      ],
+      "initial_decision": "skipped",
+      "expected_statuses": [
+        "skipped",
+        "duplicate"
+      ],
+      "expected_new_tasks": 0
+    },
+    {
+      "name": "deduplication_unavailable_returns_503",
+      "deduplication_available": false,
+      "requests": [
+        1
+      ],
+      "expected_statuses": [
+        503
+      ],
+      "expected_new_tasks": 0
+    },
+    {
+      "name": "signed_extension_does_not_bypass_deduplication",
+      "deduplication_available": true,
+      "requests": [
+        0,
+        2
+      ],
+      "initial_decision": "accepted",
+      "expected_statuses": [
+        "accepted",
+        "duplicate"
+      ],
+      "expected_new_tasks": 1
+    },
+    {
+      "name": "unrecognized_message_type_accepted_then_duplicate",
+      "deduplication_available": true,
+      "requests": [
+        3,
+        3
+      ],
+      "initial_decision": "accepted",
+      "expected_statuses": [
+        "accepted",
+        "duplicate"
+      ],
+      "expected_new_tasks": 1
+    },
+    {
+      "name": "optional_subject_metadata_does_not_bypass_deduplication",
+      "deduplication_available": true,
+      "requests": [
+        1,
+        4
+      ],
+      "initial_decision": "accepted",
+      "expected_statuses": [
+        "accepted",
+        "duplicate"
+      ],
+      "expected_new_tasks": 1
+    }
+  ],
+  "notification_responses": [
+    {
+      "response": {
+        "http_status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"status\":\"accepted\"}"
+      },
+      "expected_action": "stop"
+    },
+    {
+      "response": {
+        "http_status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"status\":\"skipped\"}"
+      },
+      "expected_action": "stop"
+    },
+    {
+      "response": {
+        "http_status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"status\":\"duplicate\"}"
+      },
+      "expected_action": "stop"
+    },
+    {
+      "response": {
+        "http_status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"status\":\"delivered\"}"
+      },
+      "expected_action": "unknown"
+    },
+    {
+      "response": {
+        "http_status": 204,
+        "headers": {}
+      },
+      "expected_action": "unknown"
+    },
+    {
+      "response": {
+        "http_status": 403,
+        "headers": {}
+      },
+      "expected_action": "stop"
+    },
+    {
+      "response": {
+        "http_status": 429,
+        "headers": {
+          "Retry-After": "30"
+        }
+      },
+      "expected_action": "optional_retry",
+      "minimum_delay_seconds": 30
+    },
+    {
+      "response": {
+        "http_status": 503,
+        "headers": {}
+      },
+      "expected_action": "optional_retry"
+    },
+    {
+      "response": {
+        "http_status": 302,
+        "headers": {
+          "Location": "https://push-next.example.com/api/push/notifications"
+        }
+      },
+      "expected_action": "do_not_follow"
+    }
+  ],
+  "connection_targets": [
+    {
+      "address": "127.0.0.1",
+      "expected_allowed": false
+    },
+    {
+      "address": "10.0.0.1",
+      "expected_allowed": false
+    },
+    {
+      "address": "172.16.0.1",
+      "expected_allowed": false
+    },
+    {
+      "address": "192.168.0.1",
+      "expected_allowed": false
+    },
+    {
+      "address": "169.254.169.254",
+      "expected_allowed": false
+    },
+    {
+      "address": "0.0.0.0",
+      "expected_allowed": false
+    },
+    {
+      "address": "224.0.0.1",
+      "expected_allowed": false
+    },
+    {
+      "address": "::1",
+      "expected_allowed": false
+    },
+    {
+      "address": "::",
+      "expected_allowed": false
+    },
+    {
+      "address": "fc00::1",
+      "expected_allowed": false
+    },
+    {
+      "address": "fe80::1",
+      "expected_allowed": false
+    },
+    {
+      "address": "ff02::1",
+      "expected_allowed": false
+    },
+    {
+      "address": "::ffff:127.0.0.1",
+      "expected_allowed": false
+    },
+    {
+      "address": "8.8.8.8",
+      "expected_allowed": true
+    },
+    {
+      "address": "2606:4700:4700::1111",
+      "expected_allowed": true
+    }
+  ]
+}

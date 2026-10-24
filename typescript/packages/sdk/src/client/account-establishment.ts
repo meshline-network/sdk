@@ -19,6 +19,8 @@ export interface AccountEstablishmentOptions {
     readonly relayId?: string;
     /** Lifetime in seconds, at most 720 days. Defaults to 365 days; valid retained certificates are reused. */
     readonly certificateValiditySeconds?: number;
+    /** Creation-only HTTPS callback URL. Existing certificates/drafts retain their declaration; omission resumes saved intent. */
+    readonly pushGateway?: string;
     /** Lifetime in seconds, at most 3650 days. Defaults to 365 days; valid confirmed routes are reused. */
     readonly routeValiditySeconds?: number;
     /** Remove this exact device in the publication that authorizes the local device. Requires contact continuity. */

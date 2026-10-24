@@ -13,7 +13,7 @@ sealed partial class DeviceManager
     // A null lifetime preserves the existing device's lifetime and requires a local
     // certificate. Ordinary establishment retains its separate durable preparation.
     internal async Task<DeviceStatePublishResult> PublishDeviceStateAsync(string relayId, DeviceStatePublishOptions options,
-        TimeSpan? certificateValidity, CancellationToken cancellationToken)
+        TimeSpan? certificateValidity, CancellationToken cancellationToken, string? pushGateway = null)
     {
         EnsureInitialized();
         using var operation = BeginOperation(ref cancellationToken);
@@ -26,9 +26,9 @@ sealed partial class DeviceManager
             certificateValidity = TimeSpan.FromSeconds(current.ExpiresAt - current.NotBefore);
         }
         if (Local is null)
-            await CreateDeviceCoreAsync(certificateValidity.Value, cancellationToken).ConfigureAwait(false);
+            await CreateDeviceCoreAsync(certificateValidity.Value, pushGateway, cancellationToken).ConfigureAwait(false);
         else if (!IsCurrentCertificate(Local))
-            await RenewDeviceCoreAsync(certificateValidity.Value, cancellationToken).ConfigureAwait(false);
+            await RenewDeviceCoreAsync(certificateValidity.Value, default, cancellationToken).ConfigureAwait(false);
         return await PublishDeviceStateCoreAsync(relayId, null, options, cancellationToken).ConfigureAwait(false);
     }
 

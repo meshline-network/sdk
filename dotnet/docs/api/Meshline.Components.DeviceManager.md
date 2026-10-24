@@ -8,6 +8,7 @@
 - [`DeviceChanged`](#Meshline.Components.DeviceManager.DeviceChanged)
 - [`DeviceStateChanged`](#Meshline.Components.DeviceManager.DeviceStateChanged)
 - [`DeviceManager(ClientOptions, DatabaseOptions, RelayClientPool, AccountManager, IAccountSigner, ISecretProtector)`](#Meshline.Components.DeviceManager.DeviceManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Components.AccountManager%2CMeshline.Interactions.IAccountSigner%2CMeshline.Interactions.ISecretProtector%29)
+- [`CreateDeviceAsync(DeviceCreationOptions, CancellationToken)`](#Meshline.Components.DeviceManager.CreateDeviceAsync%28Meshline.Models.Client.DeviceCreationOptions%2CSystem.Threading.CancellationToken%29)
 - [`CreateDeviceAsync(TimeSpan, CancellationToken)`](#Meshline.Components.DeviceManager.CreateDeviceAsync%28System.TimeSpan%2CSystem.Threading.CancellationToken%29)
 - [`DeriveSharedSecretAsync(ReadOnlyMemory<byte>, CancellationToken)`](#Meshline.Components.DeviceManager.DeriveSharedSecretAsync%28System.ReadOnlyMemory_byte_%2CSystem.Threading.CancellationToken%29)
 - [`GetAuthorizationState(string)`](#Meshline.Components.DeviceManager.GetAuthorizationState%28string%29)
@@ -21,6 +22,7 @@
 - [`RefreshDeviceStateAsync(ContactInvite, CancellationToken)`](#Meshline.Components.DeviceManager.RefreshDeviceStateAsync%28Meshline.Models.Protocol.ContactInvite%2CSystem.Threading.CancellationToken%29)
 - [`RefreshDeviceStateAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.RefreshDeviceStateAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`RemoveDeviceAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.RemoveDeviceAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`RenewDeviceAsync(DeviceRenewalOptions, CancellationToken)`](#Meshline.Components.DeviceManager.RenewDeviceAsync%28Meshline.Models.Client.DeviceRenewalOptions%2CSystem.Threading.CancellationToken%29)
 - [`RenewDeviceAsync(TimeSpan, CancellationToken)`](#Meshline.Components.DeviceManager.RenewDeviceAsync%28System.TimeSpan%2CSystem.Threading.CancellationToken%29)
 - [`SignAsync(ReadOnlyMemory<byte>, CancellationToken)`](#Meshline.Components.DeviceManager.SignAsync%28System.ReadOnlyMemory_byte_%2CSystem.Threading.CancellationToken%29)
 - [`DeviceState`](#Meshline.Components.DeviceManager.DeviceState)
@@ -165,6 +167,69 @@ public Meshline.Transport.RelayClientPool RelayClients { get; }
 [RelayClientPool](Meshline.Transport.RelayClientPool.md 'Meshline\.Transport\.RelayClientPool')
 ### Methods
 
+<a name='Meshline.Components.DeviceManager.CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions,System.Threading.CancellationToken)'></a>
+
+## DeviceManager\.CreateDeviceAsync\(DeviceCreationOptions, CancellationToken\) Method
+
+Creates and stores a new local device with the supplied certificate lifetime and optional push gateway declaration\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.DeviceCertificate> CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions options, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.DeviceManager.CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions,System.Threading.CancellationToken).options'></a>
+
+`options` [DeviceCreationOptions](Meshline.Models.Client.DeviceCreationOptions.md 'Meshline\.Models\.Client\.DeviceCreationOptions')
+
+The certificate lifetime and optional push gateway declaration\.
+
+<a name='Meshline.Components.DeviceManager.CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[DeviceCertificate](Meshline.Models.Protocol.DeviceCertificate.md 'Meshline\.Models\.Protocol\.DeviceCertificate')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The newly stored local device certificate\.
+
+#### Exceptions
+
+[System\.ArgumentNullException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentnullexception 'System\.ArgumentNullException')<br>
+[options](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions,System.Threading.CancellationToken).options 'Meshline\.Components\.DeviceManager\.CreateDeviceAsync\(Meshline\.Models\.Client\.DeviceCreationOptions, System\.Threading\.CancellationToken\)\.options') is null\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The push gateway is not a valid protocol HTTPS URL\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation observes cancellation of [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.CreateDeviceAsync\(Meshline\.Models\.Client\.DeviceCreationOptions, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. An account signer or required secret protector is unavailable, a local device already exists, or device preparation/publication is unfinished\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component or a component used by the operation has been disposed\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\. The account signer produces a certificate that fails identity or signature validation\.
+
+[System\.ArgumentOutOfRangeException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentoutofrangeexception 'System\.ArgumentOutOfRangeException')<br>
+The requested certificate validity is outside one second through 720 days\.
+
+### Remarks
+Requires an account signer, a secret protector, and no local device or unfinished device preparation/publication\.<br>
+Publish device state before treating the device as authorized by the relay\.
+
 <a name='Meshline.Components.DeviceManager.CreateDeviceAsync(System.TimeSpan,System.Threading.CancellationToken)'></a>
 
 ## DeviceManager\.CreateDeviceAsync\(TimeSpan, CancellationToken\) Method
@@ -219,7 +284,7 @@ The local device key cannot be validated against its certificate, or cryptograph
 The requested certificate validity is outside one second through 720 days\.
 
 ### Remarks
-Requires an account signer, a secret protector, and a database without a local device or unfinished device preparation/publication\. The returned certificate is stored locally; publish device state before treating the device as authorized by the relay\.
+Requires an account signer, a secret protector, and a database without a local device or unfinished device preparation/publication\. This overload omits the push gateway declaration\. The returned certificate is stored locally; publish device state before treating the device as authorized by the relay\.
 
 <a name='Meshline.Components.DeviceManager.DeriveSharedSecretAsync(System.ReadOnlyMemory_byte_,System.Threading.CancellationToken)'></a>
 
@@ -1008,6 +1073,72 @@ The next device\-state revision exceeds the protocol safe\-integer limit\.
 Uses the same retained\-history and confirmed\-grant checks as account setup with an explicit replacement\.<br>
 This operation checks existing evidence; it does not send contact\-grant updates or start background synchronization\.
 
+<a name='Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken)'></a>
+
+## DeviceManager\.RenewDeviceAsync\(DeviceRenewalOptions, CancellationToken\) Method
+
+Renews and stores the local certificate with an optional push gateway change, retaining the device keys and identity\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Protocol.DeviceCertificate> RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions options, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken).options'></a>
+
+`options` [DeviceRenewalOptions](Meshline.Models.Client.DeviceRenewalOptions.md 'Meshline\.Models\.Client\.DeviceRenewalOptions')
+
+The certificate lifetime and gateway update\. See [PushGateway](Meshline.Models.Client.DeviceRenewalOptions.md#Meshline.Models.Client.DeviceRenewalOptions.PushGateway 'Meshline\.Models\.Client\.DeviceRenewalOptions\.PushGateway') for retain, set and remove semantics\.
+
+<a name='Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the operation\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[DeviceCertificate](Meshline.Models.Protocol.DeviceCertificate.md 'Meshline\.Models\.Protocol\.DeviceCertificate')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The renewed local device certificate with the same device keys\.
+
+#### Exceptions
+
+[System\.ArgumentNullException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentnullexception 'System\.ArgumentNullException')<br>
+[options](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken).options 'Meshline\.Components\.DeviceManager\.RenewDeviceAsync\(Meshline\.Models\.Client\.DeviceRenewalOptions, System\.Threading\.CancellationToken\)\.options') is null\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The assigned gateway is null or is not a valid protocol HTTPS URL\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The operation observes cancellation of [cancellationToken](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.DeviceManager\.RenewDeviceAsync\(Meshline\.Models\.Client\.DeviceRenewalOptions, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\. An account signer or required secret protector is unavailable, no local device has been created, or device preparation/publication is unfinished\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+This component or a component used by the operation has been disposed\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked\.
+
+[Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
+Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+A stored or received protocol document cannot be serialized or deserialized\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\. The account signer produces a certificate that fails identity or signature validation\.
+
+[System\.ArgumentOutOfRangeException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentoutofrangeexception 'System\.ArgumentOutOfRangeException')<br>
+The requested certificate validity is outside one second through 720 days\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+The stored local device certificate is JSON null\.
+
+### Remarks
+Requires account signing and no unfinished device preparation or publication\. Renewal stores the certificate<br>
+and retires device sessions; publish device state to make the new authorization authoritative at the relay\.
+
 <a name='Meshline.Components.DeviceManager.RenewDeviceAsync(System.TimeSpan,System.Threading.CancellationToken)'></a>
 
 ## DeviceManager\.RenewDeviceAsync\(TimeSpan, CancellationToken\) Method
@@ -1065,7 +1196,7 @@ The requested certificate validity is outside one second through 720 days\.
 The stored local device certificate is JSON null\.
 
 ### Remarks
-The renewed certificate retains the device identity\. Complete any unfinished device preparation or publication before renewing\. Publish device state to make the renewed authorization authoritative at the relay\.
+The renewed certificate retains the device identity and push gateway declaration\. Complete any unfinished device preparation or publication before renewing\. Publish device state to make the renewed authorization authoritative at the relay\.
 
 <a name='Meshline.Components.DeviceManager.SignAsync(System.ReadOnlyMemory_byte_,System.Threading.CancellationToken)'></a>
 

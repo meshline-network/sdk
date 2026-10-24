@@ -8,6 +8,7 @@
 - [`CertificateValidity`](#Meshline.Models.Client.AccountRecoveryOptions.CertificateValidity)
 - [`DeviceStateRevision`](#Meshline.Models.Client.AccountRecoveryOptions.DeviceStateRevision)
 - [`PreviousDeviceState`](#Meshline.Models.Client.AccountRecoveryOptions.PreviousDeviceState)
+- [`PushGateway`](#Meshline.Models.Client.AccountRecoveryOptions.PushGateway)
 - [`RelayId`](#Meshline.Models.Client.AccountRecoveryOptions.RelayId)
 - [`RouteRevision`](#Meshline.Models.Client.AccountRecoveryOptions.RouteRevision)
 - [`RouteValidity`](#Meshline.Models.Client.AccountRecoveryOptions.RouteValidity)
@@ -66,6 +67,23 @@ public Meshline.Models.Protocol.AccountDeviceState? PreviousDeviceState { get; s
 
 #### Property Value
 [AccountDeviceState](Meshline.Models.Protocol.AccountDeviceState.md 'Meshline\.Models\.Protocol\.AccountDeviceState')
+
+<a name='Meshline.Models.Client.AccountRecoveryOptions.PushGateway'></a>
+
+## AccountRecoveryOptions\.PushGateway Property
+
+The complete HTTPS callback URL when recovery creates a new local device, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') for no declaration\.
+
+```csharp
+public string? PushGateway { get; set; }
+```
+
+#### Property Value
+[System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+### Remarks
+A retained device keeps its declaration, including during renewal\.<br>
+Use [PushGateway](Meshline.Models.Client.DeviceRenewalOptions.md#Meshline.Models.Client.DeviceRenewalOptions.PushGateway 'Meshline\.Models\.Client\.DeviceRenewalOptions\.PushGateway') to change or remove it\.
 
 <a name='Meshline.Models.Client.AccountRecoveryOptions.RelayId'></a>
 

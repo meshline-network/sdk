@@ -3,7 +3,7 @@ import * as sdk from '@meshline/sdk';
 export interface VectorFile { readonly source: string; readonly sha256: string }
 export interface VectorResult { readonly name: string; readonly passed: boolean; readonly error?: string }
 export interface VectorReport { readonly results: readonly VectorResult[]; readonly passed: number; readonly failed: number }
-const topics = ['common', 'identity-auth', 'message-encryption', 'message-content', 'contacts', 'channels', 'groups'] as const;
+const topics = ['common', 'identity-auth', 'push-notifications', 'message-encryption', 'message-content', 'contacts', 'channels', 'groups'] as const;
 type Topic = typeof topics[number];
 const object = (value: sdk.JsonValue | undefined): sdk.JsonObject => sdk.requireObject(value!);
 function rows(value: sdk.JsonValue | undefined): sdk.JsonObject[] { if (!Array.isArray(value)) throw new Error('Vector array is absent.'); return value.map(object); }
@@ -76,6 +76,34 @@ export async function runPortableVectors(files: Readonly<Record<string, VectorFi
         const input = sdk.certificateAccountInput(certificate, context); equal(hex(input), row.account_signing_input_utf8_hex);
         equal(sdk.verifyAccount(input, sdk.signAccount(input, bytes(row.private_key), random), bytes(row.public_key)), true);
         rejects(() => sdk.validateCertificate(certificate, new sdk.NetworkContext(context.reference + 1, context.registry)));
+    });
+    const push = documents['push-notifications'];
+    for (const row of rows(push.device_certificates)) await check(`push certificate: ${text(row.name)}`, () => {
+        const certificate = sdk.deviceCertificateCodec.decode(row.object!); sdk.validateCertificate(certificate, context);
+        equal(sdk.certificateId(certificate, context), row.device_id);
+        equal(hex(sdk.certificateDeviceInput(certificate, context)), object(row.device_signing_input).utf8_hex);
+        equal(hex(sdk.certificateAccountInput(certificate, context)), object(row.account_signing_input).utf8_hex);
+        equal(sdk.deviceCertificateCodec.encode(certificate), row.object);
+    });
+    for (const row of rows(push.certificate_tampering)) await check(`push certificate tampering: ${text(row.name)}`, () => {
+        let source: sdk.JsonValue = push;
+        for (const part of text(row.certificate_ref).split('/').slice(1)) source = Array.isArray(source) ? source[Number(part)]! : object(source)[part]!;
+        const original = sdk.deviceCertificateCodec.decode(source); const wire = { ...object(source), ...object(row.set) };
+        for (const key of row.remove as string[]) delete wire[key];
+        const certificate = sdk.deviceCertificateCodec.decode(wire);
+        equal(sdk.verifyDevice(sdk.certificateDeviceInput(certificate, context), certificate.deviceSignature, certificate.signingPublicKey), row.expected_device_signature_valid);
+        equal(sdk.verifyAccount(sdk.certificateAccountInput(certificate, context), certificate.accountSignature, certificate.accountPublicKey), row.expected_account_signature_valid);
+        equal(sdk.certificateId(certificate, context), sdk.certificateId(original, context));
+        rejects(() => sdk.validateCertificate(certificate, context));
+    });
+    for (const row of rows(push.gateway_urls)) await check(`push gateway URL: ${text(row.name)}`, () => {
+        const validateFormat = () => {
+            const certificate = sdk.deviceCertificateCodec.decode({ ...object(rows(push.device_certificates)[0]!.object), push_gateway: row.value! });
+            equal(certificate.pushGateway, row.value);
+            try { sdk.validateCertificate(certificate, context); }
+            catch (error) { if (!(error instanceof sdk.ProtocolError) || error.code !== 'invalid_signature') throw error; }
+        };
+        if (row.expected_format_valid) validateFormat(); else rejects(validateFormat);
     });
     const timeline = object(message.timeline); const request = sdk.messageSendRequestCodec.decode(timeline.request!);
     for (const side of ['target', 'sender'] as const) await check(`direct message ${side} X25519 / HKDF / AES-GCM key box`, () => {

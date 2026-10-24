@@ -27,6 +27,9 @@ import type { RelayClient } from '../transport/client.js';
 import { RelayError } from '../transport/relay-error.js';
 import type { AccountManager } from './account.js';
 import { ClientComponent, type ClientOptions } from './component.js';
+import { FieldUpdate } from '../models/field-update.js';
+import type { DeviceCreationOptions, DeviceRenewalOptions } from '../models/device-options.js';
+import { validatePushGateway } from '../protocol/push-gateway.js';
 
 export type DeviceAuthorizationState = 'unknown' | 'notRegistered' | 'notYetValid' | 'expired' | 'authorized';
 export interface DeviceEvents { readonly deviceChanged: string; readonly deviceStateChanged: AccountDeviceState }
@@ -121,20 +124,27 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
             return encodeBase64Url(protectedData);
         } finally { input.fill(0); }
     }
-    async #issue(signingKey: Uint8Array, encryptionKey: Uint8Array, seconds: number, signal: AbortSignal): Promise<DeviceCertificate> {
+    async #issue(signingKey: Uint8Array, encryptionKey: Uint8Array, seconds: number, pushGateway: string | undefined, signal: AbortSignal): Promise<DeviceCertificate> {
         const signer = this.#accountSigner;
         if (!signer) throw new ProtocolError('signer_required', 'An account signer is required to authorize a device.');
         const publicKey = signer.publicKey.slice();
         if (signer.accountId !== this.accountId || !matchesAccount(this.accountId, publicKey)) throw new ProtocolError('invalid_identity', 'Account signer belongs to another account.');
         const now = this.clock.nowSeconds(); requireSafeInteger(now, 0); requireSafeInteger(now + seconds, 0);
         let certificate: DeviceCertificate = { account: this.accountId, accountPublicKey: publicKey, signingPublicKey: devicePublicKey(signingKey), encryptionPublicKey: encryptionKey.slice(),
-            notBefore: now, expiresAt: now + seconds, deviceSignature: new Uint8Array(64), accountSignature: new Uint8Array(64) };
+            notBefore: now, expiresAt: now + seconds, ...(pushGateway === undefined ? {} : { pushGateway }), deviceSignature: new Uint8Array(64), accountSignature: new Uint8Array(64) };
         certificate = { ...certificate, deviceSignature: signDevice(certificateDeviceInput(certificate, this.context), signingKey) };
         certificate = { ...certificate, accountSignature: (await signer.sign(certificateAccountInput(certificate, this.context), signal)).slice() };
         throwIfAborted(signal); validateCertificate(certificate, this.context); return certificate;
     }
-    async createDevice(validitySeconds: number, signal?: AbortSignal): Promise<DeviceCertificate> {
+    /** Create and store a local certificate without a gateway declaration. Publish device state to authorize it. */
+    createDevice(validitySeconds: number, signal?: AbortSignal): Promise<DeviceCertificate>;
+    /** Create a local certificate with an optional gateway and a default lifetime of 365 days. Publish device state to authorize it. */
+    createDevice(options: DeviceCreationOptions, signal?: AbortSignal): Promise<DeviceCertificate>;
+    async createDevice(options: number | DeviceCreationOptions, signal?: AbortSignal): Promise<DeviceCertificate> {
+        const validitySeconds = typeof options === 'number' ? options : options.validitySeconds ?? 365 * 86400;
+        const pushGateway = typeof options === 'number' ? undefined : options.pushGateway;
         validity(validitySeconds);
+        if (pushGateway !== undefined) validatePushGateway(pushGateway);
         if (!this.#protector || !this.#accountSigner) throw new ProtocolError('integration_required', 'Creating a device requires an account signer and a secret protector.');
         const certificate = await this.runOperation(scope => this.#keyGate.run(async () => {
             await this.#requireNoPendingPreparation(scope);
@@ -144,7 +154,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
             try {
                 signing = this.#random.bytes(32); encryption = this.#random.bytes(32);
                 requireLength(signing, 32, 'Device signing key'); requireLength(encryption, 32, 'Device encryption key');
-                const certificate = await this.#issue(signing, encryptionPublicKey(encryption), validitySeconds, scope);
+                const certificate = await this.#issue(signing, encryptionPublicKey(encryption), validitySeconds, pushGateway, scope);
                 const id = certificateId(certificate, this.context);
                 const protectedSigningKey = await this.#protect(signing, id, 'signing', scope);
                 const protectedEncryptionKey = await this.#protect(encryption, id, 'encryption', scope);
@@ -159,14 +169,22 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         }, scope), signal);
         this.#notify('deviceChanged', certificateId(certificate, this.context)); return clone(certificate);
     }
-    async renewDevice(validitySeconds: number, signal?: AbortSignal): Promise<DeviceCertificate> {
+    /** Renew the local certificate, retaining its keys, identity and gateway. Publish device state to confirm the new authorization. */
+    renewDevice(validitySeconds: number, signal?: AbortSignal): Promise<DeviceCertificate>;
+    /** Renew with a retain/set/delete gateway update and a default lifetime of 365 days. Persist before publishing and retire old device sessions. */
+    renewDevice(options: DeviceRenewalOptions, signal?: AbortSignal): Promise<DeviceCertificate>;
+    async renewDevice(options: number | DeviceRenewalOptions, signal?: AbortSignal): Promise<DeviceCertificate> {
+        const validitySeconds = typeof options === 'number' ? options : options.validitySeconds ?? 365 * 86400;
+        const pushGateway = typeof options === 'number' ? undefined : options.pushGateway;
         validity(validitySeconds);
+        if (pushGateway !== undefined && pushGateway !== FieldUpdate.delete) validatePushGateway(pushGateway);
         const certificate = await this.runOperation(scope => this.#keyGate.run(async () => {
             await this.#requireNoPendingPreparation(scope);
             const saved = (await this.#store.read([localKey], scope)).sets[0]![0]?.value;
             if (!saved) throw new ProtocolError('device_required', 'No local device has been created.');
             const previous = this.#readCertificate(saved); const key = await this.#getKey('signing', scope);
-            const issued = await this.#issue(key, previous.encryptionPublicKey, validitySeconds, scope);
+            const issued = await this.#issue(key, previous.encryptionPublicKey, validitySeconds,
+                pushGateway === FieldUpdate.delete ? undefined : pushGateway ?? previous.pushGateway, scope);
             await updateStore(this.#store, [localKey], snapshot => {
                 if (fingerprint(snapshot.sets[0]![0]?.value) !== fingerprint(saved)) throw new StateConflictError('Local certificate changed while being renewed.');
                 return { mutations: [{ ...localKey, kind: 'put', value: { ...saved, certificate: deviceCertificateCodec.encode(issued) } }], result: undefined };
@@ -272,7 +290,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
                 { keyIssue: error instanceof SecretAccessError ? error.failure : 'unknown' }, { cause: error });
         }
     }
-    async #prepareAuthorizationDevice(operationId: string, seconds: number, signal: AbortSignal): Promise<DeviceCertificate> {
+    async #prepareAuthorizationDevice(operationId: string, seconds: number, initialPushGateway: string | undefined, signal: AbortSignal): Promise<DeviceCertificate> {
         const snapshot = await this.#store.read([localKey, preparationKey], signal);
         const local = snapshot.sets[0]![0]?.value;
         let draft = snapshot.sets[1]![0]?.value;
@@ -292,7 +310,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
                 keys = local ? { signing: (await this.#getKey('signing', signal)).slice(), encryption: (await this.#getKey('encryption', signal)).slice() }
                     : { signing: this.#random.bytes(32), encryption: this.#random.bytes(32) };
                 certificate = local ? this.#readCertificate(local) : { account: this.accountId, accountPublicKey: signer.publicKey.slice(), signingPublicKey: devicePublicKey(keys.signing), encryptionPublicKey: encryptionPublicKey(keys.encryption),
-                    notBefore: 0, expiresAt: 1, deviceSignature: new Uint8Array(64), accountSignature: new Uint8Array(64) };
+                    notBefore: 0, expiresAt: 1, ...(initialPushGateway === undefined ? {} : { pushGateway: initialPushGateway }), deviceSignature: new Uint8Array(64), accountSignature: new Uint8Array(64) };
             }
 
             if (!draft?.operationId || certificate.expiresAt <= this.clock.nowSeconds()) {
@@ -343,7 +361,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
         } finally { keys?.signing.fill(0); keys?.encryption.fill(0); }
     }
     /** @internal Idempotent device authorization; the client alone checkpoints workflow steps. */
-    authorizeDevice(options: { operationId: string; relayId: string; validitySeconds: number; replaceDeviceId?: string; previousLocalDeviceId?: string }, signal: AbortSignal): Promise<'authorized' | 'awaitingRoute'> {
+    authorizeDevice(options: { operationId: string; relayId: string; validitySeconds: number; initialPushGateway?: string; replaceDeviceId?: string; previousLocalDeviceId?: string }, signal: AbortSignal): Promise<'authorized' | 'awaitingRoute'> {
         validity(options.validitySeconds); validateRelayId(options.relayId);
         return this.runOperation(scope => this.#publicationGate.run(async () => {
             const operationKey = `${options.operationId}/${options.replaceDeviceId ?? ''}`;
@@ -356,7 +374,7 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
                 if (route && !current) throw new DeviceAuthorizationError('accountStateUnavailable', 'The established account has no readable complete device state.');
                 const pending = readSignedRequest((await this.#store.read([requestKey(method)], scope)).sets[0]![0]?.value);
                 // An unresolved request retains its original certificate, even after expiry. Resolve it before renewal.
-                const certificate = pending?.pending ? this.#local : await this.#prepareAuthorizationDevice(options.operationId, options.validitySeconds, scope);
+                const certificate = pending?.pending ? this.#local : await this.#prepareAuthorizationDevice(options.operationId, options.validitySeconds, options.initialPushGateway, scope);
                 if (!certificate) throw new StateConflictError('The pending device publication has no retained local certificate.');
 
                 const localId = certificateId(certificate, this.context);

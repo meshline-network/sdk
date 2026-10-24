@@ -35,6 +35,23 @@ Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). After s
 
 `RecoverAccountAsync` supports advanced explicit recovery with revision and previous-state options. The unified establishment entry point does not call it as a fallback. Neither API is a general response to network or storage errors. Device reauthorization does not restore old chat history.
 
+When explicit recovery needs to create a new local device, pass its callback URL
+through `AccountRecoveryOptions.PushGateway`. A retained device keeps its current
+declaration, including during renewal; this option does not update it. See
+[gateway declaration and updates](accounts-and-devices.md#declare-an-offline-push-gateway)
+for URL requirements and removal.
+
+<!-- snippet: push-account-recovery -->
+```csharp
+public static Task RecoverPushEnabledAccountAsync(
+    MeshlineClient client, string pushGateway, CancellationToken cancellationToken = default) =>
+    client.RecoverAccountAsync(new AccountRecoveryOptions
+    {
+        PushGateway = pushGateway
+    }, cancellationToken);
+```
+<!-- /snippet -->
+
 ## Move to another home relay
 
 Prerequisites: initialized client, known route, complete device state, local device, account signer, and an eligible target relay from the same registry.

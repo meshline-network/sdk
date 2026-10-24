@@ -23,6 +23,9 @@ sealed class AccountEstablishmentRecord
     public long CertificateValiditySeconds { get; set; } = 31536000;
     public long RouteValiditySeconds { get; set; } = 31536000;
     public string? InitialProfileJson { get; set; }
+    // Creation-only intent, saved before dispatching device preparation. Null means no declaration.
+    [MaxLength(512)]
+    public string? InitialPushGateway { get; set; }
     public bool IsInitialState { get; set; }
     // Keep the original choice until the device owner resolves a proposed change.
     [MaxLength(26)]

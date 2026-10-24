@@ -105,6 +105,116 @@ state reads reconcile pending requests; a temporary staging response does not.
 
 `GetAuthorizationState(deviceId)` distinguishes authorization conditions for a known device. `GetCertificate(deviceId)` retrieves a known certificate. `DeviceChanged` and `DeviceStateChanged` notify applications about changes; query current state again when updating UI.
 
+## Declare an offline push gateway
+
+Pass the application's complete public HTTPS callback URL through
+`AccountEstablishmentOptions.PushGateway` when establishing a new local device.
+The SDK preserves the exact string, including query text, without appending a
+path or normalizing it.
+
+<!-- snippet: push-gateway-options -->
+```csharp
+public static Task EstablishPushEnabledAccountAsync(
+    MeshlineClient client, string pushGateway, CancellationToken cancellationToken = default) =>
+    client.EstablishAccountAsync(new AccountEstablishmentOptions
+    {
+        PushGateway = pushGateway
+    }, cancellationToken);
+```
+<!-- /snippet -->
+
+The URL must begin with `https://`, have a valid host, and fit within 512 UTF-8 bytes.
+Whitespace, userinfo, backslashes, and fragments (including an empty `#`) are
+invalid. Omit the option for no declaration; an empty string is invalid. URL
+validation does not contact the endpoint or establish that it is publicly reachable.
+Do not include FCM/APNs tokens, callback secrets, or platform credentials.
+
+The parameter applies only to **new devices**. An existing certificate or persisted
+preparation draft retains its own declaration. Ordinary renewal, expired-certificate
+recovery, and restart preserve that declaration, including its absence.
+
+Applications creating the local certificate separately can use
+`DeviceCreationOptions`. This method stores the certificate locally; call
+`EstablishAccountAsync` afterwards to publish and confirm authorization.
+The existing `CreateDeviceAsync(TimeSpan, ...)` overload creates without a gateway.
+
+<!-- snippet: push-device-creation -->
+```csharp
+public static Task<Meshline.Models.Protocol.DeviceCertificate> CreatePushEnabledDeviceAsync(
+    MeshlineClient client, string pushGateway, CancellationToken cancellationToken = default) =>
+    client.DeviceManager.CreateDeviceAsync(new DeviceCreationOptions
+    {
+        Validity = TimeSpan.FromDays(365),
+        PushGateway = pushGateway
+    }, cancellationToken);
+```
+<!-- /snippet -->
+
+### Change or remove a declaration
+
+For an existing device, pass `DeviceRenewalOptions` to `RenewDeviceAsync` and publish
+the resulting certificate. The original `RenewDeviceAsync(TimeSpan, ...)` overload
+retains the current gateway declaration.
+
+| Renewal options | Gateway declaration |
+| --- | --- |
+| Omit `PushGateway`, or use `FieldUpdate<string>.Unspecified` / `default` | Retain the current declaration. |
+| Set `PushGateway` to a complete HTTPS URL | Add or replace the declaration. |
+| Set `PushGateway = FieldUpdate<string>.Delete` | Remove the declaration. |
+
+`FieldUpdate<T>` is in `Meshline.Models`. A string converts to a field assignment
+implicitly. A null or empty assignment is invalid; use `Delete` to remove the
+declaration. Set `Validity` for the new certificate lifetime; it defaults to 365 days.
+
+<!-- snippet: push-gateway-update -->
+```csharp
+public static async Task RenewDeviceWithGatewayAsync(
+    MeshlineClient client,
+    FieldUpdate<string> pushGateway,
+    TimeSpan validity,
+    CancellationToken cancellationToken = default)
+{
+    // Use an initialized, stopped client constructed with an account signer.
+    // Pass default to retain the gateway, a URL to set it,
+    // or FieldUpdate<string>.Delete to remove the declaration.
+    await client.DeviceManager.RenewDeviceAsync(new DeviceRenewalOptions
+    {
+        Validity = validity,
+        PushGateway = pushGateway
+    }, cancellationToken);
+    // Publish and confirm the exact local certificate through the resumable workflow.
+    await client.EstablishAccountAsync(cancellationToken: cancellationToken);
+}
+```
+<!-- /snippet -->
+
+Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). Removing a
+declaration omits `push_gateway` from the certificate; wire-level `null` is rejected.
+Both account and device signatures cover the address,
+while `DeviceId`, device keys, message history, and contact relationships remain
+unchanged. Existing device sessions are retired and subsequent authentication uses
+the new certificate.
+
+### Publish and resume
+
+`RenewDeviceAsync` stores the new certificate locally before any publication.
+Its return alone does not confirm relay acceptance. `EstablishAccountAsync` publishes
+and verifies effective authorization; if it fails or is interrupted, resume that
+workflow after restart instead of reissuing the certificate. An unresolved device
+publication or preparation blocks another standalone update. Applications managing
+publication themselves may use `PublishDeviceStateAsync` as described above and
+must distinguish `accepted` from `staged` or unknown outcomes.
+
+Interrupted creation retains its original gateway intent, even before a draft
+exists. Omit `PushGateway` when resuming; an explicit conflicting address is rejected.
+See [account establishment options](account-establishment.md#options) for the retry contract.
+
+This SDK support declares and publishes the gateway. Relay offline detection,
+gateway confirmation and callbacks, platform token registration, and FCM/APNs
+delivery remain integration responsibilities. Publishing at the home relay does
+not by itself prove other group relays have adopted the new declaration or that a
+phone can receive a push notification.
+
 ## Removing devices and preserving access
 
 `RemoveDeviceAsync` independently reads the latest device state before publishing updated authorization; it requires the account signer. Do not treat deletion of a local database as remote device revocation. Removing a device's authorization affects future authorized operations, while local copies of already retrieved data remain under the application's storage policy.

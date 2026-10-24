@@ -21,9 +21,19 @@ import { updateStore } from '../storage/transaction.js';
 import type { RelayClientPool } from '../transport/pool.js';
 import { RelayError } from '../transport/relay-error.js';
 import { AccountEstablishmentError, type AccountEstablishmentOptions, type AccountInitialProfile } from './account-establishment.js';
+import { validatePushGateway } from '../protocol/push-gateway.js';
 
 export type { AccountEstablishmentOptions } from './account-establishment.js';
-export interface AccountRecoveryOptions { readonly relayId?: string; readonly certificateValiditySeconds?: number; readonly routeValiditySeconds?: number; readonly previousDeviceState?: AccountDeviceState; readonly deviceStateRevision?: number; readonly routeRevision?: number }
+export interface AccountRecoveryOptions {
+    readonly relayId?: string;
+    readonly certificateValiditySeconds?: number;
+    readonly routeValiditySeconds?: number;
+    /** Used only when recovery creates a new device. Retained devices preserve their own declaration, including during renewal. */
+    readonly pushGateway?: string;
+    readonly previousDeviceState?: AccountDeviceState;
+    readonly deviceStateRevision?: number;
+    readonly routeRevision?: number;
+}
 export interface AccountOperationsOptions {
     readonly store: MeshlineStore; readonly pool: RelayClientPool; readonly account: AccountManager; readonly device: DeviceManager; readonly profile: ProfileManager;
     readonly context: NetworkContext; readonly accountId: string; readonly clock: RuntimeClock; readonly random: RandomSource;
@@ -44,6 +54,7 @@ type EstablishmentRecord = JsonObject & {
     certificateValiditySeconds: number;
     routeValiditySeconds: number;
     initialProfile?: JsonObject;
+    initialPushGateway?: string;
     replaceDeviceId?: string;
     previousLocalDeviceId?: string;
 };
@@ -59,6 +70,7 @@ function readInitialProfile(value: JsonObject | undefined): AccountInitialProfil
         ...(value.avatar === undefined ? {} : { avatar: contentReferenceCodec.decode(value.avatar) }), ...(value.publicDiscovery === undefined ? {} : { publicDiscovery: value.publicDiscovery as boolean }) };
 }
 function settings(source: AccountEstablishmentOptions) {
+    if (source.pushGateway !== undefined) validatePushGateway(source.pushGateway);
     if (source.relayId !== undefined) validateRelayId(source.relayId);
     const certificateValiditySeconds = source.certificateValiditySeconds ?? 365 * day; const routeValiditySeconds = source.routeValiditySeconds ?? 365 * day;
     requireSafeInteger(certificateValiditySeconds, 1); requireSafeInteger(routeValiditySeconds, 1);
@@ -89,9 +101,9 @@ export class ClientAccountOperations {
         }
         throw new ProtocolError('no_active_relay', 'No verified active relay is available.', { cause: new AggregateError(failures) });
     }
-    async #prepareDevice(validity: number, signal: AbortSignal) {
+    async #prepareDevice(validity: number, signal: AbortSignal, pushGateway?: string) {
         const local = this.host.device.local; const now = this.host.clock.nowSeconds();
-        if (!local) return this.host.device.createDevice(validity, signal);
+        if (!local) return this.host.device.createDevice({ validitySeconds: validity, ...(pushGateway === undefined ? {} : { pushGateway }) }, signal);
         return local.notBefore <= now && now < local.expiresAt ? local : this.host.device.renewDevice(validity, signal);
     }
     async #confirm(relayId: string, signal: AbortSignal): Promise<void> {
@@ -153,13 +165,12 @@ export class ClientAccountOperations {
                 || !['authorizingDevice', 'ensuringRoute', 'initializingProfile'].includes(String(saved.step)))
                 throw new ProtocolError('invalid_storage', 'Invalid account establishment record.');
             record = saved as EstablishmentRecord;
+            if (record.initialPushGateway !== undefined) validatePushGateway(record.initialPushGateway);
+            if (source.pushGateway !== undefined && source.pushGateway !== record.initialPushGateway)
+                throw new AccountEstablishmentError('operationParametersConflict', 'The initial push gateway is fixed by the unfinished operation.');
             settings({ relayId: record.relayId, certificateValiditySeconds: record.certificateValiditySeconds, routeValiditySeconds: record.routeValiditySeconds });
-            for (const key of ['certificateValiditySeconds', 'routeValiditySeconds', 'initialProfile'] as const) {
-                if (source[key] === undefined) continue;
-                const requested = key === 'initialProfile' ? encodeInitialProfile(source.initialProfile)! : source[key]!;
-                if (canonicalJson(requested) !== canonicalJson(record[key] ?? null))
-                    throw new AccountEstablishmentError('operationParametersConflict', 'Resume with the saved lifetimes and initial profile.');
-            }
+            if (source.initialProfile !== undefined && canonicalJson(encodeInitialProfile(source.initialProfile)!) !== canonicalJson(record.initialProfile ?? null))
+                throw new AccountEstablishmentError('operationParametersConflict', 'The initial profile is fixed by the unfinished operation.');
         }
         const deviceIntent = () => {
             const replaceDeviceId = record ? record.replaceDeviceId : source.replaceDeviceId;
@@ -196,6 +207,7 @@ export class ClientAccountOperations {
                 step: retained && (retained.expiresAt <= clock.nowSeconds() || unconfirmed) ? 'ensuringRoute' : 'authorizingDevice',
                 certificateValiditySeconds: options.certificateValiditySeconds, routeValiditySeconds: unconfirmed ? unconfirmed.expiresAt - unconfirmed.updatedAt : options.routeValiditySeconds,
                 ...(source.initialProfile ? { initialProfile: encodeInitialProfile(source.initialProfile)! } : {}),
+                ...(source.pushGateway === undefined ? {} : { initialPushGateway: source.pushGateway }),
                 ...(source.replaceDeviceId ? { replaceDeviceId: source.replaceDeviceId } : {}),
                 ...(previousLocalDeviceId ? { previousLocalDeviceId } : {}) }, signal);
         } else {
@@ -219,6 +231,7 @@ export class ClientAccountOperations {
                 record = await this.#checkpoint(record, { ...record, step: 'authorizingDevice' }, signal);
             } else if (record.step === 'authorizingDevice') {
                 const result = await device.authorizeDevice({ operationId: record.operationId, relayId, validitySeconds: record.certificateValiditySeconds,
+                    ...(record.initialPushGateway === undefined ? {} : { initialPushGateway: record.initialPushGateway }),
                     ...(typeof record.replaceDeviceId === 'string' ? { replaceDeviceId: record.replaceDeviceId } : {}),
                     ...(typeof record.previousLocalDeviceId === 'string' ? { previousLocalDeviceId: record.previousLocalDeviceId } : {}) }, signal);
                 record = await this.#checkpoint(record, { ...record, step: result === 'awaitingRoute' ? 'ensuringRoute' : 'initializingProfile' }, signal);
@@ -261,7 +274,7 @@ export class ClientAccountOperations {
             try { await device.getOwnDeviceState(account.route.relayId, signal); }
             catch (error) { throwIfAborted(signal); if (!lookupFailure(error)) throw error; this.host.report({ operation: 'resolve_recovery_devices', resource: account.route.relayId, error }); }
         }
-        await this.#prepareDevice(options.certificateValiditySeconds, signal);
+        await this.#prepareDevice(options.certificateValiditySeconds, signal, options.pushGateway);
         await device.publishDeviceState(relayId, { ...(previous ? { previousState: previous } : {}), recovery: true, ...(source.deviceStateRevision === undefined ? {} : { revision: source.deviceStateRevision }), signal });
         await account.publishRoute(relayId, { validitySeconds: options.routeValiditySeconds, recovery: true, ...(source.routeRevision === undefined ? {} : { revision: source.routeRevision }), signal });
         await this.#confirm(relayId, signal); await this.#clear([establishmentKey, migrationKey], signal);

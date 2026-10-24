@@ -78,6 +78,79 @@ are distinct steps. Do not treat a staged certificate as relay-authorized.
 updates itself. Message synchronization performs those updates in the background.
 Subscribe to `deviceChanged` and `deviceStateChanged` to refresh the UI.
 
+## Declare an offline push gateway
+
+Pass the application's complete HTTPS callback address when creating a device:
+
+```typescript
+await client.establishAccount({ pushGateway: 'https://push.example.com/api/push/notifications' });
+```
+
+`pushGateway` is a creation parameter on `AccountEstablishmentOptions`,
+`AccountRecoveryOptions` and `DeviceCreationOptions`.
+Existing certificates and saved drafts retain their own declaration,
+including its absence, even when a different creation address is supplied.
+`createDevice({ validitySeconds, pushGateway })` creates a local certificate;
+follow it with `establishAccount()` to publish and confirm authorization.
+The existing `createDevice(validitySeconds)` overload omits the gateway.
+
+The address must begin with `https://`, contain a valid host, and fit within
+512 UTF-8 bytes. Query text is allowed. Whitespace, userinfo, backslashes and
+fragments (including an empty `#`) are forbidden. The SDK retains the exact
+string; it does not normalize it, append paths, contact the endpoint, or verify
+public reachability. Do not include platform tokens, callback secrets or credentials.
+
+### Change or remove a declaration
+
+For an existing device, use `DeviceRenewalOptions`:
+
+```typescript
+import { FieldUpdate } from '@meshline/sdk';
+
+// Use an initialized, stopped client with an account signer.
+await client.deviceManager.renewDevice({
+    validitySeconds: 365 * 86400,
+    pushGateway: 'https://push.example.com/api/push/notifications',
+});
+await client.establishAccount();
+
+// Remove the declaration, then publish and confirm the new certificate.
+await client.deviceManager.renewDevice({ pushGateway: FieldUpdate.delete });
+await client.establishAccount();
+```
+
+| Renewal value | Behavior |
+| --- | --- |
+| Omitted, `undefined`, or `FieldUpdate.unspecified` | Retain the current declaration. |
+| A complete HTTPS URL | Add or replace the declaration. |
+| `FieldUpdate.delete` | Remove the declaration. |
+
+Null and empty assignments are invalid. Removing a declaration omits
+`push_gateway` from the certificate; wire-level null is rejected.
+
+Both options overloads default `validitySeconds` to 365 days and accept integer
+seconds from 1 through 720 days. The original `renewDevice(validitySeconds)`
+overload retains the gateway. Options are copied before asynchronous work.
+The certificate's account and device signatures cover the gateway; device ID,
+keys and existing history remain unchanged. Renewal retires old device sessions
+so subsequent authentication uses the new certificate.
+
+### Publish and resume
+
+Renewal stores the certificate before publication. Its return alone does not
+confirm relay acceptance. If establishment fails after renewal, resume it using
+the same store instead of reissuing the certificate. Pending device preparation
+or publication blocks another standalone renewal.
+
+Interrupted creation retains its original gateway intent, even before a draft
+exists. Omit `pushGateway` when resuming; an explicit conflicting address is rejected.
+See [account establishment options](account-establishment.md#options-and-errors) for the retry contract.
+
+See the compiled examples in [workflows.ts](../../examples/workflows.ts).
+Relay offline detection, callbacks, gateway confirmation, platform registration
+and phone delivery remain integration responsibilities. Home-relay publication
+does not by itself confirm that every group relay has adopted the new declaration.
+
 If loading an existing identity fails, surface the error. Replacing its database
 or protection key can lose access to messages and pending operations.
 

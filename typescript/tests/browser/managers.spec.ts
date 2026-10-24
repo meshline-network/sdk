@@ -1,6 +1,53 @@
 import { expect, test } from '@playwright/test';
 import type {} from './harness.js';
 
+test('push gateway intent survives an IndexedDB reopen before any device draft exists', async ({ page }) => {
+    await page.goto('/tests/browser/'); await page.waitForFunction(() => Boolean(window.meshlineHarness));
+    const result = await page.evaluate(async () => {
+        const { createClientNetwork } = window.meshlineHarness; const network = createClientNetwork();
+        const pushGateway = 'https://PUSH.example.com:443/callback?app=chat';
+        try {
+            const first = await network.open(); const commit = first.store.commit.bind(first.store);
+            first.store.commit = async (version, mutations, signal) => {
+                if (mutations.some(value => value.kind === 'put' && value.collection === 'device_preparation')) throw new Error('Interrupted before draft');
+                return commit(version, mutations, signal);
+            };
+            let error: string | undefined;
+            try { await first.client.establishAccount({ pushGateway }); }
+            catch (failure) { error = (failure as Error).message; }
+            const saved = await first.store.read([{ collection: 'client_account_operations', key: 'establishment' }, { collection: 'device_preparation', key: 'current' }]);
+            await first.dispose();
+            const resumed = await network.open(91, first.path); await resumed.client.establishAccount();
+            return { error, saved: saved.sets[0]![0]!.value.initialPushGateway, drafts: saved.sets[1]!.length,
+                local: resumed.client.device!.pushGateway, published: resumed.client.deviceState!.certificates[0]!.pushGateway };
+        } finally { await network.dispose(); }
+    });
+    expect(result).toEqual({ error: 'Interrupted before draft', saved: 'https://PUSH.example.com:443/callback?app=chat', drafts: 0,
+        local: 'https://PUSH.example.com:443/callback?app=chat', published: 'https://PUSH.example.com:443/callback?app=chat' });
+});
+
+test('gateway removal resumes an unknown publication after IndexedDB reopen without restoring the old declaration', async ({ page }) => {
+    await page.goto('/tests/browser/'); await page.waitForFunction(() => Boolean(window.meshlineHarness));
+    const result = await page.evaluate(async () => {
+        const { sdk, createClientNetwork } = window.meshlineHarness; const network = createClientNetwork();
+        try {
+            const first = await network.open(); await first.client.establishAccount({ pushGateway: 'https://push.example.com/callback' });
+            const originalId = sdk.certificateId(first.client.device!, network.registry.context);
+            const renewed = await first.client.deviceManager.renewDevice({ pushGateway: sdk.FieldUpdate.delete });
+            network.loseAfter = 'device.state.publish'; let reason: string | undefined;
+            try { await first.client.establishAccount(); }
+            catch (error) { if (!(error instanceof sdk.AccountEstablishmentError)) throw error; reason = error.reason; }
+            await first.dispose(); network.loseAfter = undefined;
+            const resumed = await network.open(91, first.path); await resumed.client.establishAccount();
+            return { reason, sameId: sdk.certificateId(resumed.client.device!, network.registry.context) === originalId,
+                exact: sdk.deviceCertificateCodec.stringify(renewed) === sdk.deviceCertificateCodec.stringify(resumed.client.device!),
+                localAbsent: !Object.hasOwn(sdk.deviceCertificateCodec.encode(resumed.client.device!), 'push_gateway'),
+                publishedAbsent: !Object.hasOwn(sdk.deviceCertificateCodec.encode(resumed.client.deviceState!.certificates[0]!), 'push_gateway') };
+        } finally { await network.dispose(); }
+    });
+    expect(result).toEqual({ reason: 'submissionOutcomeUnknown', sameId: true, exact: true, localAbsent: true, publishedAbsent: true });
+});
+
 test('managers, encrypted messages, accepted channel posts and group keys recover in a real browser', async ({ page }) => {
     await page.goto('/tests/browser/'); await page.waitForFunction(() => Boolean(window.meshlineHarness));
     expect(await page.evaluate(() => window.meshlineHarness.managerRoundtrip())).toEqual({

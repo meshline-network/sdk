@@ -7,6 +7,7 @@
 
 - [`CertificateValidity`](#Meshline.Models.Client.AccountEstablishmentOptions.CertificateValidity)
 - [`InitialProfile`](#Meshline.Models.Client.AccountEstablishmentOptions.InitialProfile)
+- [`PushGateway`](#Meshline.Models.Client.AccountEstablishmentOptions.PushGateway)
 - [`RelayId`](#Meshline.Models.Client.AccountEstablishmentOptions.RelayId)
 - [`ReplaceDeviceId`](#Meshline.Models.Client.AccountEstablishmentOptions.ReplaceDeviceId)
 - [`RouteValidity`](#Meshline.Models.Client.AccountEstablishmentOptions.RouteValidity)
@@ -27,8 +28,9 @@ public sealed class AccountEstablishmentOptions
 Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system.object 'System\.Object') → AccountEstablishmentOptions
 
 ### Remarks
-An unfinished setup retains its saved lifetimes and initial profile\. Omitted options resume that operation;<br>
-conflicting explicit relay or profile values are rejected\. Valid certificates and routes are retained\.
+Options and initial profile fields are copied when setup is called\.<br>
+An unfinished setup retains its saved lifetimes, initial push gateway and initial profile\. Omitted options resume that operation;<br>
+conflicting explicit relay, gateway or profile values are rejected\. Valid certificates and routes are retained\.
 ### Properties
 
 <a name='Meshline.Models.Client.AccountEstablishmentOptions.CertificateValidity'></a>
@@ -56,6 +58,24 @@ public Meshline.Models.Client.AccountInitialProfile? InitialProfile { get; set; 
 
 #### Property Value
 [AccountInitialProfile](Meshline.Models.Client.AccountInitialProfile.md 'Meshline\.Models\.Client\.AccountInitialProfile')
+
+<a name='Meshline.Models.Client.AccountEstablishmentOptions.PushGateway'></a>
+
+## AccountEstablishmentOptions\.PushGateway Property
+
+The complete HTTPS callback URL for a new local device, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') for no declaration when starting setup\.
+
+```csharp
+public string? PushGateway { get; set; }
+```
+
+#### Property Value
+[System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+### Remarks
+Existing devices and saved drafts retain their declaration\. Omit this value to resume saved intent;<br>
+a conflicting non\-null value is rejected while setup is unfinished\.<br>
+Use [PushGateway](Meshline.Models.Client.DeviceRenewalOptions.md#Meshline.Models.Client.DeviceRenewalOptions.PushGateway 'Meshline\.Models\.Client\.DeviceRenewalOptions\.PushGateway') to change or remove an existing declaration\.
 
 <a name='Meshline.Models.Client.AccountEstablishmentOptions.RelayId'></a>
 

@@ -24,7 +24,7 @@ for (const name of Object.keys(dependencies)) {
     const installed = await realpath(join(consumer, 'node_modules', name)); if (!installed.startsWith(consumer + sep)) throw new Error(`Consumer escaped its independent installation: ${name}`);
 }
 await mkdir(join(consumer, 'examples'));
-for (const name of ['shared.ts', 'node.ts', 'browser.ts']) await copyFile(join(root, 'examples', name), join(consumer, 'examples', name));
+for (const name of ['shared.ts', 'node.ts', 'browser.ts', 'workflows.ts']) await copyFile(join(root, 'examples', name), join(consumer, 'examples', name));
 await writeFile(join(consumer, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext', lib: ['ES2022', 'DOM', 'DOM.Iterable'], strict: true, exactOptionalPropertyTypes: true, noUncheckedIndexedAccess: true, noEmit: true, skipLibCheck: false, types: ['node'] }, include: ['examples/*.ts'] }, null, 2));
 const ts = JSON.parse(await readFile(join(root, 'node_modules/typescript/package.json'), 'utf8')); run([join(root, 'node_modules/typescript', ts.bin.tsc), '-p', join(consumer, 'tsconfig.json')]);
 await copyFile(join(root, 'tests/consumers/node.mjs'), join(consumer, 'smoke.mjs')); console.log(run(['smoke.mjs']));
@@ -48,7 +48,7 @@ for (const name of Object.keys(expoDependencies)) {
     const installed = await realpath(join(expoConsumer, 'node_modules', name)); if (!installed.startsWith(expoConsumer + sep)) throw new Error(`Expo consumer escaped its independent installation: ${name}`);
 }
 await mkdir(join(expoConsumer, 'examples'));
-for (const name of ['shared.ts', 'expo.ts']) await copyFile(join(root, 'examples', name), join(expoConsumer, 'examples', name));
+for (const name of ['shared.ts', 'expo.ts', 'workflows.ts']) await copyFile(join(root, 'examples', name), join(expoConsumer, 'examples', name));
 await writeFile(join(expoConsumer, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', customConditions: ['react-native'], lib: ['ES2022', 'DOM', 'DOM.Iterable'], strict: true, exactOptionalPropertyTypes: true, noUncheckedIndexedAccess: true, noEmit: true, skipLibCheck: true, types: ['react-native'] }, include: ['examples/*.ts'] }, null, 2));
 runExpo([join(root, 'node_modules/typescript', ts.bin.tsc), '-p', join(expoConsumer, 'tsconfig.json')]);
 result.expoConsumer = relative(root, expoConsumer).split(sep).join('/'); result.expoDeclarations = 'passed';

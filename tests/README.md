@@ -5,7 +5,7 @@ with their SDK; live interoperability is a separate suite requiring both runtime
 
 | Directory | Responsibility |
 | --- | --- |
-| [vectors](vectors/manifest.json) | One immutable snapshot of seven protocol vector files, with source revision and SHA-256 hashes. |
+| [vectors](vectors/manifest.json) | One immutable snapshot of eight protocol vector files, with source revision and SHA-256 hashes. |
 | [scenarios](scenarios/README.md) | Language-neutral SDK behavior cases with stable IDs, operations and independent expected results. |
 | [interop](interop/README.md) | Tests that exchange signed or encrypted data between actual SDK implementations. |
 
@@ -14,6 +14,13 @@ pinned copy here so a checkout of this SDK repository is sufficient after restor
 do not load a moving sibling protocol checkout or regenerate expected answers with
 the implementation being tested. Both language test suites verify the vector
 manifest. Platform acceptance also consumes this same snapshot.
+
+The .NET push adapter currently executes the certificate, certificate-tampering,
+and gateway-URL sections of `push-notifications-v1.json`. Its component tests cover
+creation, declaration updates/removal, renewal, session rebinding and publication
+recovery. The remaining notification, HTTP, gateway-state and deduplication sections
+are reserved for Relay/gateway implementations; copying the fixture is not evidence
+that those behaviors or TypeScript push support have been implemented.
 
 The additional [NEP-6 wallet fixtures](vectors/nep6-wallets.json) are SDK integration
 vectors generated with the official Neo 3.10.1 wallet implementation, independent

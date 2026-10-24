@@ -81,7 +81,10 @@ restart and successful retry together prove resumability.
 | Contact continuity and atomic publication | `Contacts/ContactAuthorizationContinuityTests`, `Contacts/ContactContinuityBoundaryTests`, `Contacts/ContactPublicationTransactionTests` |
 | Background grant supplementation and delivery | `Contacts/BackgroundContactAuthorizationTests` |
 | Standalone mutation serialization and signing without holding the database writer | `Devices/DeviceMutationConcurrencyTests` |
-| Fresh schema and direct upgrade from `InitialCreate` | `Storage/DatabaseTests` |
+| Push gateway creation, renewal keep/set/remove, local persistence, session rebinding and publication replay | `Devices/PushGatewayTests` |
+| Gateway intent, retained declarations, recovery and interrupted device preparation | `Accounts/PushGatewayEstablishmentTests` |
+| Push certificate signing, identity and URL validation | `Protocol/PushCertificateTests` |
+| Fresh schema, direct upgrade from `InitialCreate` and gateway intent migration preserving unfinished setup | `Storage/DatabaseTests` |
 
 Preserve these boundary assertions when reorganizing cases:
 
@@ -156,7 +159,7 @@ Acceptance uses behavioral checks without an overall coverage-percentage thresho
 
 ## Protocol vector snapshots
 
-`../tests/vectors/*.json` are byte-for-byte snapshots from the protocol repository's `v1/test-vectors` directory, at commit `d3f358afe650afd5fecb777b35cebfeec5bd147d`. The source checkout contained documentation changes at capture time; the exact status and each file's SHA-256 are recorded in [the vector manifest](../tests/vectors/manifest.json). The vector files themselves were clean. `SerializationTests.Snapshot_files_match_recorded_hashes` checks their integrity on every test run.
+`../tests/vectors/*.json` are byte-for-byte snapshots from the protocol repository's `v1/test-vectors` directory, at commit `c4602bbfe2430ebfc8f34efc53bc569409db0535`. The source checkout was clean at capture time; its status and each file's SHA-256 are recorded in [the vector manifest](../tests/vectors/manifest.json). `SerializationTests.Snapshot_files_match_recorded_hashes` checks their integrity on every test run.
 
 Expected bytes, hashes, ciphertext, keys, and signatures come from these snapshots, never from an SDK-generated golden-file update. Dynamic workflow fixtures sign their own requests and compare observable behavior; they complement these independent known-answer tests. Do not regenerate expected vectors using the SDK under test.
 
@@ -170,6 +173,7 @@ Protocol paths below are source identifiers in that recorded revision. They are 
 | --- | --- | --- |
 | `common-v1.json` | `canonical_json.vectors`, `canonical_json.rejection_vectors`, `base64url.cases`, `network_binding.format_cases` | `v1/en/general.md`; `v1/en/test-vectors/common.md` |
 | `identity-auth-v1.json` | `device_identity`, `device_certificate`, `relay_origin.normalization_cases`, `session_auth.verification_cases` with both signing inputs | `client-relay/core-objects/accounts-and-devices.md`; `client-relay/methods/authentication-and-sessions.md`; `test-vectors/identity-auth.md` under `v1/en` |
+| `push-notifications-v1.json` | `device_certificates`, `certificate_tampering`, `gateway_urls`; gateway changes retain device identity and are covered by both certificate signatures | `client-relay/core-objects/accounts-and-devices.md`; `test-vectors/push-notifications.md` under `v1/en` |
 | `contacts-v1.json` | `signing.vector`, every `signing.verification_cases` row | `v1/en/client-relay/concepts/contacts.md`; `v1/en/test-vectors/contacts.md` |
 | `message-encryption-v1.json` | `timeline` sender/recipient X25519 agreements through the device API; sender-copy reception, fixed plaintext and envelope signing input; key/ciphertext/AAD tampering and foreign-network signature rejection | `client-relay/core-objects/messages-and-content.md`; `client-relay/concepts/message-timeline.md`; `test-vectors/message-encryption.md` under `v1/en` |
 | `message-content-v1.json` | `body.body_cases`, `body.invalid_body_cases`, `attachment_encryption.reference` and plaintext integrity | `v1/en/client-relay/core-objects/messages-and-content.md`; `v1/en/test-vectors/message-content.md` |

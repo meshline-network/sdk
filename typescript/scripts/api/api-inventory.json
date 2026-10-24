@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "0df21150ca8458f91aec8faeaaa58f084625e194ca1a2a9c11dada4b3d21fac1",
+  "sourceSha256": "4a69c5aa568235949abef07a3b6d1bb7e61512bd0d4f8ee7638122c13962b92b",
   "sdkBaseline": "f024be46d6ff288739d1555ef9e6607b914d571d",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1447,6 +1447,13 @@
       "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
     },
     {
+      "symbol": "M:Meshline.Components.DeviceManager.CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.CreateDeviceAsync(Meshline.Models.Client.DeviceCreationOptions,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/device.ts",
+      "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+    },
+    {
       "symbol": "M:Meshline.Components.DeviceManager.CreateDeviceAsync(System.TimeSpan,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.CreateDeviceAsync(System.TimeSpan,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1533,6 +1540,13 @@
     {
       "symbol": "M:Meshline.Components.DeviceManager.RemoveDeviceAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RemoveDeviceAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/device.ts",
+      "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+    },
+    {
+      "symbol": "M:Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/device.ts",
       "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
@@ -2304,15 +2318,15 @@
       "symbol": "M:Meshline.Models.FieldUpdate`1.#ctor(`0)",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md#Meshline.Models.FieldUpdate_T_.FieldUpdate(T)",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "M:Meshline.Models.FieldUpdate`1.op_Implicit(`0)~Meshline.Models.FieldUpdate{`0}",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md#Meshline.Models.FieldUpdate_T_.op_ImplicitMeshline.Models.FieldUpdate_T_(T)",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "M:Meshline.Models.NetworkContext.Parse(System.String,System.IFormatProvider)",
@@ -3498,6 +3512,21 @@
       "notes": "MeshlineStore.migrate provides the explicit migration capability, implemented separately by each platform adapter. Initialization does not create a missing database."
     },
     {
+      "symbol": "M:Meshline.Storage.Migrations.DeviceCreationPushGateway.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.DeviceCreationPushGateway.md#Meshline.Storage.Migrations.DeviceCreationPushGateway.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.DeviceCreationPushGateway.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.DeviceCreationPushGateway.md#Meshline.Storage.Migrations.DeviceCreationPushGateway.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.DeviceCreationPushGateway.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.DeviceCreationPushGateway.md#Meshline.Storage.Migrations.DeviceCreationPushGateway.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
       "symbol": "M:Meshline.Storage.Migrations.InitialCreate.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.InitialCreate.md#Meshline.Storage.Migrations.InitialCreate.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "status": "mapped-requires-behavior-review",
@@ -4177,6 +4206,13 @@
       "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
     },
     {
+      "symbol": "P:Meshline.Models.Client.AccountEstablishmentOptions.PushGateway",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md#Meshline.Models.Client.AccountEstablishmentOptions.PushGateway",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-establishment.ts",
+      "notes": "Integer-second lifetimes, original relay, creation-only initialProfile and explicit replaceDeviceId; omitted parameters resume durable intent."
+    },
+    {
       "symbol": "P:Meshline.Models.Client.AccountEstablishmentOptions.RelayId",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountEstablishmentOptions.md#Meshline.Models.Client.AccountEstablishmentOptions.RelayId",
       "status": "mapped-requires-behavior-review",
@@ -4242,6 +4278,13 @@
     {
       "symbol": "P:Meshline.Models.Client.AccountRecoveryOptions.PreviousDeviceState",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountRecoveryOptions.md#Meshline.Models.Client.AccountRecoveryOptions.PreviousDeviceState",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client/account-operations.ts",
+      "notes": "Explicit recovery accepts previous device state and revision overrides; does not run as a startup fallback."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.AccountRecoveryOptions.PushGateway",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.AccountRecoveryOptions.md#Meshline.Models.Client.AccountRecoveryOptions.PushGateway",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client/account-operations.ts",
       "notes": "Explicit recovery accepts previous device state and revision overrides; does not run as a startup fallback."
@@ -4602,6 +4645,34 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client/conversations.ts",
       "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceCreationOptions.PushGateway",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceCreationOptions.md#Meshline.Models.Client.DeviceCreationOptions.PushGateway",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/device-options.ts",
+      "notes": "DeviceCreationOptions supplies validitySeconds (default 365 days) and optional creation-only pushGateway. The numeric createDevice overload remains available and omits the declaration."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceCreationOptions.Validity",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceCreationOptions.md#Meshline.Models.Client.DeviceCreationOptions.Validity",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/device-options.ts",
+      "notes": "DeviceCreationOptions supplies validitySeconds (default 365 days) and optional creation-only pushGateway. The numeric createDevice overload remains available and omits the declaration."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceRenewalOptions.PushGateway",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceRenewalOptions.md#Meshline.Models.Client.DeviceRenewalOptions.PushGateway",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/device-options.ts",
+      "notes": "DeviceRenewalOptions retains keys and DeviceId; undefined preserves the gateway, a string sets it, and FieldUpdate.delete removes it. Null is invalid. Persist before publishing; numeric renewDevice retains the declaration."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.DeviceRenewalOptions.Validity",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceRenewalOptions.md#Meshline.Models.Client.DeviceRenewalOptions.Validity",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/device-options.ts",
+      "notes": "DeviceRenewalOptions retains keys and DeviceId; undefined preserves the gateway, a string sets it, and FieldUpdate.delete removes it. Null is invalid. Persist before publishing; numeric renewDevice retains the declaration."
     },
     {
       "symbol": "P:Meshline.Models.Client.DeviceSelectionInfo.DeviceLimit",
@@ -5251,36 +5322,36 @@
       "symbol": "P:Meshline.Models.FieldUpdate`1.Delete",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md#Meshline.Models.FieldUpdate_T_.Delete",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "P:Meshline.Models.FieldUpdate`1.IsDeleted",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md#Meshline.Models.FieldUpdate_T_.IsDeleted",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "P:Meshline.Models.FieldUpdate`1.IsSpecified",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md#Meshline.Models.FieldUpdate_T_.IsSpecified",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "P:Meshline.Models.FieldUpdate`1.Unspecified",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md#Meshline.Models.FieldUpdate_T_.Unspecified",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "P:Meshline.Models.FieldUpdate`1.Value",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md#Meshline.Models.FieldUpdate_T_.Value",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "P:Meshline.Models.NetworkContext.Reference",
@@ -6139,6 +6210,13 @@
     {
       "symbol": "P:Meshline.Models.Protocol.DeviceCertificate.NotBefore",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Protocol.DeviceCertificate.md#Meshline.Models.Protocol.DeviceCertificate.NotBefore",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/identity.ts",
+      "notes": "Explicit codec, signatures, validation and certificateId; current authorization is separate."
+    },
+    {
+      "symbol": "P:Meshline.Models.Protocol.DeviceCertificate.PushGateway",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Protocol.DeviceCertificate.md#Meshline.Models.Protocol.DeviceCertificate.PushGateway",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/models/identity.ts",
       "notes": "Explicit codec, signatures, validation and certificateId; current authorization is separate."
@@ -8377,6 +8455,20 @@
       "notes": "Snapshot queries and durable read positions. TypeScript uses string kinds and a kinds array in place of enum flags; summary timestamps are Unix seconds."
     },
     {
+      "symbol": "T:Meshline.Models.Client.DeviceCreationOptions",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceCreationOptions.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/device-options.ts",
+      "notes": "DeviceCreationOptions supplies validitySeconds (default 365 days) and optional creation-only pushGateway. The numeric createDevice overload remains available and omits the declaration."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.DeviceRenewalOptions",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceRenewalOptions.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/device-options.ts",
+      "notes": "DeviceRenewalOptions retains keys and DeviceId; undefined preserves the gateway, a string sets it, and FieldUpdate.delete removes it. Null is invalid. Persist before publishing; numeric renewDevice retains the declaration."
+    },
+    {
       "symbol": "T:Meshline.Models.Client.DeviceSelectionInfo",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.DeviceSelectionInfo.md",
       "status": "mapped-requires-behavior-review",
@@ -8576,8 +8668,8 @@
       "symbol": "T:Meshline.Models.FieldUpdate`1",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.FieldUpdate_T_.md",
       "status": "mapped-requires-behavior-review",
-      "typescript": "../../packages/sdk/src/protocol/codec.ts",
-      "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+      "typescript": "../../packages/sdk/src/models/field-update.ts",
+      "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
     },
     {
       "symbol": "T:Meshline.Models.NetworkContext",
@@ -9481,6 +9573,11 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/storage/store.ts",
       "notes": "MeshlineStore.migrate provides the explicit migration capability, implemented separately by each platform adapter. Initialization does not create a missing database."
+    },
+    {
+      "symbol": "T:Meshline.Storage.Migrations.DeviceCreationPushGateway",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.DeviceCreationPushGateway.md",
+      "status": "unmapped"
     },
     {
       "symbol": "T:Meshline.Storage.Migrations.InitialCreate",

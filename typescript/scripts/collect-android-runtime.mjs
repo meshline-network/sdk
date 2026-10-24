@@ -206,7 +206,7 @@ if (['interop', 'prepare-recovery', 'recovery'].includes(kind)) {
 await writeFile(join(directory, 'check.json'), JSON.stringify(receipt, null, 2) + '\n');
 consumer.expoAndroidRuntimeChecks = { ...consumer.expoAndroidRuntimeChecks, [kind]: { status: receipt.status, report: `artifacts/native/android/runtime/${kind}/check.json`, passed, failed } };
 consumer.expoNativeRuntime = `Android subsets: ${Object.entries(consumer.expoAndroidRuntimeChecks).map(([name, check]) => `${name} ${check.status}`).join(', ')}; full native acceptance and iOS remain pending`;
-if (kind === 'local' && consumer.expoVectorFixtures) consumer.expoVectorFixtures.nativeRuntime = failed ? 'Android local suite failed; see the per-check report' : 'Android/Hermes portable subset passed (214 checks); iOS not tested';
+if (kind === 'local' && consumer.expoVectorFixtures) consumer.expoVectorFixtures.nativeRuntime = failed ? 'Android local suite failed; see the per-check report' : 'Android/Hermes portable subset passed; see the per-check report; iOS not tested';
 if (consumer.expoAndroidNativeBuilds?.app) consumer.expoAndroidNativeBuilds.app.runtime = 'See expoAndroidRuntimeChecks; full native acceptance not complete';
 await writeFile(consumerPath, JSON.stringify(consumer, null, 2) + '\n');
 console.log(`Android ${kind}: ${passed} passed, ${failed} failed. Full native acceptance remains separate.`);

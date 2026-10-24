@@ -12,7 +12,7 @@ function files(): Record<string, VectorFile> {
 test('the exact portable native-acceptance runner passes its independent fixture subset on Node', async () => {
     let yields = 0; const report = await runPortableVectors(files(), undefined, async () => { yields++; });
     expect(report.results.filter(value => !value.passed)).toEqual([]); expect(report.passed).toBeGreaterThan(100); expect(yields).toBe(report.results.length);
-    expect(report.results.filter(value => value.name.startsWith('fixture SHA-256:'))).toHaveLength(7);
+    expect(report.results.filter(value => value.name.startsWith('fixture SHA-256:'))).toHaveLength(8);
 });
 
 test('the portable runner uses its injected signing randomness when Web Crypto is absent', async () => {
@@ -30,11 +30,11 @@ test('the portable runner uses its injected signing randomness when Web Crypto i
     `;
     const result = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', script,
         new URL('../expo/portable-vectors.ts', import.meta.url).href], { input: JSON.stringify(files()), encoding: 'utf8', windowsHide: true }));
-    expect(result).toEqual({ failures: [], passed: 214, requests: [32] });
+    expect(result).toEqual({ failures: [], passed: 241, requests: [32] });
 });
 test('fixture integrity failure prevents protocol checks from using changed expected answers', async () => {
     const input = files(); input['common-v1.json'] = { ...input['common-v1.json']!, source: input['common-v1.json']!.source + ' ' };
-    const report = await runPortableVectors(input); expect(report.failed).toBe(1); expect(report.results).toHaveLength(7);
+    const report = await runPortableVectors(input); expect(report.failed).toBe(1); expect(report.results).toHaveLength(8);
 });
 test('a cryptographic failure stays failed while later independent checks still run', async () => {
     const input = files(); const fixture = JSON.parse(input['identity-auth-v1.json']!.source) as { device_certificate: { account_signature: string } };

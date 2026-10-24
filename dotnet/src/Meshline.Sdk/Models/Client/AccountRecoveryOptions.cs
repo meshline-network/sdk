@@ -16,6 +16,14 @@ public sealed class AccountRecoveryOptions
     /// </summary>
     public TimeSpan CertificateValidity { get; set; } = TimeSpan.FromDays(365);
     /// <summary>
+    /// The complete HTTPS callback URL when recovery creates a new local device, or <see langword="null"/> for no declaration.
+    /// </summary>
+    /// <remarks>
+    /// A retained device keeps its declaration, including during renewal.
+    /// Use <see cref="DeviceRenewalOptions.PushGateway"/> to change or remove it.
+    /// </remarks>
+    public string? PushGateway { get; set; }
+    /// <summary>
     /// The requested account route lifetime, from one second through 3650 days; defaults to 365 days.
     /// </summary>
     public TimeSpan RouteValidity { get; set; } = TimeSpan.FromDays(365);

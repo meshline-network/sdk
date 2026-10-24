@@ -7,6 +7,7 @@ import { NetworkContext, signingInput } from '../protocol/context.js';
 import { encodeUtf8 } from '../protocol/encoding.js';
 import { canonicalJson, requireSafeInteger, type JsonObject } from '../protocol/json.js';
 import { validateCompleteObject } from '../protocol/validation.js';
+import { validatePushGateway } from '../protocol/push-gateway.js';
 
 export interface DeviceCertificate extends ExtensibleModel {
     readonly account: string;
@@ -15,6 +16,8 @@ export interface DeviceCertificate extends ExtensibleModel {
     readonly encryptionPublicKey: Uint8Array;
     readonly notBefore: number;
     readonly expiresAt: number;
+    /** Original HTTPS callback address; signed by both keys and excluded from DeviceId. */
+    readonly pushGateway?: string;
     readonly deviceSignature: Uint8Array;
     readonly accountSignature: Uint8Array;
 }
@@ -26,6 +29,7 @@ export const deviceCertificateCodec = defineCodec<DeviceCertificate>({
     encryptionPublicKey: { wire: 'encryption_public_key', codec: bytes },
     notBefore: { wire: 'not_before', codec: integer },
     expiresAt: { wire: 'expires_at', codec: integer },
+    pushGateway: { wire: 'push_gateway', codec: text, optional: true },
     deviceSignature: { wire: 'device_signature', codec: bytes },
     accountSignature: { wire: 'account_signature', codec: bytes },
 }, 'meshline.device.certificate');
@@ -45,6 +49,7 @@ export function certificateAccountInput(certificate: DeviceCertificate, context:
 /** Checks complete certificate integrity; current account authorization is a separate operation. */
 export function validateCertificate(certificate: DeviceCertificate, context: NetworkContext): void {
     validateCompleteObject(deviceCertificateCodec.encode(certificate));
+    if (certificate.pushGateway !== undefined) validatePushGateway(certificate.pushGateway);
     requireLength(certificate.signingPublicKey, 32, 'Signing public key');
     requireLength(certificate.encryptionPublicKey, 32, 'Encryption public key');
     requireLength(certificate.deviceSignature, 64, 'Device signature');

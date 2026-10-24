@@ -7,6 +7,8 @@ export * from './identity/neo.js';
 export * from './identity/identifiers.js';
 export type { ExtensibleModel, ProtocolCodec } from './protocol/codec.js';
 export * from './models/identity.js';
+export * from './models/field-update.js';
+export * from './models/device-options.js';
 export * from './storage/store.js';
 export * from './runtime/async-gate.js';
 export * from './runtime/clock.js';

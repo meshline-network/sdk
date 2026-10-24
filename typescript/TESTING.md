@@ -52,6 +52,8 @@ Use the fixture clock for SDK timers and an explicit handshake for concurrent wo
 | `components/account-establishment.test.ts` | Suites for establishment/renewal, prerequisites, device selection/continuity, interrupted operations/conflicts, and startup/authorization loss. |
 | `components/account.test.ts` | Route reconciliation, exact replay, original-relay preservation, expired publication evidence and cache/publication concurrency. |
 | `components/device.test.ts` | Device-state acceptance, complete-state publication and atomic publication/grant guards. |
+| `components/push-gateway.test.ts` | Suites for creation/renewal, account establishment/recovery, input validation and call isolation. |
+| `protocol/push-certificate.test.ts`, `protocol/push-interop.test.ts` | Fixed push certificate/URL vectors, signature coverage, UTF-8 limits and actual C# certificate interoperability. |
 | `components/message.test.ts` | Contact authorization maintenance, target acceptance, overlapping notification revisions, stop/start retries and shared outbox scans with delivery-retention checks. |
 | `transport/pool.test.ts` | Session reuse with unchanged certificates and device-session retirement after renewal, preserving account sessions. |
 | `browser/managers.spec.ts` | IndexedDB reopen after a lost acknowledgement and a fresh installation preserving devices and profile. |
@@ -61,10 +63,23 @@ installation. Secret-protector failures preserve retained data. Test wallets and
 relays expose explicit interruption hooks; assertions verify keys, exact signed
 requests, and authoritative state across reopen, not only successful completion.
 
+Push gateway intent is an optional property of the existing JSON establishment
+record. Missing properties in older records mean no creation declaration; no
+adapter schema migration is needed. Browser tests verify IndexedDB reopen before
+the draft exists and after an unknown gateway-update publication. Signed
+certificate and URL expectations come from `push-notifications-v1.json` in the
+shared snapshot; notification delivery remains a Relay/gateway responsibility.
+
+The interoperability suite compares signed URL acceptance, exact JSON and
+DeviceId with the C# driver. Its IPv6 and Unicode authority tables run under both
+Node's and Expo's URL implementations on Node; native acceptance remains separate.
+Component cases verify original-address retention, failure before side effects,
+and exact certificate/key reuse after interruption.
+
 Run the account lifecycle and its supporting components together after a build:
 
 ```sh
-npx vitest run tests/components/account-establishment.test.ts tests/components/account.test.ts tests/components/device.test.ts tests/components/message.test.ts tests/components/client.test.ts tests/transport/pool.test.ts
+npx vitest run tests/components/account-establishment.test.ts tests/components/account.test.ts tests/components/device.test.ts tests/components/push-gateway.test.ts tests/components/message.test.ts tests/components/client.test.ts tests/transport/pool.test.ts
 ```
 
 ## Outgoing-message coverage

@@ -29,6 +29,8 @@ Application\-facing options, drafts, queries, result models, and pagination type
 | [Conversation](Meshline.Models.Client.Conversation.md 'Meshline\.Models\.Client\.Conversation') | Summarizes a local direct, group, or channel conversation\. |
 | [ConversationQuery](Meshline.Models.Client.ConversationQuery.md 'Meshline\.Models\.Client\.ConversationQuery') | Filters local conversations by kind, unread state, and message presence\. |
 | [ConversationSummary](Meshline.Models.Client.ConversationSummary.md 'Meshline\.Models\.Client\.ConversationSummary') | Contains the latest message preview used to summarize a conversation\. |
+| [DeviceCreationOptions](Meshline.Models.Client.DeviceCreationOptions.md 'Meshline\.Models\.Client\.DeviceCreationOptions') | Supplies certificate settings for creating a new local device\. |
+| [DeviceRenewalOptions](Meshline.Models.Client.DeviceRenewalOptions.md 'Meshline\.Models\.Client\.DeviceRenewalOptions') | Supplies certificate settings for renewing the existing local device without replacing its keys or identity\. |
 | [DeviceSelectionInfo](Meshline.Models.Client.DeviceSelectionInfo.md 'Meshline\.Models\.Client\.DeviceSelectionInfo') | The current complete device list supplied when explicit selection is needed\. |
 | [DeviceStatePublishOptions](Meshline.Models.Client.DeviceStatePublishOptions.md 'Meshline\.Models\.Client\.DeviceStatePublishOptions') | Controls the prior state, recovery mode, and revision used when publishing device authorization\. |
 | [DeviceStatePublishResult](Meshline.Models.Client.DeviceStatePublishResult.md 'Meshline\.Models\.Client\.DeviceStatePublishResult') | Contains the submitted device state and whether the relay accepted or temporarily staged it\. |

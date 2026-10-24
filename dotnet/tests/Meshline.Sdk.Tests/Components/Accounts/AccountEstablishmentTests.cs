@@ -15,6 +15,72 @@ public sealed class AccountEstablishmentTests
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task Establishment_snapshots_options_and_nested_profile_before_asynchronous_work()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync(false);
+        var avatar = new ContentReference
+        {
+            Uri = "https://example.com/avatar.png",
+            Hash = "sha256:" + new string('A', 43),
+            ContentType = "image/png",
+            Size = 10
+        };
+        var profile = new AccountInitialProfile
+        {
+            Nickname = "Alice",
+            Bio = "Original",
+            Avatar = avatar,
+            PublicDiscovery = true
+        };
+        var options = new AccountEstablishmentOptions
+        {
+            RelayId = fixture.Relay.RelayId,
+            CertificateValidity = TimeSpan.FromDays(7),
+            RouteValidity = TimeSpan.FromDays(14),
+            InitialProfile = profile
+        };
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        fixture.Relay.Handler = async (request, cancellationToken) =>
+        {
+            entered.TrySetResult();
+            await release.Task.WaitAsync(cancellationToken);
+            return fixture.Relay.Respond(request);
+        };
+
+        var establishment = fixture.Client.EstablishAccountAsync(options, Token);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+            options.RelayId = "invalid";
+            options.CertificateValidity = TimeSpan.Zero;
+            options.RouteValidity = TimeSpan.Zero;
+            options.ReplaceDeviceId = "invalid";
+            profile.Nickname = "Changed";
+            profile.Bio = "Changed";
+            profile.Avatar = null;
+            profile.PublicDiscovery = false;
+            options.InitialProfile = new() { Nickname = "Replacement" };
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+        await establishment;
+
+        Assert.Equal(fixture.Relay.RelayId, fixture.Client.Route!.RelayId);
+        Assert.Equal(7 * 86400, fixture.Client.Device!.ExpiresAt - fixture.Client.Device.NotBefore);
+        Assert.Equal(14 * 86400, fixture.Client.Route.ExpiresAt - fixture.Client.Route.UpdatedAt);
+        Assert.Single(fixture.Client.DeviceState!.Certificates);
+        Assert.Equal("Alice", fixture.Client.Profile!.Nickname);
+        Assert.Equal("Original", fixture.Client.Profile.Bio);
+        Assert.Equal(avatar.ToJson(), fixture.Client.Profile.Avatar!.ToJson());
+        Assert.True(fixture.Client.Profile.PublicDiscovery);
+    }
+
+    [Fact]
     public async Task Initial_setup_creates_profile_without_starting_runtime_and_repeat_needs_no_signer()
     {
         using var time = Clock.Use(new ManualClock());

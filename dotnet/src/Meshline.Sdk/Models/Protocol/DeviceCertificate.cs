@@ -38,6 +38,11 @@ public sealed record DeviceCertificate() : TypedProtocolModel("meshline.device.c
     /// </summary>
     public required long ExpiresAt { get; init; }
     /// <summary>
+    /// The original complete HTTPS push callback URL, at most 512 UTF-8 bytes, or <see langword="null"/> to omit the declaration.
+    /// Covered by both signatures but excluded from device identity derivation. No platform tokens or credentials belong here.
+    /// </summary>
+    public string? PushGateway { get; init; }
+    /// <summary>
     /// The device signature over the model's device signing input.
     /// </summary>
     public required ImmutableArray<byte> DeviceSignature { get; init; }
@@ -82,6 +87,8 @@ public sealed record DeviceCertificate() : TypedProtocolModel("meshline.device.c
 
         try
         {
+            if (PushGateway is not null && PushGatewayValidator.Validate(PushGateway) is { } gatewayViolation)
+                return gatewayViolation;
             if (AccountAdapter.ValidateAccountId(Account) is { } violation)
                 return violation;
 

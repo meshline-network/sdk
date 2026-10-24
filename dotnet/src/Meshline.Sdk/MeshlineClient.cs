@@ -4,6 +4,7 @@ using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Storage;
 using Meshline.Transport;
+using Meshline.Validation;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Runtime.ExceptionServices;
@@ -257,7 +258,7 @@ public sealed partial class MeshlineClient : ClientComponent
     /// <summary>
     /// Idempotently establishes or renews local-device authorization while preserving the account's other devices and original relay.
     /// </summary>
-    /// <param name="options">Optional initial settings and explicit device replacement. An unfinished operation retains its saved lifetimes and profile.</param>
+    /// <param name="options">Optional initial settings and explicit device replacement. An unfinished operation retains its saved lifetimes, initial push gateway and profile.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>A task that completes after confirming effective route/device authorization and initializing the profile as needed.</returns>
     /// <remarks>
@@ -286,7 +287,8 @@ public sealed partial class MeshlineClient : ClientComponent
     {
         EnsureInitialized();
         using var _ = BeginOperation(ref cancellationToken);
-        ValidateEstablishmentOptions(options ??= new());
+        options = SnapshotEstablishmentOptions(options);
+        ValidateEstablishmentOptions(options);
         await _accountGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -326,6 +328,9 @@ public sealed partial class MeshlineClient : ClientComponent
         EnsureInitialized();
         using var _ = BeginOperation(ref cancellationToken);
         options ??= new();
+        var pushGateway = options.PushGateway;
+        if (pushGateway is not null && PushGatewayValidator.Validate(pushGateway) is { } gatewayViolation)
+            throw new ArgumentException(gatewayViolation.Message, nameof(options));
         if (options.PreviousDeviceState is { } supplied && (supplied.Account != Options.AccountId || supplied.Validate(Context) is not null))
             throw new ArgumentException("The previous device state must be valid and belong to this account.", nameof(options));
         await _accountGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -365,7 +370,7 @@ public sealed partial class MeshlineClient : ClientComponent
             }
             await DeviceManager.PublishDeviceStateAsync(relayId,
                 new() { PreviousState = options.PreviousDeviceState, IsRecovery = true, Revision = options.DeviceStateRevision },
-                options.CertificateValidity, cancellationToken).ConfigureAwait(false);
+                options.CertificateValidity, cancellationToken, pushGateway).ConfigureAwait(false);
             await AccountManager.PublishRouteAsync(relayId, options.RouteValidity, options.RouteRevision, isRecovery: true, cancellationToken).ConfigureAwait(false);
             await DeviceManager.ConfirmAuthorizationAsync(relayId, cancellationToken).ConfigureAwait(false);
             await using var database = new MeshlineDbContext(_databaseOptions);

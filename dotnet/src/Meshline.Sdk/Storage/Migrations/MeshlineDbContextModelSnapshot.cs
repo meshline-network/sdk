@@ -31,6 +31,10 @@ namespace Meshline.Storage.Migrations
                     b.Property<string>("InitialProfileJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("InitialPushGateway")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsInitialState")
                         .HasColumnType("INTEGER");
 

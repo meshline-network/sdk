@@ -86,6 +86,11 @@ Account establishment uses the `ResumableAccountEstablishment` migration after
 signed publications and history. Intermediate development schemas are not upgrade
 baselines.
 
+`DeviceCreationPushGateway` adds nullable creation intent to `AccountEstablishment`
+before a device draft exists. Verify upgrades from `ResumableAccountEstablishment`
+preserve unfinished setup, protected drafts and exact pending publications. Existing
+certificates and drafts remain authoritative for their gateway declaration.
+
 ## Account establishment
 
 The [account establishment guide](dotnet/docs/guides/account-establishment.md)
@@ -101,7 +106,7 @@ owner; they do not introduce another component, forwarding facade or workflow st
 
 | Owner | Responsibility and durable evidence |
 | --- | --- |
-| `MeshlineClient` | `AccountEstablishment`: operation ID, relay, lifetimes, initial profile, next step, replacement intent, original local identity and historical authorization checkpoint. |
+| `MeshlineClient` | `AccountEstablishment`: operation ID, relay, lifetimes, initial push gateway, initial profile, next step, replacement intent, original local identity and historical authorization checkpoint. |
 | `DeviceManager` | `LocalDevice`: active keys/certificate. `DevicePreparation`: protected draft and last activation receipt. Device-state cache and the `device.state.publish` record in `SignedRequests`. |
 | `AccountManager` | Verified `AccountRoutes` and the `account.route.publish` record in `SignedRequests`; route revisions, replay and confirmation. |
 | `ProfileManager` | Existing profile resolution, creation-only initialization and exact pending profile publication. |

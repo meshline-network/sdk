@@ -1,9 +1,11 @@
 using Meshline.Identity;
 using Meshline.Interactions;
+using Meshline.Models;
 using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Storage;
 using Meshline.Transport;
+using Meshline.Validation;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Org.BouncyCastle.Math.EC.Rfc7748;
@@ -86,7 +88,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The newly stored local device certificate.</returns>
     /// <remarks>
-    /// Requires an account signer, a secret protector, and a database without a local device or unfinished device preparation/publication. The returned certificate is stored locally; publish device state before treating the device as authorized by the relay.
+    /// Requires an account signer, a secret protector, and a database without a local device or unfinished device preparation/publication. This overload omits the push gateway declaration. The returned certificate is stored locally; publish device state before treating the device as authorized by the relay.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. An account signer or required secret protector is unavailable, a local device already exists, or device preparation/publication is unfinished.</exception>
@@ -96,15 +98,37 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails. The account signer produces a certificate that fails identity or signature validation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The requested certificate validity is outside one second through 720 days.</exception>
-    public async Task<DeviceCertificate> CreateDeviceAsync(TimeSpan validity, CancellationToken cancellationToken = default)
+    public Task<DeviceCertificate> CreateDeviceAsync(TimeSpan validity, CancellationToken cancellationToken = default) =>
+        CreateDeviceAsync(new DeviceCreationOptions { Validity = validity }, cancellationToken);
+
+    /// <summary>
+    /// Creates and stores a new local device with the supplied certificate lifetime and optional push gateway declaration.
+    /// </summary>
+    /// <param name="options">The certificate lifetime and optional push gateway declaration.</param>
+    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <returns>The newly stored local device certificate.</returns>
+    /// <remarks>
+    /// Requires an account signer, a secret protector, and no local device or unfinished device preparation/publication.
+    /// Publish device state before treating the device as authorized by the relay.
+    /// </remarks>
+    /// <inheritdoc cref="CreateDeviceAsync(TimeSpan, CancellationToken)" path="/exception"/>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is null.</exception>
+    /// <exception cref="ArgumentException">The push gateway is not a valid protocol HTTPS URL.</exception>
+    public async Task<DeviceCertificate> CreateDeviceAsync(DeviceCreationOptions options, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(options);
+        var validity = options.Validity;
+        var pushGateway = options.PushGateway;
+        ValidateValidity(validity);
+        if (pushGateway is not null && PushGatewayValidator.Validate(pushGateway) is { } violation)
+            throw new ArgumentException(violation.Message, nameof(options));
         using var _ = BeginOperation(ref cancellationToken);
         using var mutation = await EnterMutationAsync(cancellationToken).ConfigureAwait(false);
-        return await CreateDeviceCoreAsync(validity, cancellationToken).ConfigureAwait(false);
+        return await CreateDeviceCoreAsync(validity, pushGateway, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task<DeviceCertificate> CreateDeviceCoreAsync(TimeSpan validity, CancellationToken cancellationToken)
+    async Task<DeviceCertificate> CreateDeviceCoreAsync(TimeSpan validity, string? pushGateway, CancellationToken cancellationToken)
     {
         ValidateValidity(validity);
         var protector = secretProtector ?? throw new InvalidOperationException("A secret protector is required to create a local device.");
@@ -124,7 +148,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             encryptionKey = RandomNumberGenerator.GetBytes(32);
             var encryptionPublicKey = new byte[32];
             X25519.GeneratePublicKey(encryptionKey.AsSpan(), encryptionPublicKey.AsSpan());
-            certificate = await IssueCertificateAsync(signingKey, [.. encryptionPublicKey], validity, cancellationToken).ConfigureAwait(false);
+            certificate = await IssueCertificateAsync(signingKey, [.. encryptionPublicKey], validity, pushGateway, cancellationToken).ConfigureAwait(false);
             var deviceId = certificate.GetDeviceId(Context);
             var protectedSigningKey = await protector.ProtectAsync(signingKey, KeyPurpose(deviceId, "signing"), cancellationToken).ConfigureAwait(false);
             var protectedEncryptionKey = await protector.ProtectAsync(encryptionKey, KeyPurpose(deviceId, "encryption"), cancellationToken).ConfigureAwait(false);
@@ -156,7 +180,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <param name="cancellationToken">A token that can cancel the operation.</param>
     /// <returns>The renewed local device certificate with the same device keys.</returns>
     /// <remarks>
-    /// The renewed certificate retains the device identity. Complete any unfinished device preparation or publication before renewing. Publish device state to make the renewed authorization authoritative at the relay.
+    /// The renewed certificate retains the device identity and push gateway declaration. Complete any unfinished device preparation or publication before renewing. Publish device state to make the renewed authorization authoritative at the relay.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. An account signer or required secret protector is unavailable, no local device has been created, or device preparation/publication is unfinished.</exception>
@@ -167,15 +191,43 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails. The account signer produces a certificate that fails identity or signature validation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The requested certificate validity is outside one second through 720 days.</exception>
     /// <exception cref="InvalidDataException">The stored local device certificate is JSON null.</exception>
-    public async Task<DeviceCertificate> RenewDeviceAsync(TimeSpan validity, CancellationToken cancellationToken = default)
+    public Task<DeviceCertificate> RenewDeviceAsync(TimeSpan validity, CancellationToken cancellationToken = default) =>
+        RenewDeviceAsync(new DeviceRenewalOptions { Validity = validity }, cancellationToken);
+
+    /// <summary>
+    /// Renews and stores the local certificate with an optional push gateway change, retaining the device keys and identity.
+    /// </summary>
+    /// <param name="options">The certificate lifetime and gateway update. See <see cref="DeviceRenewalOptions.PushGateway"/> for retain, set and remove semantics.</param>
+    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <returns>The renewed local device certificate with the same device keys.</returns>
+    /// <remarks>
+    /// Requires account signing and no unfinished device preparation or publication. Renewal stores the certificate
+    /// and retires device sessions; publish device state to make the new authorization authoritative at the relay.
+    /// </remarks>
+    /// <inheritdoc cref="RenewDeviceAsync(TimeSpan, CancellationToken)" path="/exception"/>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is null.</exception>
+    /// <exception cref="ArgumentException">The assigned gateway is null or is not a valid protocol HTTPS URL.</exception>
+    public async Task<DeviceCertificate> RenewDeviceAsync(DeviceRenewalOptions options, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(options);
+        var validity = options.Validity;
+        var pushGateway = options.PushGateway;
+        ValidateValidity(validity);
+        if (pushGateway.IsSpecified)
+        {
+            if (pushGateway.Value is null)
+                throw new ArgumentException("Use FieldUpdate<string>.Delete to remove the push gateway declaration.", nameof(options));
+            if (PushGatewayValidator.Validate(pushGateway.Value) is { } violation)
+                throw new ArgumentException(violation.Message, nameof(options));
+        }
         using var _ = BeginOperation(ref cancellationToken);
         using var mutation = await EnterMutationAsync(cancellationToken).ConfigureAwait(false);
-        return await RenewDeviceCoreAsync(validity, cancellationToken).ConfigureAwait(false);
+        return await RenewDeviceCoreAsync(validity, pushGateway, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task<DeviceCertificate> RenewDeviceCoreAsync(TimeSpan validity, CancellationToken cancellationToken)
+    async Task<DeviceCertificate> RenewDeviceCoreAsync(TimeSpan validity, FieldUpdate<string> pushGateway,
+        CancellationToken cancellationToken)
     {
         ValidateValidity(validity);
         if (accountSigner is null)
@@ -196,7 +248,8 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         finally { _deviceGate.Release(); }
         try
         {
-            certificate = await IssueCertificateAsync(signingKey, previous.EncryptionPublicKey, validity, cancellationToken).ConfigureAwait(false);
+            certificate = await IssueCertificateAsync(signingKey, previous.EncryptionPublicKey, validity,
+                pushGateway.IsDeleted ? null : pushGateway.IsSpecified ? pushGateway.Value : previous.PushGateway, cancellationToken).ConfigureAwait(false);
             local.CertificateJson = certificate.ToJson();
             await CommitLocalDeviceAsync(database, certificate, null, null, cancellationToken).ConfigureAwait(false);
             await relayClients.RebindDeviceAsync(local.DeviceId, certificate).ConfigureAwait(false);
@@ -707,7 +760,8 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             throw new InvalidOperationException("Complete the pending device preparation or publication before creating or renewing a certificate.");
     }
 
-    async Task<DeviceCertificate> IssueCertificateAsync(byte[] signingKey, ImmutableArray<byte> encryptionPublicKey, TimeSpan validity, CancellationToken cancellationToken)
+    async Task<DeviceCertificate> IssueCertificateAsync(byte[] signingKey, ImmutableArray<byte> encryptionPublicKey, TimeSpan validity,
+        string? pushGateway, CancellationToken cancellationToken)
     {
         var signer = accountSigner ?? throw new InvalidOperationException("An account signer is required to authorize a device.");
         var signingPublicKey = new byte[Ed25519.PublicKeySize];
@@ -721,6 +775,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             EncryptionPublicKey = encryptionPublicKey,
             NotBefore = now,
             ExpiresAt = checked(now + (long)validity.TotalSeconds),
+            PushGateway = pushGateway,
             DeviceSignature = [],
             AccountSignature = []
         };

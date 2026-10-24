@@ -5,7 +5,7 @@ namespace Meshline.Components;
 
 // Device-domain contracts: no account workflow records, progress or exceptions.
 sealed record DeviceAuthorizationIntent(Guid OperationId, string RelayId, TimeSpan Validity,
-    string? ReplaceDeviceId, string? ProposedReplaceDeviceId, string? PreviousLocalDeviceId);
+    string? ReplaceDeviceId, string? ProposedReplaceDeviceId, string? PreviousLocalDeviceId, string? InitialPushGateway);
 
 sealed record DeviceAuthorizationInspection(bool IsAuthorized, string? PreviousLocalDeviceId);
 

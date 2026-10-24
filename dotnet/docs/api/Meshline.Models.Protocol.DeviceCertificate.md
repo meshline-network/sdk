@@ -17,6 +17,7 @@
 - [`EncryptionPublicKey`](#Meshline.Models.Protocol.DeviceCertificate.EncryptionPublicKey)
 - [`ExpiresAt`](#Meshline.Models.Protocol.DeviceCertificate.ExpiresAt)
 - [`NotBefore`](#Meshline.Models.Protocol.DeviceCertificate.NotBefore)
+- [`PushGateway`](#Meshline.Models.Protocol.DeviceCertificate.PushGateway)
 - [`SigningPublicKey`](#Meshline.Models.Protocol.DeviceCertificate.SigningPublicKey)
 
 </details>
@@ -138,6 +139,20 @@ public long NotBefore { get; init; }
 
 #### Property Value
 [System\.Int64](https://learn.microsoft.com/en-us/dotnet/api/system.int64 'System\.Int64')
+
+<a name='Meshline.Models.Protocol.DeviceCertificate.PushGateway'></a>
+
+## DeviceCertificate\.PushGateway Property
+
+The original complete HTTPS push callback URL, at most 512 UTF\-8 bytes, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') to omit the declaration\.<br>
+Covered by both signatures but excluded from device identity derivation\. No platform tokens or credentials belong here\.
+
+```csharp
+public string? PushGateway { get; init; }
+```
+
+#### Property Value
+[System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
 
 <a name='Meshline.Models.Protocol.DeviceCertificate.SigningPublicKey'></a>
 

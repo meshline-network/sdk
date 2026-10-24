@@ -4,8 +4,9 @@ namespace Meshline.Models.Client;
 /// Configures idempotent account setup without starting background synchronization.
 /// </summary>
 /// <remarks>
-/// An unfinished setup retains its saved lifetimes and initial profile. Omitted options resume that operation;
-/// conflicting explicit relay or profile values are rejected. Valid certificates and routes are retained.
+/// Options and initial profile fields are copied when setup is called.
+/// An unfinished setup retains its saved lifetimes, initial push gateway and initial profile. Omitted options resume that operation;
+/// conflicting explicit relay, gateway or profile values are rejected. Valid certificates and routes are retained.
 /// </remarks>
 public sealed class AccountEstablishmentOptions
 {
@@ -17,6 +18,15 @@ public sealed class AccountEstablishmentOptions
     /// The lifetime for a certificate that needs issuance or renewal, from one second through 720 days; defaults to 365 days.
     /// </summary>
     public TimeSpan CertificateValidity { get; set; } = TimeSpan.FromDays(365);
+    /// <summary>
+    /// The complete HTTPS callback URL for a new local device, or <see langword="null"/> for no declaration when starting setup.
+    /// </summary>
+    /// <remarks>
+    /// Existing devices and saved drafts retain their declaration. Omit this value to resume saved intent;
+    /// a conflicting non-null value is rejected while setup is unfinished.
+    /// Use <see cref="DeviceRenewalOptions.PushGateway"/> to change or remove an existing declaration.
+    /// </remarks>
+    public string? PushGateway { get; set; }
     /// <summary>
     /// The lifetime for a route that needs publication or renewal, from one second through 3650 days; defaults to 365 days.
     /// </summary>

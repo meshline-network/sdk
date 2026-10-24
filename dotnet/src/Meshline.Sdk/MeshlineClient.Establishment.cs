@@ -3,6 +3,7 @@ using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Storage;
 using Meshline.Transport;
+using Meshline.Validation;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -11,8 +12,30 @@ namespace Meshline;
 
 sealed partial class MeshlineClient
 {
+    static AccountEstablishmentOptions SnapshotEstablishmentOptions(AccountEstablishmentOptions? options)
+    {
+        if (options is null) return new();
+        return new()
+        {
+            RelayId = options.RelayId,
+            CertificateValidity = options.CertificateValidity,
+            PushGateway = options.PushGateway,
+            RouteValidity = options.RouteValidity,
+            ReplaceDeviceId = options.ReplaceDeviceId,
+            InitialProfile = options.InitialProfile is { } profile ? new()
+            {
+                Nickname = profile.Nickname,
+                Bio = profile.Bio,
+                Avatar = profile.Avatar,
+                PublicDiscovery = profile.PublicDiscovery
+            } : null
+        };
+    }
+
     void ValidateEstablishmentOptions(AccountEstablishmentOptions options)
     {
+        if (options.PushGateway is not null && PushGatewayValidator.Validate(options.PushGateway) is { } gatewayViolation)
+            throw new ArgumentException(gatewayViolation.Message, nameof(options));
         if (options.CertificateValidity < TimeSpan.FromSeconds(1) || options.CertificateValidity > TimeSpan.FromDays(720))
             throw new ArgumentOutOfRangeException(nameof(options), "Certificate validity must be between one second and 720 days.");
         if (options.RouteValidity < TimeSpan.FromSeconds(1) || options.RouteValidity > TimeSpan.FromDays(3650))
@@ -42,7 +65,7 @@ sealed partial class MeshlineClient
         var setup = await database.AccountEstablishments.SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         DeviceAuthorizationIntent? DeviceIntent() => setup is null ? null : new(setup.OperationId, setup.RelayId,
             TimeSpan.FromSeconds(setup.CertificateValiditySeconds), setup.ReplaceDeviceId, setup.PendingReplaceDeviceId,
-            setup.PreviousLocalDeviceId);
+            setup.PreviousLocalDeviceId, setup.InitialPushGateway);
         try
         {
             if (await database.HomeRelayMigrations.AnyAsync(cancellationToken).ConfigureAwait(false))
@@ -88,6 +111,7 @@ sealed partial class MeshlineClient
                     CertificateValiditySeconds = (long)options.CertificateValidity.TotalSeconds,
                     RouteValiditySeconds = (long)options.RouteValidity.TotalSeconds,
                     InitialProfileJson = options.InitialProfile is null ? null : JsonSerializer.Serialize(options.InitialProfile),
+                    InitialPushGateway = options.PushGateway,
                     IsInitialState = route is null && Route is null,
                     ReplaceDeviceId = options.ReplaceDeviceId,
                     PreviousLocalDeviceId = inspection.PreviousLocalDeviceId
@@ -96,6 +120,8 @@ sealed partial class MeshlineClient
             }
             else if (options.InitialProfile is not null && JsonSerializer.Serialize(options.InitialProfile) != setup.InitialProfileJson)
                 throw new AccountEstablishmentException(AccountEstablishmentReason.OperationParametersConflict, "The initial profile is already fixed by the unfinished operation.");
+            else if (options.PushGateway is not null && options.PushGateway != setup.InitialPushGateway)
+                throw new AccountEstablishmentException(AccountEstablishmentReason.OperationParametersConflict, "The initial push gateway is already fixed by the unfinished operation.");
 
             var replacement = options.ReplaceDeviceId ?? setup.PendingReplaceDeviceId ?? setup.ReplaceDeviceId;
             if (replacement != (setup.PendingReplaceDeviceId ?? setup.ReplaceDeviceId))

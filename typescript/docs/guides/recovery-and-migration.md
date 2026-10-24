@@ -14,11 +14,17 @@ Choose the action deliberately; do not use recovery as a generic error fallback.
 ## Recover an account
 
 `recoverAccount` remains available for deliberate administrative recovery. It
-accepts `relayId`, the two validity durations, `previousDeviceState`,
+accepts `relayId`, the two validity durations, creation-only `pushGateway`, `previousDeviceState`,
 `deviceStateRevision`, and `routeRevision`. Recovery may change authoritative
 route and device-state revisions. Supply complete known previous device state
 when available; recovery preserves it rather than intentionally dropping other
 devices. Revision overrides must advance beyond known state.
+
+`pushGateway` is used only if recovery creates a new local device. A retained
+device keeps its own declaration, including during expired-certificate renewal.
+Use [device renewal options](accounts-and-devices.md#declare-an-offline-push-gateway)
+to add, change or remove an existing declaration. Home-relay migration also retains
+the declaration when renewing an expired certificate.
 
 Use [unified establishment](account-establishment.md) for normal first use, new
 installations, renewal and explicit device reauthorization. Neither entry point

@@ -51,14 +51,19 @@ automatic wallet signing. Observe `BackgroundError` and `StateChanged`; the
 | --- | --- |
 | `RelayId` | Optional initial target or original-relay hint. A conflicting existing route or unfinished-operation target is rejected. Use explicit migration to change relays. |
 | `CertificateValidity` | Lifetime when a certificate needs issuance or renewal: 1 second–720 days, default 365 days. Valid certificates are retained. |
+| `PushGateway` | Complete HTTPS callback URL for a new local device. Existing certificates and drafts retain their own declaration, including during renewal. Omit for no declaration when starting setup, or to resume saved intent. |
 | `RouteValidity` | Lifetime when a route needs publication or renewal: 1 second–3650 days, default 365 days. Valid routes are retained. |
 | `InitialProfile` | Creation-only `Nickname`, `Bio`, `Avatar` and `PublicDiscovery` (default false). Existing values are preserved. |
 | `ReplaceDeviceId` | Exact caller-selected device to remove while authorizing the local device in one complete state publication. Omit it to resume a saved choice, or preserve all other devices when no choice is saved. |
 
-An unfinished operation retains its saved lifetimes and profile. Omitted options
-resume those settings; changing lifetimes does not restart it. A conflicting
-explicit relay or initial profile is rejected. When adopting an unfinished standalone
-route publication, use its original relay and route lifetime; mismatched settings
+Options and initial profile fields are copied when setup is called. An unfinished
+operation retains its saved lifetimes, initial push gateway and profile. Omitted
+options resume those settings; changing lifetimes does not restart it. A conflicting
+explicit relay, non-null gateway or initial profile is rejected.
+To change or remove an existing declaration, complete setup and use the
+[device renewal options](accounts-and-devices.md#declare-an-offline-push-gateway).
+When adopting an unfinished standalone route publication, use its original relay
+and route lifetime; mismatched settings
 are rejected before saving a new workflow or preparing keys.
 
 ## Structured failures and device selection

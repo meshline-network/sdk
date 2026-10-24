@@ -20,12 +20,12 @@ internal sealed class TestClient : IAsyncDisposable
     }
 
     MeshlineClient Create() => new(Relay.Options(Account), Database.Options, Pool, Protector, Account);
-    public async Task InitializeAsync(bool establish = true)
+    public async Task InitializeAsync(bool establish = true, string? pushGateway = null)
     {
         await Database.MigrateAsync();
         await Client.InitializeAsync(TestContext.Current.CancellationToken);
         if (establish)
-            await Client.EstablishAccountAsync(new AccountEstablishmentOptions { RelayId = Relay.RelayId }, TestContext.Current.CancellationToken);
+            await Client.EstablishAccountAsync(new AccountEstablishmentOptions { RelayId = Relay.RelayId, PushGateway = pushGateway }, TestContext.Current.CancellationToken);
     }
 
     public async Task ReopenAsync()

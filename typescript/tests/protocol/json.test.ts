@@ -23,7 +23,7 @@ const context = NetworkContext.parse(common.network_context);
 
 test('all fixture snapshots match recorded SHA-256 values', () => {
     const manifest = JSON.parse(readFileSync(new URL('manifest.json', vectorDirectory), 'utf8')) as { files: Record<string, string> };
-    expect(Object.keys(manifest.files)).toHaveLength(7);
+    expect(Object.keys(manifest.files)).toHaveLength(8);
     for (const [name, expected] of Object.entries(manifest.files))
         expect(createHash('sha256').update(readFileSync(new URL(name, vectorDirectory))).digest('hex'), name).toBe(expected);
 });

@@ -1011,8 +1011,18 @@
   },
   {
     "type": "Meshline.Models.FieldUpdate`1",
-    "path": "packages/sdk/src/protocol/codec.ts",
-    "notes": "CLR wrapper and implicit conversion are replaced by optional properties and null deletion in permitted update models. Complete documents use separate null rejection. No FieldUpdate class is exported."
+    "path": "packages/sdk/src/models/field-update.ts",
+    "notes": "FieldUpdate<T> uses direct values, undefined/FieldUpdate.unspecified and the explicit FieldUpdate.delete marker for device renewal. Null assignments are invalid there. Existing protocol patch models retain optional properties and permitted null deletion; complete documents reject null."
+  },
+  {
+    "type": "Meshline.Models.Client.DeviceCreationOptions",
+    "path": "packages/sdk/src/models/device-options.ts",
+    "notes": "DeviceCreationOptions supplies validitySeconds (default 365 days) and optional creation-only pushGateway. The numeric createDevice overload remains available and omits the declaration."
+  },
+  {
+    "type": "Meshline.Models.Client.DeviceRenewalOptions",
+    "path": "packages/sdk/src/models/device-options.ts",
+    "notes": "DeviceRenewalOptions retains keys and DeviceId; undefined preserves the gateway, a string sets it, and FieldUpdate.delete removes it. Null is invalid. Persist before publishing; numeric renewDevice retains the declaration."
   },
   {
     "type": "Meshline.Models.Protocol.AccountQuery",

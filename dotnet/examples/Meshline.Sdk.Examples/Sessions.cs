@@ -1,4 +1,5 @@
 using Meshline.Interactions;
+using Meshline.Models;
 using Meshline.Models.Client;
 using Meshline.Storage;
 using Meshline.Transport;
@@ -160,6 +161,54 @@ public static class Sessions
         var publication = await client.DeviceManager.PublishDeviceStateAsync(
             route.RelayId, cancellationToken: cancellationToken);
         Console.WriteLine($"Device-state publication: {publication.Status}");
+    }
+    #endregion
+
+    #region push-gateway-options
+    public static Task EstablishPushEnabledAccountAsync(
+        MeshlineClient client, string pushGateway, CancellationToken cancellationToken = default) =>
+        client.EstablishAccountAsync(new AccountEstablishmentOptions
+        {
+            PushGateway = pushGateway
+        }, cancellationToken);
+    #endregion
+
+    #region push-device-creation
+    public static Task<Meshline.Models.Protocol.DeviceCertificate> CreatePushEnabledDeviceAsync(
+        MeshlineClient client, string pushGateway, CancellationToken cancellationToken = default) =>
+        client.DeviceManager.CreateDeviceAsync(new DeviceCreationOptions
+        {
+            Validity = TimeSpan.FromDays(365),
+            PushGateway = pushGateway
+        }, cancellationToken);
+    #endregion
+
+    #region push-account-recovery
+    public static Task RecoverPushEnabledAccountAsync(
+        MeshlineClient client, string pushGateway, CancellationToken cancellationToken = default) =>
+        client.RecoverAccountAsync(new AccountRecoveryOptions
+        {
+            PushGateway = pushGateway
+        }, cancellationToken);
+    #endregion
+
+    #region push-gateway-update
+    public static async Task RenewDeviceWithGatewayAsync(
+        MeshlineClient client,
+        FieldUpdate<string> pushGateway,
+        TimeSpan validity,
+        CancellationToken cancellationToken = default)
+    {
+        // Use an initialized, stopped client constructed with an account signer.
+        // Pass default to retain the gateway, a URL to set it,
+        // or FieldUpdate<string>.Delete to remove the declaration.
+        await client.DeviceManager.RenewDeviceAsync(new DeviceRenewalOptions
+        {
+            Validity = validity,
+            PushGateway = pushGateway
+        }, cancellationToken);
+        // Publish and confirm the exact local certificate through the resumable workflow.
+        await client.EstablishAccountAsync(cancellationToken: cancellationToken);
     }
     #endregion
 }

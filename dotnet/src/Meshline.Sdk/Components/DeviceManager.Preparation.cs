@@ -113,6 +113,10 @@ sealed partial class DeviceManager
                 Ed25519.GeneratePublicKey(signingKey.AsSpan(), signingPublicKey.AsSpan());
                 X25519.GeneratePublicKey(encryptionKey.AsSpan(), encryptionPublicKey.AsSpan());
                 var now = Clock.UtcNow.ToUnixTimeSeconds();
+                // An absent declaration on an existing certificate/draft is intentional.
+                // Only a brand-new device takes the saved creation intent.
+                var pushGateway = draft is not null ? draft.PushGateway
+                    : local is not null ? ReadLocalCertificate(local).PushGateway : authorization.InitialPushGateway;
                 draft = new DeviceCertificate
                 {
                     Account = Options.AccountId,
@@ -121,6 +125,7 @@ sealed partial class DeviceManager
                     EncryptionPublicKey = [.. encryptionPublicKey],
                     NotBefore = now,
                     ExpiresAt = checked(now + (long)validity.TotalSeconds),
+                    PushGateway = pushGateway,
                     DeviceSignature = [],
                     AccountSignature = []
                 };

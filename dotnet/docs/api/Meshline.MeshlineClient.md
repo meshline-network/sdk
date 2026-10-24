@@ -329,7 +329,7 @@ public System.Threading.Tasks.Task EstablishAccountAsync(Meshline.Models.Client.
 
 `options` [AccountEstablishmentOptions](Meshline.Models.Client.AccountEstablishmentOptions.md 'Meshline\.Models\.Client\.AccountEstablishmentOptions')
 
-Optional initial settings and explicit device replacement\. An unfinished operation retains its saved lifetimes and profile\.
+Optional initial settings and explicit device replacement\. An unfinished operation retains its saved lifetimes, initial push gateway and profile\.
 
 <a name='Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken).cancellationToken'></a>
 

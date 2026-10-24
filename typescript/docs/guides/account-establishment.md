@@ -43,13 +43,18 @@ Reauthorizing a device does **not** restore lost chat history or group secrets.
 | --- | --- |
 | `relayId` | Select a verified relay for an initial account. Existing accounts and unfinished operations retain their original relay. |
 | `certificateValiditySeconds` | Lifetime of a new or renewed certificate: a positive integer in seconds, default 365 days, maximum 720 days. Valid certificates are reused. |
+| `pushGateway` | Complete HTTPS callback for a new device. Existing certificates/drafts retain their declaration. Omit to resume saved intent. |
 | `routeValiditySeconds` | Lifetime of a new or renewed route: a positive integer in seconds, default 365 days, maximum 3650 days. Valid confirmed routes are reused. |
 | `replaceDeviceId` | Explicit device to remove in the same publication that authorizes the local device, subject to contact continuity. |
 | `initialProfile` | Creation-only `nickname`, `bio`, `avatar` and `publicDiscovery`. Existing remote or retained profiles take precedence. |
 
-Omitted options resume saved values. An incompatible lifetime/profile raises
-`operationParametersConflict`. Internal operation IDs associate durable work;
-callers do not supply or persist an operation ID.
+Options, including nested initial profile data, are copied before asynchronous work.
+Omitted options resume saved values; changed lifetime options do not replace the
+saved lifetimes. A conflicting explicit relay, initial profile or non-undefined
+gateway is rejected. Gateway/profile conflicts raise `operationParametersConflict`.
+To change or remove an existing declaration, complete setup and use the
+[renewal options](accounts-and-devices.md#declare-an-offline-push-gateway).
+The SDK manages operation identifiers and progress internally.
 
 The result is `Promise<void>`. Catch `AccountEstablishmentError` and inspect
 `reason`, optional `deviceSelection` and `keyIssue`, and `contactIssues`:
