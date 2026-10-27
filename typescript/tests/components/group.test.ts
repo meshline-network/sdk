@@ -1,9 +1,36 @@
 import { afterEach, expect, test } from 'vitest';
-import { GroupManager, canonicalJson, groupMessageEnvelopeCodec, groupSyncPageCodec, type QueryReader, type GroupEvents } from '@meshline/sdk';
+import { GroupManager, canonicalJson, groupMessageEnvelopeCodec, groupSyncPageCodec, messageSendRequestCodec, type QueryReader, type GroupEvents } from '@meshline/sdk';
 import { GroupNetwork } from '../support/group-network.js';
 const networks: GroupNetwork[] = []; afterEach(async () => { for (const network of networks.splice(0)) await network.dispose(); });
 async function fixture() { const network = new GroupNetwork(); networks.push(network); const owner = await network.client(51); const peer = await network.client(52); return { network, owner, peer, relayId: network.network.descriptor.relayId }; }
 async function all<T>(query: Promise<QueryReader<T>>): Promise<readonly T[]> { const reader = await query; try { return await reader.readNext(100); } finally { await reader.dispose(); } }
+
+test.each([
+    { content: 'chat', notify: true },
+    { content: 'reply', notify: true },
+    { content: 'nickname', notify: false },
+    { content: 'clear-nickname', notify: false },
+])('group notification intent follows content type: $content', async ({ content, notify }) => {
+    const { network, owner, relayId } = await fixture();
+    const group = await owner.groups.createGroup(relayId, { name: 'notification intent', memberCapacity: 10 });
+    if (content === 'nickname' || content === 'clear-nickname') {
+        await owner.groups.setNickname(group.ref, 'member');
+        if (content === 'clear-nickname') await owner.groups.setNickname(group.ref, null);
+    } else {
+        const message = await owner.groups.sendMessage(group.ref, { body: { contentType: 'text/plain', text: 'hello' } });
+        if (content === 'reply') await owner.groups.sendMessage(group.ref, { body: { contentType: 'text/plain', text: 'reply' }, replyToSeq: message.sequence });
+    }
+    const request = network.requests.filter(value => value.method === 'group.message.send').at(-1)!;
+    expect(groupMessageEnvelopeCodec.decode(request.body).notify).toBe(notify);
+});
+
+test('group key synchronization does not request push', async () => {
+    const { owner, relayId } = await fixture();
+    await owner.groups.createGroup(relayId, { name: 'key synchronization', memberCapacity: 10 });
+    const synchronization = (await owner.store.read([{ collection: 'message_outbox' }])).sets[0]!;
+    expect(synchronization.length).toBeGreaterThan(0);
+    for (const row of synchronization) expect(messageSendRequestCodec.decode(row.value.request!).envelope.notify).toBe(false);
+});
 
 test.each([false, true])('message batches follow group then sequence despite older creation times (filter group: %s)', async filterGroup => {
     const { network, owner, relayId } = await fixture();
@@ -127,6 +154,7 @@ test('an unaccepted uncertain request retries exactly the same encrypted envelop
     const { network, owner, relayId } = await fixture(); const group = await owner.groups.createGroup(relayId, { name: 'exact retry', memberCapacity: 10 }); network.failBeforeAccept = 'group.message.send';
     await expect(owner.groups.sendMessage(group.ref, { body: { contentType: 'text/plain', text: 'stable ciphertext' } })).rejects.toThrow('Connection lost');
     const pending = (await owner.store.read([{ collection: 'group_operations' }])).sets[0]![0]!.value; const expected = groupMessageEnvelopeCodec.decode(pending.request!);
+    expect(expected.notify).toBe(true);
     await owner.dispose(); network.failBeforeAccept = undefined; const resumed = await network.client(51, owner.path); await resumed.groups.start();
     await network.network.until(async () => !(await resumed.store.read([{ collection: 'group_operations' }])).sets[0]!.length); await resumed.groups.stop();
     const sent = network.requests.filter(value => value.method === 'group.message.send'); expect(sent).toHaveLength(2); expect(sent[0]!.body).toEqual(sent[1]!.body); expect((await all(resumed.groups.getMessages()))[0]!.messageId).toBe(expected.messageId);

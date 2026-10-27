@@ -32,10 +32,13 @@ export function validateEncryptedPayload(value: EncryptedPayload): void {
 }
 export interface MessageEnvelope extends ExtensibleModel {
     readonly messageId: string; readonly createdAt: number; readonly from: string; readonly fromDeviceId: string; readonly to: string;
+    /** Requests offline push when true; omission or false does not request a notification. Relay authorization and delivery conditions still apply. */
+    readonly notify?: boolean;
     readonly payload: EncryptedPayload; readonly deviceSignature: Uint8Array;
 }
 export const messageEnvelopeCodec = defineCodec<MessageEnvelope>({ messageId: { wire: 'message_id', codec: text }, createdAt: { wire: 'created_at', codec: integer },
     from: { wire: 'from', codec: text }, fromDeviceId: { wire: 'from_device_id', codec: text }, to: { wire: 'to', codec: text },
+    notify: { wire: 'notify', codec: boolean, optional: true },
     payload: { wire: 'payload', codec: encryptedPayloadCodec }, deviceSignature: { wire: 'device_signature', codec: bytes } }, 'meshline.message.envelope');
 export const messageEnvelopeInput = (value: MessageEnvelope, context: NetworkContext): Uint8Array => signingInput(messageEnvelopeCodec.encode(value), context, ['device_signature']);
 export function validateMessageEnvelope(value: MessageEnvelope): void {

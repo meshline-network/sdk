@@ -176,5 +176,261 @@
         }
       ]
     }
+  },
+  "notification": {
+    "base_envelope_ref": "/timeline/request/envelope",
+    "signing_private_key_ref": "/timeline/sender_signing_private_key",
+    "signing_public_key_ref": "/timeline/request/signer_certificate/signing_public_key",
+    "variants": [
+      {
+        "name": "omitted",
+        "envelope_ref": "/timeline/request/envelope",
+        "signing_input_utf8_hex_ref": "/timeline/envelope_signing_input_utf8_hex",
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_false",
+        "envelope": {
+          "$type": "meshline.message.envelope",
+          "message_id": "msg_AAECAwQFBgcICQoLDA0ODw",
+          "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+          "from_device_id": "dev_nhv09l2lqfqD_WeF_UWsHg",
+          "to": "neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn",
+          "notify": false,
+          "payload": {
+            "alg": "AES-256-GCM",
+            "nonce": "MTIzNDU2Nzg5Ojs8",
+            "ciphertext": "jp2Ry3N_Dm00H3c9zA00PNDiKC5sUstcDjlPxWizypdatkCjvMbFvgyoMoY3T8LhoIaQcKl_QMlB2BjbWWzxVLrS8gxyAZ72Tt0OZ3dzlCpMLyd1TzP6qoldWoOXyQPYy4sHSNHg3RcaRospydHf8SFbSP-nujk"
+          },
+          "device_signature": "Uy7lweMYzEr1rjqk30eIcIYf-03rrW0vBfl97hpqQh0mYq_0wLOnhzQrTb--JQKh1tCcsrRvIgKqY1b5A7qiDg",
+          "created_at": 1730000000
+        },
+        "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6d6573736167652e656e76656c6f7065222c22637265617465645f6174223a313733303030303030302c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c2266726f6d5f6465766963655f6964223a226465765f6e687630396c326c716671445f5765465f5557734867222c226d6573736167655f6964223a226d73675f41414543417751464267634943516f4c4441304f4477222c226e6f74696679223a66616c73652c227061796c6f6164223a7b22616c67223a224145532d3235362d47434d222c2263697068657274657874223a226a70325279334e5f446d3030483363397a413030504e44694b43357355737463446a6c507857697a79706461746b436a764d62467667796f4d6f593354384c686f496151634b6c5f514d6c4232426a6257577a78564c725338677879415a37325474304f5a33647a6c43704d4c796431547a5036716f6c64576f4f587951505979347348534e486733526361526f7370796448663853466253502d6e756a6b222c226e6f6e6365223a224d54497a4e4455324e7a67354f6a7338227d2c22746f223a226e656f3a3836303833333130323a4e51346477437579526e356f65726d646f6867773367577559446d7154395665646e227d",
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_true",
+        "envelope": {
+          "$type": "meshline.message.envelope",
+          "message_id": "msg_AAECAwQFBgcICQoLDA0ODw",
+          "from": "neo:860833102:NgaxELHoZFpQWNwd74Fvq4wF3qz57WTfpp",
+          "from_device_id": "dev_nhv09l2lqfqD_WeF_UWsHg",
+          "to": "neo:860833102:NQ4dwCuyRn5oermdohgw3gWuYDmqT9Vedn",
+          "notify": true,
+          "payload": {
+            "alg": "AES-256-GCM",
+            "nonce": "MTIzNDU2Nzg5Ojs8",
+            "ciphertext": "jp2Ry3N_Dm00H3c9zA00PNDiKC5sUstcDjlPxWizypdatkCjvMbFvgyoMoY3T8LhoIaQcKl_QMlB2BjbWWzxVLrS8gxyAZ72Tt0OZ3dzlCpMLyd1TzP6qoldWoOXyQPYy4sHSNHg3RcaRospydHf8SFbSP-nujk"
+          },
+          "device_signature": "MDpvKDWbzb_-Tqhh0smazYuHaiPVaIP1DPL58tu8NefgIADN_Qf8gue5ulTVZCMcE043C1_E5gbPAk_cRuG0Bw",
+          "created_at": 1730000000
+        },
+        "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e6d6573736167652e656e76656c6f7065222c22637265617465645f6174223a313733303030303030302c2266726f6d223a226e656f3a3836303833333130323a4e676178454c486f5a467051574e7764373446767134774633717a35375754667070222c2266726f6d5f6465766963655f6964223a226465765f6e687630396c326c716671445f5765465f5557734867222c226d6573736167655f6964223a226d73675f41414543417751464267634943516f4c4441304f4477222c226e6f74696679223a747275652c227061796c6f6164223a7b22616c67223a224145532d3235362d47434d222c2263697068657274657874223a226a70325279334e5f446d3030483363397a413030504e44694b43357355737463446a6c507857697a79706461746b436a764d62467667796f4d6f593354384c686f496151634b6c5f514d6c4232426a6257577a78564c725338677879415a37325474304f5a33647a6c43704d4c796431547a5036716f6c64576f4f587951505979347348534e486733526361526f7370796448663853466253502d6e756a6b222c226e6f6e6365223a224d54497a4e4455324e7a67354f6a7338227d2c22746f223a226e656f3a3836303833333130323a4e51346477437579526e356f65726d646f6867773367577559446d7154395665646e227d",
+        "expected_allows_push": true
+      }
+    ],
+    "field_cases": [
+      {
+        "name": "omitted",
+        "remove": [
+          "notify"
+        ],
+        "expected_format_valid": true,
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_false",
+        "set": {
+          "notify": false
+        },
+        "expected_format_valid": true,
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_true",
+        "set": {
+          "notify": true
+        },
+        "expected_format_valid": true,
+        "expected_allows_push": true
+      },
+      {
+        "name": "null",
+        "set": {
+          "notify": null
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "string_true",
+        "set": {
+          "notify": "true"
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "string_false",
+        "set": {
+          "notify": "false"
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "number_zero",
+        "set": {
+          "notify": 0
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "number_one",
+        "set": {
+          "notify": 1
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "array",
+        "set": {
+          "notify": []
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "object",
+        "set": {
+          "notify": {}
+        },
+        "expected_format_valid": false
+      }
+    ],
+    "signature_tampering": [
+      {
+        "name": "omitted_to_explicit_false",
+        "envelope_ref": "/timeline/request/envelope",
+        "set": {
+          "notify": false
+        },
+        "expected_signature_valid": false
+      },
+      {
+        "name": "omitted_to_explicit_true",
+        "envelope_ref": "/timeline/request/envelope",
+        "set": {
+          "notify": true
+        },
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_false_to_omitted",
+        "envelope_ref": "/notification/variants/1/envelope",
+        "remove": [
+          "notify"
+        ],
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_false_to_explicit_true",
+        "envelope_ref": "/notification/variants/1/envelope",
+        "set": {
+          "notify": true
+        },
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_true_to_omitted",
+        "envelope_ref": "/notification/variants/2/envelope",
+        "remove": [
+          "notify"
+        ],
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_true_to_explicit_false",
+        "envelope_ref": "/notification/variants/2/envelope",
+        "set": {
+          "notify": false
+        },
+        "expected_signature_valid": false
+      }
+    ],
+    "retry_methods": [
+      "message.send",
+      "message.deliver"
+    ],
+    "retry_cases": [
+      {
+        "name": "omitted_to_omitted",
+        "accepted_envelope_ref": "/timeline/request/envelope",
+        "retry_envelope_ref": "/timeline/request/envelope",
+        "expected_result": "original_result",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "omitted_to_explicit_false",
+        "accepted_envelope_ref": "/timeline/request/envelope",
+        "retry_envelope_ref": "/notification/variants/1/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "omitted_to_explicit_true",
+        "accepted_envelope_ref": "/timeline/request/envelope",
+        "retry_envelope_ref": "/notification/variants/2/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_false_to_omitted",
+        "accepted_envelope_ref": "/notification/variants/1/envelope",
+        "retry_envelope_ref": "/timeline/request/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_false_to_explicit_false",
+        "accepted_envelope_ref": "/notification/variants/1/envelope",
+        "retry_envelope_ref": "/notification/variants/1/envelope",
+        "expected_result": "original_result",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_false_to_explicit_true",
+        "accepted_envelope_ref": "/notification/variants/1/envelope",
+        "retry_envelope_ref": "/notification/variants/2/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_true_to_omitted",
+        "accepted_envelope_ref": "/notification/variants/2/envelope",
+        "retry_envelope_ref": "/timeline/request/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_true_to_explicit_false",
+        "accepted_envelope_ref": "/notification/variants/2/envelope",
+        "retry_envelope_ref": "/notification/variants/1/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_true_to_explicit_true",
+        "accepted_envelope_ref": "/notification/variants/2/envelope",
+        "retry_envelope_ref": "/notification/variants/2/envelope",
+        "expected_result": "original_result",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      }
+    ]
   }
 }

@@ -9,13 +9,14 @@ import {
     validateAccountGroupHistorySecretSync, validateAccountGroupPrivateStateSync, validateAccountGroupPrivateStateRequest,
     type JsonObject, type JsonValue, type RandomSource,
 } from '@meshline/sdk';
-import { vector, hex, unhex } from '../support/vectors.js';
+import { vector, vectorValue, hex, unhex } from '../support/vectors.js';
 
 interface Actor { label: string; signing_private_key: string; certificate: JsonObject; device_id: string }
 interface NicknameVector { name: string; actor: string; plaintext: JsonObject; plaintext_utf8_hex: string; message_aad_utf8_hex: string; signing_input_utf8_hex: string;
     event: { epoch: number; signer_device_id: string; payload: JsonObject }; expected_sender_account: string; expected_business_valid: boolean | null; message_nonce: string; message_key: string }
 const data = vector<{
     network_context: string;
+    notification: { variants: (JsonObject & { name: string })[] };
     keying: { input: { account: string; group_id: string; device_id: string; epoch: number; member_encryption_private_key: string; member_encryption_public_key: string;
         device_encryption_private_key: string; device_encryption_public_key: string; client_group_secret: string; relay_epoch_secret: string; client_box_ephemeral_private_key: string; client_box_nonce: string;
         relay_box_ephemeral_private_key: string; relay_box_nonce: string; message_signing_private_key: string; message_id: string; message_created_at: number; message_content: JsonObject; message_nonce: string };
@@ -65,6 +66,20 @@ function actorFor(row: NicknameVector) {
     const certificate = deviceCertificateCodec.decode(row.actor === 'A2' ? data.management_chain.signer_account_binding.cases.find(value => value.name === 'same_account')!.certificate : actor.certificate);
     return { certificate, async sign(bytes: Uint8Array) { return signDevice(bytes, decodeBase64Url(actor.signing_private_key)); } };
 }
+
+test.each(data.notification.variants)('notification variant retains fixed group keys and plaintext: $name', async variant => {
+    const envelope = groupMessageEnvelopeCodec.decode(vectorValue(data as unknown as JsonObject, variant, 'envelope'));
+    const source = data.encrypted_nicknames.messages[0]!; const signer = actorFor(source);
+    const secret = decodeBase64Url(data.encrypted_nicknames.epoch_inputs.find(row => row.epoch === envelope.epoch)!.epoch_application_secret);
+    const aad = groupMessageAad(envelope, signer.certificate.account, source.event.signer_device_id, context);
+    expect(hex(aad)).toBe(source.message_aad_utf8_hex); expect(encodeBase64Url(deriveGroupMessageKey(secret, aad))).toBe(source.message_key);
+    expect(decryptGroupMessage({ context, envelope, sender: signer.certificate, signerDeviceId: source.event.signer_device_id, applicationSecret: secret })).toEqual(source.plaintext);
+    if (envelope.notify === false) {
+        const encrypted = await encryptGroupMessage({ context, signer, groupId: envelope.groupId, epoch: envelope.epoch,
+            messageId: envelope.messageId, createdAt: envelope.createdAt, applicationSecret: secret, payload: source.plaintext, random: deterministic(source.message_nonce) });
+        expect(groupMessageEnvelopeCodec.encode(encrypted)).toEqual(groupMessageEnvelopeCodec.encode(envelope));
+    }
+});
 test.each(data.encrypted_nicknames.messages)('encrypted nickname vector: $name', async row => {
     const envelope = groupMessageEnvelopeCodec.decode(row.event.payload); const signer = actorFor(row);
     const secret = decodeBase64Url(data.encrypted_nicknames.epoch_inputs.find(value => value.epoch === envelope.epoch)!.epoch_application_secret);
@@ -79,8 +94,8 @@ test.each(data.encrypted_nicknames.messages)('encrypted nickname vector: $name',
     validateGroupPayload(plaintext);
     const encrypted = await encryptGroupMessage({ context, signer, groupId: envelope.groupId, epoch: envelope.epoch, messageId: envelope.messageId, createdAt: envelope.createdAt,
         applicationSecret: secret, payload: plaintext, random: deterministic(row.message_nonce) });
-    if (hex(canonicalBytes(plaintext)) === row.plaintext_utf8_hex) expect(groupMessageEnvelopeCodec.encode(encrypted)).toEqual(row.event.payload);
-    else expect(decryptGroupMessage({ context, envelope: encrypted, sender: signer.certificate, signerDeviceId: row.event.signer_device_id, applicationSecret: secret })).toEqual(row.plaintext);
+    if (hex(canonicalBytes(plaintext)) === row.plaintext_utf8_hex) expect(encrypted.payload).toEqual(envelope.payload);
+    expect(decryptGroupMessage({ context, envelope: encrypted, sender: signer.certificate, signerDeviceId: row.event.signer_device_id, applicationSecret: secret })).toEqual(row.plaintext);
 });
 test.each(data.encrypted_nicknames.field_cases)('nickname Unicode, byte length and presence: $name', row => {
     const run = () => validateGroupMemberNicknameUpdate(groupMemberNicknameUpdateCodec.decode({ $type: 'meshline.group.member.nickname.update', ...(row.omit ? {} : { nickname: row.value! }) }));

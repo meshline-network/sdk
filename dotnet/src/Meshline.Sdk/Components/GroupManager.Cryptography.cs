@@ -140,6 +140,7 @@ sealed partial class GroupManager
             Epoch = epoch,
             MessageId = Identifiers.CreateMessageId(),
             CreatedAt = Clock.UtcNow.ToUnixTimeSeconds(),
+            Notify = payload is GroupMessage,
             Payload = new() { Alg = "AES-256-GCM", Nonce = [.. nonce], Ciphertext = [] },
             DeviceSignature = []
         };

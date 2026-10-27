@@ -47,6 +47,12 @@ public sealed class BackgroundContactAuthorizationTests
         });
         await fixture.Client.MessageManager.StopAsync(Token);
 
+        await using (var database = fixture.Database.Open())
+        {
+            var maintenance = await database.MessageOutbox.Where(row => row.Recipient == peer.AccountId).ToListAsync(Token);
+            Assert.Equal(2, maintenance.Count);
+            Assert.All(maintenance, row => Assert.False(ProtocolModel.FromJson<MessageSendRequest>(row.RequestJson)!.Envelope.Notify));
+        }
         Assert.Equal(delivery == MessageDeliveryState.TargetAccepted, await HasLocalSignatureAsync(fixture, confirmed: true));
         await fixture.ReopenAsync();
         Assert.Equal(delivery == MessageDeliveryState.TargetAccepted, await HasLocalSignatureAsync(fixture, confirmed: true));

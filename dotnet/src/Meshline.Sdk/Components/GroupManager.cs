@@ -271,6 +271,7 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
 
     /// <summary>
     /// Encrypts and submits a group message and synchronizes its accepted timeline entry.
+    /// The message requests offline push.
     /// </summary>
     /// <param name="group">The group identifier and hosting relay.</param>
     /// <param name="draft">The plaintext message body, attachment references, and optional reply information to send.</param>

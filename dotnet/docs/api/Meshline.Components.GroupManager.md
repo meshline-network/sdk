@@ -2072,7 +2072,8 @@ The operation prepares encrypted secret boxes and then commits a signed manageme
 
 ## GroupManager\.SendMessageAsync\(GroupRef, GroupMessageDraft, CancellationToken\) Method
 
-Encrypts and submits a group message and synchronizes its accepted timeline entry\.
+Encrypts and submits a group message and synchronizes its accepted timeline entry\.<br>
+The message requests offline push\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Client.GroupMessageInfo> SendMessageAsync(Meshline.Models.Client.GroupRef group, Meshline.Models.Client.GroupMessageDraft draft, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));

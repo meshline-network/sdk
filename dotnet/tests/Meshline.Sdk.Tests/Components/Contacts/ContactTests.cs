@@ -99,11 +99,34 @@ public sealed class ContactTests
 
         Assert.Equal(first.MessageId, second.MessageId);
 
+        await using (var database = fixture.Database.Open())
+        {
+            var outgoing = await database.MessageOutbox.SingleAsync(row => row.MessageId == first.MessageId, Token);
+            Assert.True(ProtocolModel.FromJson<MessageSendRequest>(outgoing.RequestJson)!.Envelope.Notify);
+        }
+
         await using (var requests = await manager.GetContactRequestsAsync(cancellationToken: Token))
             Assert.Single(await requests.ReadNextAsync(10, Token));
 
         Assert.True(await manager.CancelMessageAsync(first.MessageId!, Token));
         await Assert.ThrowsAsync<ArgumentException>(() => manager.AddContactAsync(fixture.Account.AccountId, cancellationToken: Token));
+    }
+
+    [Fact]
+    public async Task Contact_acceptance_requests_push_while_account_synchronization_is_silent()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        using var peer = new AccountSigner();
+
+        await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
+
+        await using var database = fixture.Database.Open();
+        var acceptance = await database.MessageOutbox.SingleAsync(row => row.Recipient == peer.AccountId, Token);
+        Assert.True(ProtocolModel.FromJson<MessageSendRequest>(acceptance.RequestJson)!.Envelope.Notify);
+        var synchronization = await database.MessageOutbox.SingleAsync(row => row.Recipient == fixture.Account.AccountId, Token);
+        Assert.False(ProtocolModel.FromJson<MessageSendRequest>(synchronization.RequestJson)!.Envelope.Notify);
     }
 
     [Theory]

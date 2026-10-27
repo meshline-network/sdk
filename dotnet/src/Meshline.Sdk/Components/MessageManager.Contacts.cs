@@ -52,6 +52,7 @@ sealed partial class MessageManager
 
     /// <summary>
     /// Creates an outgoing contact request and queues signed consent for delivery to the account.
+    /// The contact request message requests offline push.
     /// </summary>
     /// <param name="accountId">The account's CAIP-10 identifier.</param>
     /// <param name="note">An optional note accompanying the contact request.</param>
@@ -76,6 +77,7 @@ sealed partial class MessageManager
 
     /// <summary>
     /// Creates an outgoing contact request and queues signed consent for delivery to the account.
+    /// The contact request message requests offline push.
     /// </summary>
     /// <param name="invite">The signed invitation authorizing the operation.</param>
     /// <param name="note">An optional note accompanying the contact request.</param>
@@ -163,6 +165,7 @@ sealed partial class MessageManager
 
     /// <summary>
     /// Verifies an incoming request, activates the contact, and queues reciprocal consent and account-device synchronization.
+    /// The acceptance message requests offline push.
     /// </summary>
     /// <param name="accountId">The account's CAIP-10 identifier.</param>
     /// <param name="cancellationToken">A token that can cancel the operation.</param>

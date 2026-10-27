@@ -26,7 +26,7 @@ public static async Task<GroupInfo> CreateGroupAsync(
 ```
 <!-- /snippet -->
 
-Source: [Spaces.cs](../../examples/Meshline.Sdk.Examples/Spaces.cs). Group sending returns a `GroupMessageInfo`; it does not use the direct-message outbox's `MessageSendStatus` contract. Membership, available group secrets, and relay authorization govern whether a send can complete. Use `GetMessagesAsync` for locally stored group messages and `TimelineChanged` to refresh the view. Messages are ordered by group ID, then ascending timeline sequence within each group. Sequence values belong to their group; `CreatedAt` remains available for display.
+Source: [Spaces.cs](../../examples/Meshline.Sdk.Examples/Spaces.cs). Group sending returns a `GroupMessageInfo`; it does not use the direct-message outbox's `MessageSendStatus` contract. Group chat messages automatically request offline push notifications. Membership, available group secrets, and relay authorization govern whether a send can complete. Use `GetMessagesAsync` for locally stored group messages and `TimelineChanged` to refresh the view. Messages are ordered by group ID, then ascending timeline sequence within each group. Sequence values belong to their group; `CreatedAt` remains available for display.
 
 ## Invite and admit members
 

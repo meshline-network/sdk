@@ -3,6 +3,7 @@ using Meshline.Models.Protocol;
 using Meshline.Tests.Support;
 using Meshline.Transport;
 using Microsoft.EntityFrameworkCore;
+using Org.BouncyCastle.Math.EC.Rfc8032;
 using System.Security.Cryptography;
 
 namespace Meshline.Tests.Components.Groups;
@@ -16,6 +17,102 @@ public sealed class GroupTests
         MemberCapacity = 10,
         InvitePolicy = GroupInvitePolicy.Administrators
     };
+
+    [Theory]
+    [InlineData("chat", true)]
+    [InlineData("nickname", false)]
+    public async Task Message_notification_intent_follows_content_type(string content, bool notify)
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        var relay = new GroupRelay(fixture);
+        relay.Install();
+        var manager = fixture.Client.GroupManager;
+        var group = await manager.CreateGroupAsync(fixture.Relay.RelayId, Options, Token);
+
+        if (content == "chat")
+            await manager.SendMessageAsync(group.Ref, new() { Body = new() { ContentType = "text/plain", Text = "hello" } }, Token);
+        else
+            await manager.SetNicknameAsync(group.Ref, "member", Token);
+
+        var envelope = Assert.IsType<GroupMessageEnvelope>(relay.Events.Last().Payload);
+        Assert.Equal(notify, envelope.Notify);
+        Assert.True(Ed25519.Verify(envelope.DeviceSignature.AsSpan(), fixture.Client.Device!.SigningPublicKey.AsSpan(), envelope.GetSigningInput(TestNetwork.Context)));
+        await using var database = fixture.Database.Open();
+        var stored = await database.GroupEvents.SingleAsync(row => row.MessageId == envelope.MessageId, Token);
+        var plaintext = ProtocolModel.FromJson<TypedProtocolModel>(stored.DecryptedPayloadJson!)!;
+        Assert.DoesNotContain("notify", plaintext.AdditionalProperties.Keys);
+    }
+
+    [Fact]
+    public async Task Group_key_synchronization_does_not_request_push()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        var relay = new GroupRelay(fixture);
+        relay.Install();
+
+        await fixture.Client.GroupManager.CreateGroupAsync(fixture.Relay.RelayId, Options, Token);
+
+        await using var database = fixture.Database.Open();
+        var synchronization = await database.MessageOutbox.ToListAsync(Token);
+        Assert.NotEmpty(synchronization);
+        Assert.All(synchronization, row =>
+            Assert.False(ProtocolModel.FromJson<MessageSendRequest>(row.RequestJson)!.Envelope.Notify));
+    }
+
+    [Fact]
+    public async Task Uncertain_message_retries_the_exact_envelope_across_restart()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        var relay = new GroupRelay(fixture);
+        relay.Install();
+        var group = await fixture.Client.GroupManager.CreateGroupAsync(fixture.Relay.RelayId, Options, Token);
+        var requests = new List<string>();
+        fixture.Relay.Handler = (request, _) =>
+        {
+            if (request.Method == "group.message.send")
+            {
+                requests.Add(request.Body!);
+                if (requests.Count == 1) throw new HttpRequestException("Connection lost before the send result was known.");
+            }
+            return Task.FromResult(relay.Respond(request));
+        };
+        var draft = new GroupMessageDraft { Body = new() { ContentType = "text/plain", Text = "recover me" } };
+        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.Client.GroupManager.SendMessageAsync(group.Ref, draft, Token));
+        await using (var database = fixture.Database.Open())
+        {
+            var operation = await database.GroupOperations.SingleAsync(Token);
+            Assert.Equal(Assert.Single(requests), operation.RequestJson);
+            var envelope = ProtocolModel.FromJson<GroupMessageEnvelope>(operation.RequestJson)!;
+            Assert.True(envelope.Notify);
+            Assert.True(Ed25519.Verify(envelope.DeviceSignature.AsSpan(), fixture.Client.Device!.SigningPublicKey.AsSpan(), envelope.GetSigningInput(TestNetwork.Context)));
+        }
+        await fixture.ReopenAsync();
+        var observed = AsyncTest.Signal();
+        Exception? rejection = null;
+        var manager = fixture.Client.GroupManager;
+        manager.TimelineChanged += (_, _) => observed.TrySetResult();
+        manager.BackgroundError += (_, error) => { rejection = error.Error; observed.TrySetResult(); };
+        await manager.StartAsync(Token);
+        await observed.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        await manager.StopAsync(Token);
+        Assert.Null(rejection);
+        Assert.Equal(2, requests.Count);
+        Assert.Single(requests.Distinct());
+        await using (var database = fixture.Database.Open())
+        {
+            Assert.Empty(await database.GroupOperations.ToListAsync(Token));
+            var stored = await database.GroupEvents.SingleAsync(row => row.IsMessage, Token);
+            Assert.Equal(requests[0], stored.PayloadJson);
+            var plaintext = ProtocolModel.FromJson<GroupMessage>(stored.DecryptedPayloadJson!)!;
+            Assert.Equal("recover me", plaintext.Body!.Text);
+        }
+    }
 
     [Theory]
     [InlineData(false)]

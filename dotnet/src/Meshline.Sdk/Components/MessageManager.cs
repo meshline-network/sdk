@@ -133,6 +133,7 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
 
     /// <summary>
     /// Validates and persists an encrypted direct-message outbox operation for background delivery.
+    /// The message requests offline push.
     /// </summary>
     /// <param name="recipient">The recipient account's CAIP-10 identifier.</param>
     /// <param name="draft">The plaintext message body, attachment references, and optional reply information to send.</param>

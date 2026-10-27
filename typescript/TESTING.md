@@ -56,6 +56,7 @@ Use the fixture clock for SDK timers and an explicit handshake for concurrent wo
 | `components/device.test.ts` | Device-state acceptance, complete-state publication and atomic publication/grant guards. |
 | `components/push-gateway.test.ts` | Suites for creation/renewal, account establishment/recovery, input validation and call isolation. |
 | `protocol/push-certificate.test.ts`, `protocol/push-interop.test.ts` | Fixed push certificate/URL vectors, signature coverage, UTF-8 limits and actual C# certificate interoperability. |
+| `protocol/message-envelopes.test.ts`, `protocol/messages.test.ts`, `protocol/groups.test.ts` | Fixed envelope notification fields, signatures, tampering, retry identity, unchanged decryption and C# round trips. |
 | `components/message.test.ts` | Contact authorization maintenance, target acceptance and shared outbox scans with delivery-retention checks. |
 | `components/device-notifications.test.ts` | Device-state notification delivery, initialization, overlapping revisions, stop/start and restart recovery. |
 | `transport/pool.test.ts` | Session reuse with unchanged certificates and device-session retirement after renewal, preserving account sessions. |
@@ -87,8 +88,8 @@ npx vitest run tests/components/account-establishment.test.ts tests/components/a
 
 ## Outgoing-message coverage
 
-- `message-outbox.test.ts`: durable submission, retries, acceptance evidence, retention and storage contention.
-- `message.test.ts`: public manager workflows and events.
+- `message-outbox.test.ts`: durable submission, retries, original notification-field preservation across restart, acceptance evidence, retention and storage contention.
+- `message.test.ts`: public manager workflows, automatic notification intent and events.
 - `send-status-waiting.test.ts`: immediate and future completion, milestones, cancellation, disposal and initial-query races.
 
 The waiting test that rolls back a failed commit and then observes a completion evicted by retention deliberately crosses those boundaries. Preserve that regression alongside isolated outbox tests. The .NET and TypeScript implementations each need their own contract coverage; matching behavior is not a reason to delete one implementation's tests.

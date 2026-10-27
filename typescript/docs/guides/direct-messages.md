@@ -24,6 +24,7 @@ use `{ from, messageId }`; attachments are content references whose hosting and
 retrieval belong to your application. Omitted attachments mean no attachments.
 
 `sendMessage()` returns a durable outbox status, not remote delivery confirmation.
+Direct messages automatically request offline push notifications.
 Persisting the encrypted request precedes submission. Observe `sendStatusChanged`
 or call `getSendStatus(messageId)` as processing continues.
 

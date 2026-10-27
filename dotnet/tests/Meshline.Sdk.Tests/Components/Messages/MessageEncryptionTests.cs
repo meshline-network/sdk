@@ -15,6 +15,9 @@ public sealed class MessageEncryptionTests
 
     [Theory]
     [InlineData("valid")]
+    [InlineData("notify-false")]
+    [InlineData("notify-true")]
+    [InlineData("notify-tampered")]
     [InlineData("key")]
     [InlineData("key-box")]
     [InlineData("ciphertext")]
@@ -26,7 +29,8 @@ public sealed class MessageEncryptionTests
     {
         using var time = Clock.Use(new ManualClock(DateTimeOffset.FromUnixTimeSeconds(1730000000)));
         await using var fixture = EncryptionVectorSetup.CreateClient();
-        var vector = ProtocolVectors.Read("message-encryption").GetProperty("timeline");
+        var root = ProtocolVectors.Read("message-encryption");
+        var vector = root.GetProperty("timeline");
         var request = ProtocolModel.FromJson<MessageSendRequest>(vector.GetProperty("request").GetRawText())!;
         var certificate = ProtocolModel.FromJson<DeviceCertificate>(vector.GetProperty("request").GetProperty("signer_certificate").GetRawText())!;
 
@@ -43,8 +47,15 @@ public sealed class MessageEncryptionTests
 
         var envelope = request.Envelope;
         var box = request.SenderBoxes!.Value[0];
+        var valid = variation is "valid" or "notify-false" or "notify-true";
 
         Assert.Equal(Convert.FromHexString(vector.GetProperty("envelope_signing_input_utf8_hex").GetString()!), envelope.GetSigningInput(TestNetwork.Context));
+        if (variation is "notify-false" or "notify-true")
+        {
+            var variant = root.GetProperty("notification").GetProperty("variants")[variation == "notify-false" ? 1 : 2];
+            envelope = ProtocolModel.FromJson<MessageEnvelope>(ProtocolVectors.Resolve(root, variant, "envelope").GetRawText())!;
+        }
+        if (variation == "notify-tampered") envelope = envelope with { Notify = true };
 
         if (variation == "key")
         {
@@ -97,7 +108,7 @@ public sealed class MessageEncryptionTests
             {
                 To = envelope.From
             };
-        if (variation != "valid")
+        if (!valid && variation != "notify-tampered")
         {
             // Re-sign mutations so ciphertext / AAD cases reach authenticated decryption.
             // The network case deliberately carries a signature for a foreign network.
@@ -152,7 +163,7 @@ public sealed class MessageEncryptionTests
 
         Assert.Equal(0, (await database.AccountTimelines.SingleAsync(Token)).Sequence);
 
-        if (variation == "valid")
+        if (valid)
         {
             Assert.Null(rejection);
             Assert.NotNull(actual);
@@ -178,7 +189,7 @@ public sealed class MessageEncryptionTests
             Assert.Null(actual);
 
             var error = Assert.IsType<InvalidDataException>(rejection);
-            if (variation == "network")
+            if (variation is "network" or "notify-tampered")
                 Assert.Contains("signature", error.Message, StringComparison.Ordinal);
             else
                 Assert.IsAssignableFrom<CryptographicException>(error.InnerException);

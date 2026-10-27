@@ -27,6 +27,8 @@ public sealed record GroupMessageEnvelope() : TypedProtocolModel("meshline.group
     /// The creation time, in Unix seconds.
     /// </summary>
     public required long CreatedAt { get; init; }
+    /// <inheritdoc cref="MessageEnvelope.Notify"/>
+    public bool? Notify { get; init; }
     /// <summary>
     /// The encrypted group-message content.
     /// </summary>

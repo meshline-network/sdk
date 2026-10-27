@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { MessageManager, StateConflictError, contactRecordCodec, contactGrantCodec, certificateId, deviceStateInput, signAccount, messageSendRequestCodec, type QueryReader, type MessageEvents } from '@meshline/sdk';
+import { MessageManager, StateConflictError, contactRecordCodec, contactGrantCodec, certificateId, decryptMessage, deviceStateInput, signAccount, messageSendRequestCodec, type QueryReader, type MessageEvents } from '@meshline/sdk';
 import { MessageContacts } from '../../packages/sdk/dist/messages/contacts.js';
 import { context } from '../support/relay-fixture.js';
 import { MessagingNetwork } from '../support/messaging-network.js';
@@ -46,6 +46,28 @@ describe('Message delivery and history', () => {
         const calls = requests.flatMap(request => request.mock.calls);
         expect(calls.filter(([, method]) => method === 'account.route.resolve')).toHaveLength(0);
         expect(calls.filter(([, method]) => method === 'device.state.resolve')).toHaveLength(0);
+    });
+
+    test('outgoing notification intent follows the business type', async () => {
+        const f = await fixture(); await connect(f); const { a, b } = f;
+        await a.messages.stop(); await b.messages.stop();
+        await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'hello' } });
+
+        const intents: Record<string, Set<boolean | undefined>> = {};
+        for (const sender of [a, b]) {
+            const rows = (await sender.store.read([{ collection: 'message_outbox' }])).sets[0]!;
+            for (const row of rows) {
+                const request = messageSendRequestCodec.decode(row.value.request!);
+                const box = (request.envelope.from === request.envelope.to ? request.recipientBoxes : request.senderBoxes)![0]!;
+                const payload = await decryptMessage({ context, receiver: sender.device, sender: sender.device.certificate, envelope: request.envelope, keyBox: box });
+                (intents[payload.$type as string] ??= new Set()).add(request.envelope.notify);
+            }
+        }
+        expect(intents).toEqual({
+            'meshline.message.direct': new Set([true]),
+            'meshline.contact.consent': new Set([true]),
+            'meshline.account.contacts.sync': new Set([false]),
+        });
     });
 
     test('ungranted direct sends are rejected; self messages persist locally and queued cancellation prevents transmission', async () => {
@@ -251,6 +273,8 @@ describe('Contact authorization maintenance', () => {
         await a.messages.stop(); await expect(second.device.removeDevice(oldId)).rejects.toMatchObject({ code: 'contact_grant_at_risk' });
         await a.device.getOwnDeviceState(network.descriptor.relayId); expect(a.device.getAuthorizationState(oldId)).toBe('authorized');
         expect(network.states.get(a.accountId)!.certificates.map(value => certificateId(value, context))).toEqual([oldId, secondId]);
+        const maintenance = network.submissions.filter(value => value.envelope.fromDeviceId === secondId && value.envelope.to === b.accountId);
+        expect(maintenance.length).toBeGreaterThan(0); expect(maintenance.every(value => value.envelope.notify === false)).toBe(true);
         const sent = await second.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'after device replacement' } });
         await network.until(async () => Boolean(await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId })));
         expect((await second.messages.getContact(b.accountId))!.grantToContact).toBe('valid');

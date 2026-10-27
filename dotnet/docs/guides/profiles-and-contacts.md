@@ -46,7 +46,7 @@ public static Task<ContactInfo> AcceptContactAsync(
 ```
 <!-- /snippet -->
 
-Run these operations on the appropriate accounts. Sending a request does not immediately establish the authorization required to send ordinary direct messages. Observe contact changes and the contact's grant state before enabling messaging.
+Run these operations on the appropriate accounts. Contact requests and acceptance messages automatically request offline push notifications. Sending a request does not immediately establish the authorization required to send ordinary direct messages. Observe contact changes and the contact's grant state before enabling messaging.
 
 For invitation-based discovery, create a time-limited `ContactInvite` using `CreateInviteAsync` and pass it to the `AddContactAsync` overload on the other account. Keep invitations within their intended audience and expiry. `DismissContactRequestAsync` dismisses a request; `SetAliasAsync` changes a contact alias; `RemoveContactAsync` removes the relationship. List and lookup APIs return local contact views, so keep synchronization running and refresh after events.
 

@@ -13,6 +13,7 @@
 - [`Epoch`](#Meshline.Models.Protocol.GroupMessageEnvelope.Epoch)
 - [`GroupId`](#Meshline.Models.Protocol.GroupMessageEnvelope.GroupId)
 - [`MessageId`](#Meshline.Models.Protocol.GroupMessageEnvelope.MessageId)
+- [`Notify`](#Meshline.Models.Protocol.GroupMessageEnvelope.Notify)
 - [`Payload`](#Meshline.Models.Protocol.GroupMessageEnvelope.Payload)
 
 </details>
@@ -108,6 +109,22 @@ public string MessageId { get; init; }
 
 #### Property Value
 [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+<a name='Meshline.Models.Protocol.GroupMessageEnvelope.Notify'></a>
+
+## GroupMessageEnvelope\.Notify Property
+
+Requests offline push when [true](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/bool 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/builtin\-types/bool'); [false](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/bool 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/builtin\-types/bool') or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') does not request a notification\.
+
+```csharp
+public System.Nullable<bool> Notify { get; init; }
+```
+
+#### Property Value
+[System\.Nullable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.nullable-1 'System\.Nullable\`1')[System\.Boolean](https://learn.microsoft.com/en-us/dotnet/api/system.boolean 'System\.Boolean')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.nullable-1 'System\.Nullable\`1')
+
+### Remarks
+[null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') omits the field\. Relay authorization and delivery conditions still apply\.
 
 <a name='Meshline.Models.Protocol.GroupMessageEnvelope.Payload'></a>
 

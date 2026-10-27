@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, test, vi } from 'vitest';
-import { createIdentifier, encryptMessage, messageSendRequestCodec, RelayError, StateConflictError, type MessageDeliveryStatus, type MeshlineStore, type StoreMutation } from '@meshline/sdk';
+import { createIdentifier, encryptMessage, messageEnvelopeCodec, messageEnvelopeInput, messageSendRequestCodec, verifyMessageEnvelope, RelayError, StateConflictError, type MessageDeliveryStatus, type MeshlineStore, type StoreMutation } from '@meshline/sdk';
 import { NodeSqliteStore } from '@meshline/storage-node';
 // Load the built internal engine so adapters and errors share the same package instance.
 import { MessageOutbox, encodeOutbox, outboxKey, type OutboxRecord, type OutboxEffects, type OutboxTransport } from '../../packages/sdk/dist/messages/outbox.js';
@@ -27,6 +27,23 @@ async function fixture() {
     const queue = new MessageOutbox(store, clock, transport); await save();
     return { store, path, clock, request, record, transport, calls, queue, save, moveHome() { home = relayB; }, reply(value: MessageDeliveryStatus) { reply = value; } };
 }
+
+test.each([undefined, false, true])('restart preserves the stored notification flag without applying sending policy: %s', async notify => {
+    const f = await fixture(); const wire = messageEnvelopeCodec.encode(f.request.envelope);
+    if (notify === undefined) delete wire.notify; else wire.notify = notify;
+    const envelope = messageEnvelopeCodec.decode(wire);
+    const request = { ...f.request, envelope: { ...envelope, deviceSignature: await from.sign(messageEnvelopeInput(envelope, context)) } };
+    const original = messageSendRequestCodec.stringify(request);
+    await f.save({ ...f.record, request, state: 'submitting' });
+    await f.store.dispose(); const reopened = new NodeSqliteStore(f.path); stores.push(reopened);
+    await reopened.initialize({ context: context.toString(), accountId: from.certificate.account });
+    const queue = new MessageOutbox(reopened, f.clock, f.transport); await queue.recover();
+    const restored = (await queue.get(id))!.request;
+    expect(messageSendRequestCodec.stringify(restored)).toBe(original); expect(restored.envelope.notify).toBe(notify);
+    verifyMessageEnvelope(restored.envelope, from.certificate, context);
+    f.clock.wall += 15; await queue.process(id);
+    expect(f.calls.filter(call => call.kind === 'send').map(call => call.json)).toEqual([original]);
+});
 
 test('submission is durable before I/O; accepted messages only poll the accepting relay and retain target acceptance', async () => {
     const f = await fixture(); const prepare = f.transport.prepare;

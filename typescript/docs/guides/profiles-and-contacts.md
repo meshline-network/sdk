@@ -27,6 +27,7 @@ timestamp does not prove acceptance of the pending write.
 
 Contact exchange is asynchronous. Run both clients while they exchange the
 request and acceptance; network delivery must occur between the following actions.
+Contact requests and acceptance messages automatically request offline push notifications.
 
 1. The inviter calls `createInvite(expiresAt)` and shares the signed invitation
    through an application-chosen channel. The expiry is integer Unix seconds.

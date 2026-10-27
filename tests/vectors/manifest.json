@@ -1,15 +1,15 @@
 {
   "source": "meshline-network/protocol/v1/test-vectors",
-  "commit": "c4602bbfe2430ebfc8f34efc53bc569409db0535",
+  "commit": "e293e37b800c42d2ee9d20317344cc1220b80c5e",
   "working_tree": [],
   "files": {
     "channels-v1.json": "2f70c1a5754e0d862e453aafa4ca8122399e2d0c375df4e6b83973adbdf3b105",
     "common-v1.json": "ac8ae251cfefc1d3c1e3595121931e83f036c5204d5d879094be1de71cebbc3c",
     "contacts-v1.json": "7391800f5fba895aa29004a0f11d935ac919f498518deb2dbc01d434133c6b19",
-    "groups-v1.json": "fe29509a435d4654d3991f09c8496b2e922cd04c8d6a7a6fbcdccabf816bda9f",
+    "groups-v1.json": "ee526da8df5f20126da87d7f800e336c754b850603c3d61f7ffa7e84b108dddb",
     "identity-auth-v1.json": "bd3216a576de2babe2fd55352f59942d2c99d93392015dcedf3299957124efc9",
     "message-content-v1.json": "bc56656082e7e6b69efc20e7875e9f7ec0c9ed9c91af8a859792515392d6aca6",
-    "message-encryption-v1.json": "7f1e63e7fe881c48057b23f2970cae0dad918bdec0a79afbfee8d239160bae77",
-    "push-notifications-v1.json": "3cb96d12a1ef9700c9411db25a268d23693cc14335f9119d426f89c9ea61b547"
+    "message-encryption-v1.json": "f0fc0fd0267345ab81a86456cbbfa0d49080a52fbfccf2205c2f5da499d003a6",
+    "push-notifications-v1.json": "1ef11023fa22e8e5e5e99071c0fadb53d2fe7218b2df3e0454381a3ac9c6f08a"
   }
 }

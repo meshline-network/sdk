@@ -48,12 +48,14 @@ export async function encryptMessage(options: EncryptMessageOptions): Promise<Me
     if (recipient === certificate.account && (authorization !== undefined || options.senderDevices !== undefined)) throw new ProtocolError('invalid_self_delivery', 'Self messages must omit sender devices and authorization.');
     const header = { messageId, createdAt, from: certificate.account, fromDeviceId: senderId, to: recipient };
     const aad = messageAad(header, context);
-    const plaintext = canonicalBytes(messagePayloadCodec.decode(options.payload));
+    const payload = messagePayloadCodec.decode(options.payload);
+    const plaintext = canonicalBytes(payload);
     let contentKey: Uint8Array | undefined;
     try {
         contentKey = random.bytes(32); requireLength(contentKey, 32, 'Content key');
         const nonce = random.bytes(12); requireLength(nonce, 12, 'Payload nonce');
-        let envelope: MessageEnvelope = { ...header, payload: { alg: 'AES-256-GCM', nonce, ciphertext: encryptAes(contentKey, nonce, plaintext, aad) }, deviceSignature: new Uint8Array(64) };
+        let envelope: MessageEnvelope = { ...header, notify: payload.$type === 'meshline.message.direct' || payload.$type === 'meshline.contact.consent',
+            payload: { alg: 'AES-256-GCM', nonce, ciphertext: encryptAes(contentKey, nonce, plaintext, aad) }, deviceSignature: new Uint8Array(64) };
         envelope = { ...envelope, deviceSignature: (await signer.sign(messageEnvelopeInput(envelope, context), signal)).slice() };
         throwIfAborted(signal);
         if (certificateId(signer.certificate, context) !== senderId) throw new ProtocolError('invalid_identity', 'Device signer changed identity during message signing.');

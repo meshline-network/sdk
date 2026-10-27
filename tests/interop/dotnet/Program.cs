@@ -34,6 +34,7 @@ while (Console.ReadLine() is { } line)
             "profile" => Profile(request),
             "message-open" => OpenMessage(request),
             "message-create" => CreateMessage(request),
+            "message-envelope" => MessageEnvelopeDocument(request),
             "channel-payload" => ChannelPayload(request),
             "channel-apply" => ApplyChannelEvent(request),
             "group-open" => OpenGroupMessage(request),
@@ -131,6 +132,20 @@ static object GroupSecrets(JsonElement request)
         return new { commitment, opened = Base64Url.EncodeToString(opened), box = sealedBox.ToJson() };
     }
     finally { CryptographicOperations.ZeroMemory(secret); CryptographicOperations.ZeroMemory(privateKey); CryptographicOperations.ZeroMemory(shared); if (opened is not null) CryptographicOperations.ZeroMemory(opened); }
+}
+
+static object MessageEnvelopeDocument(JsonElement request)
+{
+    var value = ProtocolModel.FromJson<TypedProtocolModel>(request.GetProperty("json").GetString()!)!;
+    var context = NetworkContext.Parse(request.GetProperty("context").GetString()!);
+    var (input, signature) = value switch
+    {
+        MessageEnvelope envelope => (envelope.GetSigningInput(context), envelope.DeviceSignature),
+        GroupMessageEnvelope envelope => (envelope.GetSigningInput(context), envelope.DeviceSignature),
+        _ => throw new ArgumentException("Unexpected message envelope.")
+    };
+    var valid = value.Validate(context) is null && Ed25519.Verify(signature.AsSpan(), Base64Url.DecodeFromChars(request.GetProperty("publicKey").GetString()!), input);
+    return new { valid, json = value.ToJson(), signingInput = Base64Url.EncodeToString(input) };
 }
 
 static object ChannelPayload(JsonElement request)

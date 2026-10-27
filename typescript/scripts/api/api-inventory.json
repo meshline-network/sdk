@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "4656c9dda75fada79aadba85c4a1a0b2f38e94c39b7e15fa2c4018b344270166",
+  "sourceSha256": "1f13b49a80531ae5a71cc5f2159405f3298053fa1ca36aceccc87360ac9ceb70",
   "sdkBaseline": "f024be46d6ff288739d1555ef9e6607b914d571d",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -6972,6 +6972,13 @@
       "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
     },
     {
+      "symbol": "P:Meshline.Models.Protocol.GroupMessageEnvelope.Notify",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Protocol.GroupMessageEnvelope.md#Meshline.Models.Protocol.GroupMessageEnvelope.Notify",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/groups.ts",
+      "notes": "Explicit camelCase/wire codec and validation; group crypto, administration chain and atomic page storage are implemented. Public GroupManager workflows now integrate these models; complete cross-language workflow acceptance remains pending."
+    },
+    {
       "symbol": "P:Meshline.Models.Protocol.GroupMessageEnvelope.Payload",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Protocol.GroupMessageEnvelope.md#Meshline.Models.Protocol.GroupMessageEnvelope.Payload",
       "status": "mapped-requires-behavior-review",
@@ -7394,6 +7401,13 @@
     {
       "symbol": "P:Meshline.Models.Protocol.MessageEnvelope.MessageId",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Protocol.MessageEnvelope.md#Meshline.Models.Protocol.MessageEnvelope.MessageId",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/messages.ts",
+      "notes": "Explicit codec, complete-object byte limit, signed extensions and historical signing-certificate verification. crypto/messages.ts supplies fixed AAD and authenticated encryption/decryption."
+    },
+    {
+      "symbol": "P:Meshline.Models.Protocol.MessageEnvelope.Notify",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Protocol.MessageEnvelope.md#Meshline.Models.Protocol.MessageEnvelope.Notify",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/models/messages.ts",
       "notes": "Explicit codec, complete-object byte limit, signed extensions and historical signing-certificate verification. crypto/messages.ts supplies fixed AAD and authenticated encryption/decryption."

@@ -88,7 +88,8 @@ export async function encryptGroupMessage(options: EncryptGroupMessageOptions): 
     const aad = groupMessageAad(header, certificate.account, signerId, context); const key = deriveGroupMessageKey(options.applicationSecret, aad); let plaintext: Uint8Array | undefined;
     try {
         plaintext = canonicalBytes(payload); const nonce = (options.random ?? systemRandom).bytes(12); requireLength(nonce, 12, 'Group message nonce');
-        let envelope: GroupMessageEnvelope = { ...header, payload: { alg: 'AES-256-GCM', nonce, ciphertext: encryptAes(key, nonce, plaintext, aad) }, deviceSignature: new Uint8Array(64) };
+        let envelope: GroupMessageEnvelope = { ...header, notify: payload.$type === 'meshline.group.message.content',
+            payload: { alg: 'AES-256-GCM', nonce, ciphertext: encryptAes(key, nonce, plaintext, aad) }, deviceSignature: new Uint8Array(64) };
         envelope = { ...envelope, deviceSignature: (await signer.sign(groupMessageEnvelopeInput(envelope, context), signal)).slice() }; throwIfAborted(signal);
         if (certificateId(signer.certificate, context) !== signerId) throw new ProtocolError('invalid_identity', 'Group signer changed identity during signing.');
         verifyGroupMessageEnvelope(envelope, certificate, signerId, context); return envelope;

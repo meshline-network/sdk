@@ -123,7 +123,8 @@ The configured account identifier uses an unsupported account namespace\.
 
 ## MessageManager\.AcceptContactRequestAsync\(string, CancellationToken\) Method
 
-Verifies an incoming request, activates the contact, and queues reciprocal consent and account\-device synchronization\.
+Verifies an incoming request, activates the contact, and queues reciprocal consent and account\-device synchronization\.<br>
+The acceptance message requests offline push\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Client.ContactInfo> AcceptContactRequestAsync(string accountId, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -197,7 +198,8 @@ The local device lacks current authorization or a direct message lacks the recip
 
 ## MessageManager\.AddContactAsync\(ContactInvite, string, CancellationToken\) Method
 
-Creates an outgoing contact request and queues signed consent for delivery to the account\.
+Creates an outgoing contact request and queues signed consent for delivery to the account\.<br>
+The contact request message requests offline push\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Client.ContactRequestInfo> AddContactAsync(Meshline.Models.Protocol.ContactInvite invite, string? note=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -277,7 +279,8 @@ The local device lacks current authorization or a direct message lacks the recip
 
 ## MessageManager\.AddContactAsync\(string, string, CancellationToken\) Method
 
-Creates an outgoing contact request and queues signed consent for delivery to the account\.
+Creates an outgoing contact request and queues signed consent for delivery to the account\.<br>
+The contact request message requests offline push\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Client.ContactRequestInfo> AddContactAsync(string accountId, string? note=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -992,7 +995,8 @@ This updates local contact state and synchronizes the account's other devices\. 
 
 ## MessageManager\.SendMessageAsync\(string, DirectMessageDraft, CancellationToken\) Method
 
-Validates and persists an encrypted direct\-message outbox operation for background delivery\.
+Validates and persists an encrypted direct\-message outbox operation for background delivery\.<br>
+The message requests offline push\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Client.MessageSendStatus> SendMessageAsync(string recipient, Meshline.Models.Client.DirectMessageDraft draft, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));

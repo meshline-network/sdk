@@ -2,6 +2,8 @@ using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Tests.Support;
 using Meshline.Transport;
+using Microsoft.EntityFrameworkCore;
+using Org.BouncyCastle.Math.EC.Rfc8032;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -40,6 +42,26 @@ public sealed class MessageSendingTests
         Assert.Equal(MessageSendState.Queued, queued.State);
         Assert.Equal(routes, fixture.Relay.Requests.Count(request => request.Method == "account.route.resolve"));
         Assert.Equal(devices, fixture.Relay.Requests.Count(request => request.Method == "device.state.resolve"));
+    }
+
+    [Fact]
+    public async Task Direct_messages_request_signed_offline_push()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        using var peer = new AccountSigner();
+        await ContactSetup.AcceptPeerAsync(fixture, peer, Token);
+
+        var queued = await fixture.Client.MessageManager.SendMessageAsync(peer.AccountId, Draft(), Token);
+
+        await using var db = fixture.Database.Open();
+        var record = await db.MessageOutbox.SingleAsync(row => row.MessageId == queued.MessageId, Token);
+        var request = ProtocolModel.FromJson<MessageSendRequest>(record.RequestJson)!;
+        Assert.True(request.Envelope.Notify);
+        Assert.True(Ed25519.Verify(request.Envelope.DeviceSignature.AsSpan(), fixture.Client.Device!.SigningPublicKey.AsSpan(), request.Envelope.GetSigningInput(TestNetwork.Context)));
+        using var plaintext = JsonDocument.Parse((await db.Messages.SingleAsync(row => row.MessageId == queued.MessageId, Token)).PayloadJson!);
+        Assert.False(plaintext.RootElement.TryGetProperty("notify", out _));
     }
 
     [Fact]
@@ -118,6 +140,7 @@ public sealed class MessageSendingTests
             Assert.Equal(MessageSendState.Queued, row.State);
             Assert.Equal(deadline.ToUnixTimeMilliseconds(), row.NextAttemptAt.ToUnixTimeMilliseconds());
             Assert.Equal(Assert.Single(bodies), row.RequestJson);
+            Assert.True(ProtocolModel.FromJson<MessageSendRequest>(row.RequestJson)!.Envelope.Notify);
             Assert.Null(row.AcceptedAt);
             Assert.Equal("limited", row.ErrorMessage);
         }

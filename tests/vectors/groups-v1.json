@@ -4877,5 +4877,258 @@
       "expected_management_head": "sha256:V2SPOouAUROaHUHuNBkF09YQUzWfKSNaPziYRFfkgFI",
       "expected_local_nicknames": {}
     }
+  },
+  "notification": {
+    "base_envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+    "signing_private_key_ref": "/management_chain/actors/0/signing_private_key",
+    "signing_public_key_ref": "/management_chain/actors/0/certificate/signing_public_key",
+    "variants": [
+      {
+        "name": "omitted",
+        "envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "signing_input_utf8_hex_ref": "/encrypted_nicknames/messages/0/signing_input_utf8_hex",
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_false",
+        "envelope": {
+          "$type": "meshline.group.message",
+          "message_id": "msg_qRx5gUYQYfQm2E5HTN3yaw",
+          "group_id": "grp_Qa7GDvUVnJwL9fDbn9f6AA",
+          "epoch": 4,
+          "created_at": 1730000028,
+          "notify": false,
+          "payload": {
+            "alg": "AES-256-GCM",
+            "nonce": "tpHe2opORrpXdWkS",
+            "ciphertext": "DcaaskXBILvWxysFg1oI57UBR723X0SAQEzSU9qeKOVJQN-yPk7AzZBP4QaUhYciHcWyO4Wn-YHzJryj6i-P4MNxUaXbeP8xL-cOxgYxcDLRtTXiZQ"
+          },
+          "device_signature": "PpIvDRpqOG7YIwuZ6wNA20rfvj2gQzkdQIQIG9qdfnlCyezKA1xRPr0qNrB-_jFPgCJDtiqfNUMyjlHZI6gwDQ"
+        },
+        "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e67726f75702e6d657373616765222c22637265617465645f6174223a313733303030303032382c2265706f6368223a342c2267726f75705f6964223a226772705f51613747447655566e4a774c396644626e3966364141222c226d6573736167655f6964223a226d73675f71527835675559515966516d32453548544e33796177222c226e6f74696679223a66616c73652c227061796c6f6164223a7b22616c67223a224145532d3235362d47434d222c2263697068657274657874223a2244636161736b5842494c76577879734667316f4935375542523732335830534151457a53553971654b4f564a514e2d79506b37417a5a42503451615568596369486357794f34576e2d59487a4a72796a36692d50344d4e7855615862655038784c2d634f7867597863444c52745458695a51222c226e6f6e6365223a2274704865326f704f5272705864576b53227d7d",
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_true",
+        "envelope": {
+          "$type": "meshline.group.message",
+          "message_id": "msg_qRx5gUYQYfQm2E5HTN3yaw",
+          "group_id": "grp_Qa7GDvUVnJwL9fDbn9f6AA",
+          "epoch": 4,
+          "created_at": 1730000028,
+          "notify": true,
+          "payload": {
+            "alg": "AES-256-GCM",
+            "nonce": "tpHe2opORrpXdWkS",
+            "ciphertext": "DcaaskXBILvWxysFg1oI57UBR723X0SAQEzSU9qeKOVJQN-yPk7AzZBP4QaUhYciHcWyO4Wn-YHzJryj6i-P4MNxUaXbeP8xL-cOxgYxcDLRtTXiZQ"
+          },
+          "device_signature": "W5I52Pyaugf5j1Eb4UZvrS1hmKUah5nvwFeGSBuhUpxJEJ96E0NtdsYk-22GPWUtclINIspUwQkDMtgxI-HeAg"
+        },
+        "signing_input_utf8_hex": "7b2224636f6e74657874223a226e656f3a3836303833333130323a307835393739626137393433313637326133386131386133326364633438666437333137383138623730222c222474797065223a226d6573686c696e652e67726f75702e6d657373616765222c22637265617465645f6174223a313733303030303032382c2265706f6368223a342c2267726f75705f6964223a226772705f51613747447655566e4a774c396644626e3966364141222c226d6573736167655f6964223a226d73675f71527835675559515966516d32453548544e33796177222c226e6f74696679223a747275652c227061796c6f6164223a7b22616c67223a224145532d3235362d47434d222c2263697068657274657874223a2244636161736b5842494c76577879734667316f4935375542523732335830534151457a53553971654b4f564a514e2d79506b37417a5a42503451615568596369486357794f34576e2d59487a4a72796a36692d50344d4e7855615862655038784c2d634f7867597863444c52745458695a51222c226e6f6e6365223a2274704865326f704f5272705864576b53227d7d",
+        "expected_allows_push": true
+      }
+    ],
+    "field_cases": [
+      {
+        "name": "omitted",
+        "remove": [
+          "notify"
+        ],
+        "expected_format_valid": true,
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_false",
+        "set": {
+          "notify": false
+        },
+        "expected_format_valid": true,
+        "expected_allows_push": false
+      },
+      {
+        "name": "explicit_true",
+        "set": {
+          "notify": true
+        },
+        "expected_format_valid": true,
+        "expected_allows_push": true
+      },
+      {
+        "name": "null",
+        "set": {
+          "notify": null
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "string_true",
+        "set": {
+          "notify": "true"
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "string_false",
+        "set": {
+          "notify": "false"
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "number_zero",
+        "set": {
+          "notify": 0
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "number_one",
+        "set": {
+          "notify": 1
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "array",
+        "set": {
+          "notify": []
+        },
+        "expected_format_valid": false
+      },
+      {
+        "name": "object",
+        "set": {
+          "notify": {}
+        },
+        "expected_format_valid": false
+      }
+    ],
+    "signature_tampering": [
+      {
+        "name": "omitted_to_explicit_false",
+        "envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "set": {
+          "notify": false
+        },
+        "expected_signature_valid": false
+      },
+      {
+        "name": "omitted_to_explicit_true",
+        "envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "set": {
+          "notify": true
+        },
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_false_to_omitted",
+        "envelope_ref": "/notification/variants/1/envelope",
+        "remove": [
+          "notify"
+        ],
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_false_to_explicit_true",
+        "envelope_ref": "/notification/variants/1/envelope",
+        "set": {
+          "notify": true
+        },
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_true_to_omitted",
+        "envelope_ref": "/notification/variants/2/envelope",
+        "remove": [
+          "notify"
+        ],
+        "expected_signature_valid": false
+      },
+      {
+        "name": "explicit_true_to_explicit_false",
+        "envelope_ref": "/notification/variants/2/envelope",
+        "set": {
+          "notify": false
+        },
+        "expected_signature_valid": false
+      }
+    ],
+    "retry_methods": [
+      "group.message.send"
+    ],
+    "retry_cases": [
+      {
+        "name": "omitted_to_omitted",
+        "accepted_envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "retry_envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "expected_result": "original_result",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "omitted_to_explicit_false",
+        "accepted_envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "retry_envelope_ref": "/notification/variants/1/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "omitted_to_explicit_true",
+        "accepted_envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "retry_envelope_ref": "/notification/variants/2/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_false_to_omitted",
+        "accepted_envelope_ref": "/notification/variants/1/envelope",
+        "retry_envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_false_to_explicit_false",
+        "accepted_envelope_ref": "/notification/variants/1/envelope",
+        "retry_envelope_ref": "/notification/variants/1/envelope",
+        "expected_result": "original_result",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_false_to_explicit_true",
+        "accepted_envelope_ref": "/notification/variants/1/envelope",
+        "retry_envelope_ref": "/notification/variants/2/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_true_to_omitted",
+        "accepted_envelope_ref": "/notification/variants/2/envelope",
+        "retry_envelope_ref": "/encrypted_nicknames/messages/0/event/payload",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_true_to_explicit_false",
+        "accepted_envelope_ref": "/notification/variants/2/envelope",
+        "retry_envelope_ref": "/notification/variants/1/envelope",
+        "expected_result": "state_conflict",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      },
+      {
+        "name": "explicit_true_to_explicit_true",
+        "accepted_envelope_ref": "/notification/variants/2/envelope",
+        "retry_envelope_ref": "/notification/variants/2/envelope",
+        "expected_result": "original_result",
+        "expected_new_timeline_records": 0,
+        "expected_new_push_triggers": 0
+      }
+    ]
   }
 }

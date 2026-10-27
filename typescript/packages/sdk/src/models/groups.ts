@@ -2,7 +2,7 @@ import { requireLength, verifyDevice } from '../crypto/primitives.js';
 import { ProtocolError } from '../errors.js';
 import { validateIdentifier } from '../identity/identifiers.js';
 import { validateAccountId, validateRelayId } from '../identity/neo.js';
-import { array, bytes, defineCodec, integer, text, type ExtensibleModel, type ValueCodec } from '../protocol/codec.js';
+import { array, boolean, bytes, defineCodec, integer, text, type ExtensibleModel, type ValueCodec } from '../protocol/codec.js';
 import { signingInput, type NetworkContext } from '../protocol/context.js';
 import { encodeUtf8 } from '../protocol/encoding.js';
 import { canonicalJson, parseJson, requireObject, requireSafeInteger, type JsonObject } from '../protocol/json.js';
@@ -25,10 +25,12 @@ export function validateGroupSecretBox(value: GroupSecretBox): void {
 /** The sender identity is carried by the verified timeline event and certificate, never by this envelope. */
 export interface GroupMessageEnvelope extends ExtensibleModel {
     readonly messageId: string; readonly groupId: string; readonly epoch: number; readonly createdAt: number;
+    /** Requests offline push when true; omission or false does not request a notification. Relay authorization and delivery conditions still apply. */
+    readonly notify?: boolean;
     readonly payload: EncryptedPayload; readonly deviceSignature: Uint8Array;
 }
 export const groupMessageEnvelopeCodec = defineCodec<GroupMessageEnvelope>({ messageId: { wire: 'message_id', codec: text }, groupId: { wire: 'group_id', codec: text },
-    epoch: { wire: 'epoch', codec: integer }, createdAt: { wire: 'created_at', codec: integer }, payload: { wire: 'payload', codec: encryptedPayloadCodec },
+    epoch: { wire: 'epoch', codec: integer }, createdAt: { wire: 'created_at', codec: integer }, notify: { wire: 'notify', codec: boolean, optional: true }, payload: { wire: 'payload', codec: encryptedPayloadCodec },
     deviceSignature: { wire: 'device_signature', codec: bytes } }, 'meshline.group.message');
 export const groupMessageEnvelopeInput = (value: GroupMessageEnvelope, context: NetworkContext): Uint8Array => signingInput(groupMessageEnvelopeCodec.encode(value), context, ['device_signature']);
 export function validateGroupMessageEnvelope(value: GroupMessageEnvelope): void {

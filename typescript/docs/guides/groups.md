@@ -45,6 +45,7 @@ for verified recipients.
 ## Messages and administration
 
 `sendMessage(group, draft)` sends group content; replies use `replyToSeq`.
+Group chat messages automatically request offline push notifications.
 `setNickname(group, nickname)` changes the caller's nickname, with `null` clearing
 it. `getMessages({ groupId, sender })` opens local message history, ordered by
 group ID and then ascending timeline sequence within each group. Sequence values

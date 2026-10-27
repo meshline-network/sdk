@@ -27,6 +27,7 @@ sealed partial class MessageManager
                 From = Options.AccountId,
                 FromDeviceId = certificate.GetDeviceId(Context),
                 To = recipient,
+                Notify = payload is DirectMessage or ContactConsent,
                 Payload = new() { Alg = "AES-256-GCM", Nonce = [.. RandomNumberGenerator.GetBytes(12)], Ciphertext = [] },
                 DeviceSignature = []
             };

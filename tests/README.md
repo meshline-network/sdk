@@ -15,12 +15,18 @@ do not load a moving sibling protocol checkout or regenerate expected answers wi
 the implementation being tested. Both language test suites verify the vector
 manifest. Platform acceptance also consumes this same snapshot.
 
-The .NET push adapter currently executes the certificate, certificate-tampering,
-and gateway-URL sections of `push-notifications-v1.json`. Its component tests cover
-creation, declaration updates/removal, renewal, session rebinding and publication
-recovery. The remaining notification, HTTP, gateway-state and deduplication sections
-are reserved for Relay/gateway implementations; copying the fixture is not evidence
-that those behaviors or TypeScript push support have been implemented.
+Both SDKs execute the certificate, certificate-tampering and gateway-URL sections
+of `push-notifications-v1.json`, and the envelope notification cases in
+`message-encryption-v1.json` and `groups-v1.json`. These cover field representation,
+fixed signatures, tampering, decryption and canonical retry identity. Component
+tests cover gateway creation, updates/removal, renewal and publication recovery,
+automatic notification intent by message type, and preservation of signed requests
+across restart. Interoperability tests exchange certificates and envelopes between
+the actual .NET and TypeScript implementations.
+
+Push eligibility, HTTP callbacks, gateway state, actual delivery and push
+deduplication belong to Relay/gateway tests. The SDK's serialization and replay
+checks do not exercise those delivery decisions.
 
 The additional [NEP-6 wallet fixtures](vectors/nep6-wallets.json) are SDK integration
 vectors generated with the official Neo 3.10.1 wallet implementation, independent

@@ -1409,5 +1409,123 @@
       "address": "2606:4700:4700::1111",
       "expected_allowed": true
     }
+  ],
+  "notification_eligibility": [
+    {
+      "name": "account_omitted_other_requirements_met",
+      "envelope_fields": {
+        "$type": "meshline.message.envelope"
+      },
+      "other_requirements_met": true,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "account_omitted_other_requirement_unmet",
+      "envelope_fields": {
+        "$type": "meshline.message.envelope"
+      },
+      "other_requirements_met": false,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "account_explicit_false_other_requirements_met",
+      "envelope_fields": {
+        "$type": "meshline.message.envelope",
+        "notify": false
+      },
+      "other_requirements_met": true,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "account_explicit_false_other_requirement_unmet",
+      "envelope_fields": {
+        "$type": "meshline.message.envelope",
+        "notify": false
+      },
+      "other_requirements_met": false,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "account_explicit_true_other_requirements_met",
+      "envelope_fields": {
+        "$type": "meshline.message.envelope",
+        "notify": true
+      },
+      "other_requirements_met": true,
+      "expected_allows_push": true,
+      "expected_eligible": true
+    },
+    {
+      "name": "account_explicit_true_other_requirement_unmet",
+      "envelope_fields": {
+        "$type": "meshline.message.envelope",
+        "notify": true
+      },
+      "other_requirements_met": false,
+      "expected_allows_push": true,
+      "expected_eligible": false
+    },
+    {
+      "name": "group_omitted_other_requirements_met",
+      "envelope_fields": {
+        "$type": "meshline.group.message"
+      },
+      "other_requirements_met": true,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "group_omitted_other_requirement_unmet",
+      "envelope_fields": {
+        "$type": "meshline.group.message"
+      },
+      "other_requirements_met": false,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "group_explicit_false_other_requirements_met",
+      "envelope_fields": {
+        "$type": "meshline.group.message",
+        "notify": false
+      },
+      "other_requirements_met": true,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "group_explicit_false_other_requirement_unmet",
+      "envelope_fields": {
+        "$type": "meshline.group.message",
+        "notify": false
+      },
+      "other_requirements_met": false,
+      "expected_allows_push": false,
+      "expected_eligible": false
+    },
+    {
+      "name": "group_explicit_true_other_requirements_met",
+      "envelope_fields": {
+        "$type": "meshline.group.message",
+        "notify": true
+      },
+      "other_requirements_met": true,
+      "expected_allows_push": true,
+      "expected_eligible": true
+    },
+    {
+      "name": "group_explicit_true_other_requirement_unmet",
+      "envelope_fields": {
+        "$type": "meshline.group.message",
+        "notify": true
+      },
+      "other_requirements_met": false,
+      "expected_allows_push": true,
+      "expected_eligible": false
+    }
   ]
 }

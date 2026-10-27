@@ -5,11 +5,12 @@ import {
     messageKeyBoxCodec, messagePayloadCodec, messageSendRequestCodec, parseJson, sha256, signDevice, validateDirectMessage, validateMessageDeliveryStatus,
     validateMessageEnvelope, validateMessageSendRequest, validateMessageTimelinePage, verifyMessageEnvelope, type JsonObject, type MessageEnvelope, type MessageSendRequest,
 } from '@meshline/sdk';
-import { vector, hex, unhex } from '../support/vectors.js';
+import { vector, vectorValue, hex, unhex } from '../support/vectors.js';
 import { messageDevice } from '../support/message-fixture.js';
 
 const rows = vector<{
     network_context: string;
+    notification: { variants: (JsonObject & { name: string })[] };
     envelope_signature: { private_key: string; signing_input_utf8_hex: string; signature: string };
     payload: { aad: { utf8_hex: string }; encryption: { envelope: JsonObject; recipient_boxes: JsonObject[]; recipient_private_key: string; recipient_public_key: string;
         ephemeral_private_key: string; ephemeral_public_key: string; shared_secret: string; hkdf_salt: string; wrap_key: string; sealed_key: string;
@@ -61,13 +62,16 @@ test.each(['target', 'sender'] as const)('complete %s key box matches independen
     expect(messageSendRequestCodec.encode(request)).toEqual(row.request);
 });
 
-test('historical sender timeline vector decrypts through the full verified public API', async () => {
+test.each(rows.notification.variants)('sender timeline variant decrypts through the full verified public API: $name', async variant => {
     const row = rows.timeline; const request = messageSendRequestCodec.decode(row.request);
+    const envelope = messageEnvelopeCodec.decode(vectorValue(rows as unknown as JsonObject, variant, 'envelope'));
     const certificate = deviceCertificateCodec.decode(row.request.signer_certificate!);
     const recovered: Uint8Array[] = [];
     const receiver = { certificate, async deriveSharedSecret(enc: Uint8Array) { const secret = agreeKey(decodeBase64Url(row.sender_encryption_private_key), enc); recovered.push(secret); return secret; } };
     expect(certificateId(certificate, context)).toBe(request.envelope.fromDeviceId);
-    const result = await decryptMessage({ context, receiver, envelope: request.envelope, keyBox: request.senderBoxes![0]!, sender: certificate });
+    expect(messageAad(envelope, context)).toEqual(messageAad(request.envelope, context));
+    expect(messageKeyBoxAad(envelope, request.senderBoxes![0]!, certificate.account, context)).toEqual(unhex(row.sender_key_box.aad_utf8_hex));
+    const result = await decryptMessage({ context, receiver, envelope, keyBox: request.senderBoxes![0]!, sender: certificate });
     expect(result).toEqual(parseJson(unhex(row.plaintext_utf8_hex))); expect(recovered[0]!.every(value => value === 0)).toBe(true);
 });
 

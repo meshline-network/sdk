@@ -33,6 +33,13 @@ public sealed record MessageEnvelope() : TypedProtocolModel("meshline.message.en
     /// </summary>
     public required string To { get; init; }
     /// <summary>
+    /// Requests offline push when <see langword="true"/>; <see langword="false"/> or <see langword="null"/> does not request a notification.
+    /// </summary>
+    /// <remarks>
+    /// <see langword="null"/> omits the field. Relay authorization and delivery conditions still apply.
+    /// </remarks>
+    public bool? Notify { get; init; }
+    /// <summary>
     /// The encrypted account-message content.
     /// </summary>
     public required EncryptedPayload Payload { get; init; }
