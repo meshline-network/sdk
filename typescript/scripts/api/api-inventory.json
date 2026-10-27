@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "4a69c5aa568235949abef07a3b6d1bb7e61512bd0d4f8ee7638122c13962b92b",
+  "sourceSha256": "4656c9dda75fada79aadba85c4a1a0b2f38e94c39b7e15fa2c4018b344270166",
   "sdkBaseline": "f024be46d6ff288739d1555ef9e6607b914d571d",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -3510,6 +3510,21 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/storage/store.ts",
       "notes": "MeshlineStore.migrate provides the explicit migration capability, implemented separately by each platform adapter. Initialization does not create a missing database."
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.ContactDeviceNotifications.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ContactDeviceNotifications.md#Meshline.Storage.Migrations.ContactDeviceNotifications.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.ContactDeviceNotifications.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ContactDeviceNotifications.md#Meshline.Storage.Migrations.ContactDeviceNotifications.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.ContactDeviceNotifications.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ContactDeviceNotifications.md#Meshline.Storage.Migrations.ContactDeviceNotifications.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
     },
     {
       "symbol": "M:Meshline.Storage.Migrations.DeviceCreationPushGateway.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
@@ -9573,6 +9588,11 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/storage/store.ts",
       "notes": "MeshlineStore.migrate provides the explicit migration capability, implemented separately by each platform adapter. Initialization does not create a missing database."
+    },
+    {
+      "symbol": "T:Meshline.Storage.Migrations.ContactDeviceNotifications",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ContactDeviceNotifications.md",
+      "status": "unmapped"
     },
     {
       "symbol": "T:Meshline.Storage.Migrations.DeviceCreationPushGateway",

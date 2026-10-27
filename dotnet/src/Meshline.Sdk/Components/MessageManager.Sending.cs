@@ -271,7 +271,7 @@ sealed partial class MessageManager
             record.State = delivery.Status switch { MessageDeliveryState.Delivering => MessageSendState.RelayAccepted, MessageDeliveryState.TargetAccepted => MessageSendState.TargetAccepted, MessageDeliveryState.Failed => MessageSendState.Failed, _ => throw new InvalidDataException("The delivery status is unknown.") };
             record.AcceptedAt = DateTimeOffset.FromUnixTimeSeconds(delivery.AcceptedAt);
             record.ErrorMessage = delivery.Error?.Message;
-            record.NextAttemptAt = Clock.UtcNow.AddSeconds(15);
+            record.NextAttemptAt = NextSendAttempt();
         }
         catch (Exception exception)
         {
@@ -282,7 +282,7 @@ sealed partial class MessageManager
                     var current = await database.MessageOutbox.FindAsync([messageId], token).ConfigureAwait(false);
                     if (current?.State != MessageSendState.Queued) return;
                     current.ErrorMessage = exception.Message;
-                    current.NextAttemptAt = Clock.UtcNow.AddSeconds(15);
+                    current.NextAttemptAt = NextSendAttempt(exception);
                     notifications.Add(() => OnSendChanged(current));
                 }, CancellationToken.None).ConfigureAwait(false);
                 if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
@@ -291,15 +291,48 @@ sealed partial class MessageManager
             }
             var wasAccepted = record.AcceptedAt is not null;
             var definitive = !mayHaveBeenAccepted && exception is RelayException rejection && rejection.Error.IsDefinitiveRejection();
-            record.State = wasAccepted ? MessageSendState.RelayAccepted : definitive ? MessageSendState.Failed : MessageSendState.SubmissionUnknown;
+            var routeRejected = definitive && exception is RelayException { Error.Code: "route_stale" or "target_not_local" };
+            // Unauthorized invalidates the transport session; the next attempt authenticates again.
+            var retryable = routeRejected || definitive && exception is RelayException { Error.Code: "rate_limited" or "unauthorized" };
+            if (wasAccepted)
+                record.State = MessageSendState.RelayAccepted;
+            else if (retryable)
+                record.State = MessageSendState.Queued;
+            else if (definitive)
+                record.State = MessageSendState.Failed;
+            else
+                record.State = MessageSendState.SubmissionUnknown;
             record.ErrorMessage = exception.Message;
-            record.NextAttemptAt = Clock.UtcNow.AddSeconds(15);
+            record.NextAttemptAt = NextSendAttempt(exception);
             await SaveSendAsync(record, CancellationToken.None).ConfigureAwait(false);
             if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
+            // Retain the unaccepted request before discovery, which can fail or be interrupted.
+            if (routeRejected)
+            {
+                try
+                {
+                    _ = await accountManager.RefreshRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
+                        ?? throw new InvalidOperationException("The account has no published home relay route.");
+                }
+                catch (Exception refreshError) when (!cancellationToken.IsCancellationRequested)
+                {
+                    ReportBackgroundError(BackgroundOperation.SendMessage, messageId,
+                        new AggregateException("Message routing was rejected and route refresh failed.", exception, refreshError));
+                    return;
+                }
+            }
             ReportBackgroundError(BackgroundOperation.SendMessage, messageId, exception);
             return;
         }
         await SaveSendAsync(record, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    static DateTimeOffset NextSendAttempt(Exception? error = null)
+    {
+        var now = Clock.UtcNow;
+        var delay = Math.Max(15, (error as RelayException)?.Error.GetRetryAfter() ?? 0);
+        var remainingSeconds = (DateTimeOffset.MaxValue - now).Ticks / TimeSpan.TicksPerSecond;
+        return delay > remainingSeconds ? DateTimeOffset.MaxValue : now.AddTicks(delay * TimeSpan.TicksPerSecond);
     }
 
     Task SaveSendAsync(MessageOutboxRecord record, CancellationToken cancellationToken) =>

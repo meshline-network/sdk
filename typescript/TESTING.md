@@ -45,7 +45,7 @@ Share preparation, not assertions or mutable state. Each test owns fresh resourc
 
 Use the fixture clock for SDK timers and an explicit handshake for concurrent work. Real timeouts bound a hung test; they should not determine operation order. Internal tracker tests use `MessagingClock` directly and do not construct a client network.
 
-## Account establishment coverage
+## Component regression coverage
 
 | Test file | Coverage |
 | --- | --- |
@@ -54,7 +54,8 @@ Use the fixture clock for SDK timers and an explicit handshake for concurrent wo
 | `components/device.test.ts` | Device-state acceptance, complete-state publication and atomic publication/grant guards. |
 | `components/push-gateway.test.ts` | Suites for creation/renewal, account establishment/recovery, input validation and call isolation. |
 | `protocol/push-certificate.test.ts`, `protocol/push-interop.test.ts` | Fixed push certificate/URL vectors, signature coverage, UTF-8 limits and actual C# certificate interoperability. |
-| `components/message.test.ts` | Contact authorization maintenance, target acceptance, overlapping notification revisions, stop/start retries and shared outbox scans with delivery-retention checks. |
+| `components/message.test.ts` | Contact authorization maintenance, target acceptance and shared outbox scans with delivery-retention checks. |
+| `components/device-notifications.test.ts` | Device-state notification delivery, initialization, overlapping revisions, stop/start and restart recovery. |
 | `transport/pool.test.ts` | Session reuse with unchanged certificates and device-session retirement after renewal, preserving account sessions. |
 | `browser/managers.spec.ts` | IndexedDB reopen after a lost acknowledgement and a fresh installation preserving devices and profile. |
 

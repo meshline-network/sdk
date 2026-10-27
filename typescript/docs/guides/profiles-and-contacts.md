@@ -56,6 +56,9 @@ Repeating the same alias performs no additional write, notification, or sync sen
 state. Render the resulting contact snapshot rather than retaining an assumed
 relationship after an operation fails.
 
+`MessageManager` notifies contacts when its own account's verified device-state
+revision advances and resumes pending notifications after restart.
+
 For payload details, see [events](events-and-errors.md). For encrypted
 content and delivery state, continue to [direct messages](direct-messages.md).
 

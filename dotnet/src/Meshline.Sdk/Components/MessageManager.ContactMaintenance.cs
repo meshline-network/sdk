@@ -10,53 +10,61 @@ sealed partial class MessageManager
 {
     readonly Channel<bool> _refreshRequests = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
     Task _refresh = Task.CompletedTask;
-    int _deviceStateNotificationPending;
     int _contactMaintenanceRetryPending;
-    readonly HashSet<string> _deviceNotificationRetries = new(StringComparer.Ordinal);
 
     void OnDeviceChanged(object? sender, DeviceChangedEventArgs args) => _refreshRequests.Writer.TryWrite(true);
 
-    void OnOwnDeviceStateChanged(object? sender, EventArgs args)
-    {
-        Interlocked.Exchange(ref _deviceStateNotificationPending, 1);
-        _refreshRequests.Writer.TryWrite(true);
-    }
+    void OnOwnDeviceStateChanged(object? sender, EventArgs args) => _refreshRequests.Writer.TryWrite(true);
 
-    async Task QueueDeviceStateNotificationsAsync(bool allContacts, CancellationToken cancellationToken)
+    async Task QueueDeviceStateNotificationsAsync(CancellationToken cancellationToken)
     {
-        if (deviceManager.DeviceState is not { } own) return;
-        var payload = new DeviceStateChanged { Revision = own.Revision };
-        // The refresh loop owns this set. A device change starts a full pass;
-        // ordinary retries visit only failed contacts, avoiding duplicate fanout.
-        var retry = allContacts ? null : _deviceNotificationRetries.ToArray();
-        _deviceNotificationRetries.Clear();
+        long revision;
+        await using (var database = new MeshlineDbContext(databaseOptions))
+        {
+            var own = await database.DeviceStates.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == Options.AccountId, cancellationToken).ConfigureAwait(false);
+            if (own is null) return;
+            revision = own.Revision;
+        }
         string after = "";
         while (true)
         {
             List<ContactStateRecord> contacts;
             await using (var database = new MeshlineDbContext(databaseOptions))
             {
-                var query = database.Contacts.AsNoTracking().Where(value => value.State == ContactRelationshipState.Active && string.Compare(value.AccountId, after) > 0);
-                if (retry is not null) query = query.Where(value => retry.Contains(value.AccountId));
-                contacts = await query
+                contacts = await database.Contacts.AsNoTracking()
+                    .Where(value => value.State == ContactRelationshipState.Active && value.DeviceNotificationRevision < revision && string.Compare(value.AccountId, after) > 0)
                     .OrderBy(value => value.AccountId).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
             }
             foreach (var contact in contacts)
             {
                 try
                 {
-                    if (ReadUnexpiredGrant(contact.GrantFromJson) is not { } authorization) continue;
+                    if (ReadUnexpiredGrant(contact.GrantFromJson) is not { } authorization)
+                    {
+                        Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
+                        continue;
+                    }
                     await RefreshSendStateAsync(contact.AccountId, authorization, cancellationToken).ConfigureAwait(false);
                     await TransactAsync(async (database, notifications, token) =>
                     {
                         var current = await database.Contacts.FindAsync([contact.AccountId], token).ConfigureAwait(false);
-                        if (current is { State: ContactRelationshipState.Active } && current.GrantFromJson == contact.GrantFromJson)
-                            await EnqueueAsync(database, notifications, contact.AccountId, payload, token, authorization).ConfigureAwait(false);
+                        if (current is not { State: ContactRelationshipState.Active }) return;
+                        if (current.GrantFromJson != contact.GrantFromJson)
+                        {
+                            Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
+                            return;
+                        }
+                        var own = await database.DeviceStates.SingleAsync(value => value.AccountId == Options.AccountId, token).ConfigureAwait(false);
+                        if (current.DeviceNotificationRevision >= own.Revision) return;
+                        // Re-read after network preparation, under the same writer transaction
+                        // as the outbox insert. Neither a race nor an interrupted pass can
+                        // advance the checkpoint without retaining the exact notification.
+                        await EnqueueAsync(database, notifications, contact.AccountId, new DeviceStateChanged { Revision = own.Revision }, token, authorization).ConfigureAwait(false);
+                        current.DeviceNotificationRevision = own.Revision;
                     }, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                 {
-                    _deviceNotificationRetries.Add(contact.AccountId);
                     Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
                     ReportBackgroundError(BackgroundOperation.Synchronize, contact.AccountId, exception);
                 }
@@ -75,16 +83,11 @@ sealed partial class MessageManager
                 while (_refreshRequests.Reader.TryRead(out _)) { }
                 try
                 {
-                    var notifyAll = Interlocked.Exchange(ref _deviceStateNotificationPending, 0) != 0;
-                    if (notifyAll || _deviceNotificationRetries.Count != 0)
+                    try { await QueueDeviceStateNotificationsAsync(cancellationToken).ConfigureAwait(false); }
+                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                     {
-                        try { await QueueDeviceStateNotificationsAsync(notifyAll, cancellationToken).ConfigureAwait(false); }
-                        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
-                        {
-                            Interlocked.Exchange(ref _deviceStateNotificationPending, 1);
-                            Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
-                            ReportBackgroundError(BackgroundOperation.Synchronize, null, exception);
-                        }
+                        Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
+                        ReportBackgroundError(BackgroundOperation.Synchronize, null, exception);
                     }
                     string after = "";
                     while (true)

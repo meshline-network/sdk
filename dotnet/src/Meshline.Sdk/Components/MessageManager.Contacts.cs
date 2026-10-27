@@ -200,7 +200,9 @@ sealed partial class MessageManager
             var selected = await database.ContactRequests.FindAsync([accountId, ContactRequestDirection.Incoming], token).ConfigureAwait(false);
             if (selected?.ConsentJson != incoming.ConsentJson) throw new InvalidOperationException("The incoming contact request changed while it was being accepted.");
             await EnqueueAsync(database, notifications, accountId, consent, token, grant).ConfigureAwait(false);
-            var record = await GetOrCreateContactAsync(database, accountId, token).ConfigureAwait(false);
+            var record = await GetOrCreateContactAsync(database, accountId, token, consent.DeviceState.Revision).ConfigureAwait(false);
+            record.DeviceNotificationRevision = record.State == ContactRelationshipState.Active
+                ? Math.Max(record.DeviceNotificationRevision, consent.DeviceState.Revision) : consent.DeviceState.Revision;
             record.State = ContactRelationshipState.Active;
             record.GrantFromJson = grant.ToJson();
             record.GrantToJson = consent.Grant.ToJson();
@@ -396,10 +398,14 @@ sealed partial class MessageManager
 
     static DateTimeOffset NextContactTime(DateTimeOffset previous) => DateTimeOffset.FromUnixTimeSeconds(Math.Max(Clock.UtcNow.ToUnixTimeSeconds(), checked(previous.ToUnixTimeSeconds() + 1)));
 
-    static async Task<ContactStateRecord> GetOrCreateContactAsync(MeshlineDbContext database, string accountId, CancellationToken cancellationToken)
+    async Task<ContactStateRecord> GetOrCreateContactAsync(MeshlineDbContext database, string accountId, CancellationToken cancellationToken, long? deviceNotificationRevision = null)
     {
         var record = await database.Contacts.FindAsync([accountId], cancellationToken).ConfigureAwait(false);
-        if (record is null) database.Contacts.Add(record = new() { AccountId = accountId, UpdatedAt = DateTimeOffset.UnixEpoch });
+        if (record is null)
+        {
+            var own = await database.DeviceStates.FindAsync([Options.AccountId], cancellationToken).ConfigureAwait(false);
+            database.Contacts.Add(record = new() { AccountId = accountId, UpdatedAt = DateTimeOffset.UnixEpoch, DeviceNotificationRevision = deviceNotificationRevision ?? own?.Revision ?? 0 });
+        }
         return record;
     }
 

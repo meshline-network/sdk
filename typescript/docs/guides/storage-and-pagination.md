@@ -52,9 +52,8 @@ setup additionally requires verified, effective authorization.
 
 Background contact maintenance reconstructs work from grants and outgoing
 messages. Each pass shares one lazy outbox scan and rechecks matching delivery
-records before reuse. Notification completion is tracked by device revision and
-reset when synchronization stops, so an older pass cannot suppress a newer
-notification.
+records before reuse. Notification progress is stored per contact, committed
+atomically with its outbox request, and retained across stops and restarts.
 
 Reauthorizing a device does not restore messages or decryption keys from a lost
 installation.

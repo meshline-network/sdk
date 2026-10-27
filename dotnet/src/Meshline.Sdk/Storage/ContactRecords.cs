@@ -19,6 +19,9 @@ sealed class ContactStateRecord
     public string? GrantToJson { get; set; }
     public string? ConfirmedGrantToJson { get; set; }
     public long? RequiredDeviceRevision { get; set; }
+    // Local baseline, then the latest own revision durably queued for this contact.
+    // Delivery/replay belongs to the outbox; this checkpoint survives its retention.
+    public long DeviceNotificationRevision { get; set; }
 }
 
 [Table("ContactRequests"), PrimaryKey(nameof(AccountId), nameof(Direction))]

@@ -80,6 +80,7 @@ restart and successful retry together prove resumability.
 | Runtime suspension, socket drainage and shutdown failures | `Accounts/RevokedDeviceRuntimeTests`, `Lifecycle/LifecycleTests` |
 | Contact continuity and atomic publication | `Contacts/ContactAuthorizationContinuityTests`, `Contacts/ContactContinuityBoundaryTests`, `Contacts/ContactPublicationTransactionTests` |
 | Background grant supplementation and delivery | `Contacts/BackgroundContactAuthorizationTests` |
+| Device-state notification delivery and recovery | `Contacts/DeviceStateNotificationTests` |
 | Standalone mutation serialization and signing without holding the database writer | `Devices/DeviceMutationConcurrencyTests` |
 | Push gateway creation, renewal keep/set/remove, local persistence, session rebinding and publication replay | `Devices/PushGatewayTests` |
 | Gateway intent, retained declarations, recovery and interrupted device preparation | `Accounts/PushGatewayEstablishmentTests` |

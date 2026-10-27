@@ -86,7 +86,8 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
         }, cancellationToken).ConfigureAwait(false);
         deviceManager.DeviceChanged += OnDeviceChanged;
         deviceManager.DeviceStateChanged += OnOwnDeviceStateChanged;
-        OnOwnDeviceStateChanged(this, EventArgs.Empty);
+        // Subscribe before the startup scan. Persisted per-contact revisions cover
+        // changes while stopped; later events wake another scan without forcing fanout.
         _refresh = RefreshContactsAsync(RuntimeCancellationToken);
         _sender = SendLoopAsync(RuntimeCancellationToken);
         _synchronizer = SynchronizeLoopAsync(RuntimeCancellationToken);

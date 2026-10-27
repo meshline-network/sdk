@@ -28,7 +28,11 @@ export interface ContactChange { readonly accountId: string; readonly contact?: 
 export type ContactRequestChangeKind = 'added' | 'updated' | 'removed';
 export interface ContactRequestChange { readonly accountId: string; readonly direction: ContactRequestDirection; readonly request?: ContactRequestInfo; readonly kind: ContactRequestChangeKind }
 export interface ContactChanges { readonly contacts: readonly ContactChange[]; readonly requests: readonly ContactRequestChange[] }
-export interface StoredContact { readonly record: ContactRecord; readonly confirmedGrantTo?: ContactGrant; readonly requiredDeviceRevision?: number }
+export interface StoredContact {
+    readonly record: ContactRecord; readonly confirmedGrantTo?: ContactGrant; readonly requiredDeviceRevision?: number;
+    /** Local baseline, then the latest own revision atomically queued in the outbox. Absent in older records. */
+    readonly deviceNotificationRevision?: number;
+}
 export interface StoredContactRequest extends ContactRequestInfo { readonly consent: ContactConsent }
 export interface PreparedContactSend { readonly outbox: OutboxRecord; readonly guards: readonly RecordGuard[] }
 interface ContactMaintenancePass { deliveries?: Promise<Map<string, OutboxRecord[]>> }
@@ -50,12 +54,15 @@ export function readContact(value: JsonObject | undefined): StoredContact | unde
     if (!value) return undefined;
     const record = contactRecordCodec.decode(value.record!);
     if (value.requiredDeviceRevision !== undefined) requireSafeInteger(value.requiredDeviceRevision, 0);
+    if (value.deviceNotificationRevision !== undefined) requireSafeInteger(value.deviceNotificationRevision, 0);
     return { record, ...(value.confirmedGrantTo === undefined ? {} : { confirmedGrantTo: contactGrantCodec.decode(value.confirmedGrantTo) }),
-        ...(value.requiredDeviceRevision === undefined ? {} : { requiredDeviceRevision: value.requiredDeviceRevision }) };
+        ...(value.requiredDeviceRevision === undefined ? {} : { requiredDeviceRevision: value.requiredDeviceRevision }),
+        ...(value.deviceNotificationRevision === undefined ? {} : { deviceNotificationRevision: value.deviceNotificationRevision }) };
 }
 export function encodeContact(value: StoredContact): JsonObject {
     return { record: contactRecordCodec.encode(value.record), ...(value.confirmedGrantTo ? { confirmedGrantTo: contactGrantCodec.encode(value.confirmedGrantTo) } : {}),
-        ...(value.requiredDeviceRevision === undefined ? {} : { requiredDeviceRevision: value.requiredDeviceRevision }) };
+        ...(value.requiredDeviceRevision === undefined ? {} : { requiredDeviceRevision: value.requiredDeviceRevision }),
+        ...(value.deviceNotificationRevision === undefined ? {} : { deviceNotificationRevision: value.deviceNotificationRevision }) };
 }
 export function readContactRequest(value: JsonObject | undefined): StoredContactRequest | undefined {
     if (!value) return undefined;
@@ -80,6 +87,16 @@ function pureValidation<T>(action: () => T): T {
 /** Contact workflows prepare signatures/encrypted synchronization outside the eventual atomic transaction. */
 export class MessageContacts {
     constructor(readonly host: ContactHost) {}
+    async initializeNotificationBaselines(signal?: AbortSignal): Promise<void> {
+        const own = await this.host.store.read([cachedDeviceStateKey(this.host.accountId)], signal);
+        // Keep the baseline across retries so concurrent device changes remain pending.
+        const baseline = state(own.sets[0]![0]?.value)?.revision ?? 0;
+        await updateStore(this.host.store, [{ collection: 'contacts' }], snapshot => ({
+            result: undefined, mutations: snapshot.sets[0]!
+                .filter(row => readContact(row.value)!.deviceNotificationRevision === undefined)
+                .map(row => put(contactKey(row.key), { ...row.value, deviceNotificationRevision: baseline })),
+        }), signal);
+    }
     #checkAccount(account: string): void { validateAccountId(account); if (account === this.host.accountId) throw new ProtocolError('invalid_contact', 'An account cannot add itself as a contact.'); }
     #nextTime(previous = -1): number { const next = Math.max(this.host.clock.nowSeconds(), previous + 1); requireSafeInteger(next, 0); return next; }
     async #snapshot(keys: readonly RecordKey[], signal?: AbortSignal): Promise<readonly RecordGuard[]> {
@@ -217,7 +234,9 @@ export class MessageContacts {
         const incoming = readContactRequest(guards[1]!.value); if (!incoming) throw new ProtocolError('contact_request_required', 'There is no incoming request from this account.');
         const remote = await this.host.getState(incoming.consent.grant, signal); const grant = this.#verified(incoming.consent.grant, remote);
         const consent = await this.#consent(account, undefined, signal); const previous = readContact(guards[0]!.value);
-        const contact: StoredContact = { record: { account, status: 'active', updatedAt: this.#nextTime(previous?.record.updatedAt), ...(previous?.record.alias === undefined ? {} : { alias: previous.record.alias }), grantFromContact: grant, grantToContact: consent.grant } };
+        const contact: StoredContact = { deviceNotificationRevision: previous?.record.status === 'active'
+            ? Math.max(previous.deviceNotificationRevision ?? consent.deviceState.revision, consent.deviceState.revision) : consent.deviceState.revision,
+            record: { account, status: 'active', updatedAt: this.#nextTime(previous?.record.updatedAt), ...(previous?.record.alias === undefined ? {} : { alias: previous.record.alias }), grantFromContact: grant, grantToContact: consent.grant } };
         const outgoing = await this.host.prepareSend(account, contactConsentCodec.encode(consent), grant, undefined, signal); const sync = await this.#sync(contact, signal);
         await this.#commit(this.#effect(guards, [put(contactKey(account), encodeContact(contact)), ...removeRequests(account)], [outgoing, sync]), signal);
         return this.#info(contact, consent.deviceState, remote);
@@ -339,7 +358,9 @@ export class MessageContacts {
             const grant = pureValidation(() => this.#merge(previous?.record.grantFromContact, consent.grant, consent.deviceState));
             const outgoing = waiting?.consent.grant ?? previous?.record.grantToContact;
             const record: ContactRecord = { ...(previous?.record ?? { account, status: 'active' as const, updatedAt: 0 }), status: 'active', updatedAt: this.#nextTime(previous?.record.updatedAt), grantFromContact: grant, ...(outgoing ? { grantToContact: outgoing } : {}) };
-            const current: StoredContact = { ...previous, record, ...(waiting && accepted && outgoing ? { confirmedGrantTo: outgoing } : {}) };
+            const current: StoredContact = { ...previous, record,
+                ...(previous?.record.status !== 'active' && waiting ? { deviceNotificationRevision: waiting.consent.deviceState.revision } : {}),
+                ...(waiting && accepted && outgoing ? { confirmedGrantTo: outgoing } : {}) };
             const sync = await this.#sync(current, signal); mutations.push(put(contactKey(account), encodeContact(current)), ...removeRequests(account));
             return this.#effect(guards, mutations, [sync]);
         }
@@ -356,7 +377,9 @@ export class MessageContacts {
             if (source.grantFromContact) { const remote = await this.host.getState(source.grantFromContact, signal); incoming = pureValidation(() => this.#merge(previous?.record.grantFromContact, source.grantFromContact!, remote)); }
             if (source.grantToContact) { const verified = pureValidation(() => this.#verified(source.grantToContact!, own)); const supplemented = await this.#signGrant(verified, signal);
                 outgoing = pureValidation(() => this.#merge(previous?.record.grantToContact, supplemented, own)); added = contactGrantCodec.stringify(supplemented) !== contactGrantCodec.stringify(verified); }
-            const current: StoredContact = source.status === 'deleted' ? { record: source } : { ...previous, record: { ...source,
+            const current: StoredContact = source.status === 'deleted' ? { record: source } : { ...previous,
+                deviceNotificationRevision: previous?.record.status === 'active' ? previous.deviceNotificationRevision ?? own.revision : own.revision,
+                record: { ...source,
                 ...(incoming ?? previous?.record.grantFromContact ? { grantFromContact: incoming ?? previous!.record.grantFromContact! } : {}),
                 ...(outgoing ?? previous?.record.grantToContact ? { grantToContact: outgoing ?? previous!.record.grantToContact! } : {}), ...(added ? { updatedAt: this.#nextTime(source.updatedAt) } : {}) } };
             mutations.push(put(contactKey(source.account), encodeContact(current))); if (source.status === 'deleted') mutations.push(...removeRequests(source.account));
@@ -391,19 +414,21 @@ export class MessageContacts {
         } };
     }
     /** A pass shares one lazy outbox scan; each contact still commits against its own current authorization. */
-    async *maintain(requests: readonly { account: string; notifyDeviceRevision: number | undefined }[], signal?: AbortSignal):
+    async *maintain(accounts: readonly string[], signal?: AbortSignal):
         AsyncGenerator<{ account: string; success: true } | { account: string; success: false; error: unknown }> {
         const pass: ContactMaintenancePass = {};
-        for (const { account, notifyDeviceRevision } of requests) {
+        for (const account of accounts) {
             throwIfAborted(signal);
-            try { await this.#maintain(account, notifyDeviceRevision, pass, signal); yield { account, success: true }; }
+            try { await this.#maintain(account, pass, signal); yield { account, success: true }; }
             catch (error) { throwIfAborted(signal); yield { account, success: false, error }; }
         }
     }
-    async #maintain(account: string, notifyDeviceRevision: number | undefined, pass: ContactMaintenancePass, signal?: AbortSignal): Promise<void> {
-        const guards = await this.#snapshot([contactKey(account)], signal); const saved = readContact(guards[0]!.value);
+    async #maintain(account: string, pass: ContactMaintenancePass, signal?: AbortSignal): Promise<void> {
+        await this.host.getState(this.host.accountId, signal);
+        const guards = await this.#snapshot([contactKey(account), cachedDeviceStateKey(this.host.accountId)], signal); const saved = readContact(guards[0]!.value);
         if (!saved || saved.record.status !== 'active') return;
-        const now = this.host.clock.nowSeconds(); const own = await this.host.getState(this.host.accountId, signal);
+        const now = this.host.clock.nowSeconds(); const own = state(guards[1]!.value);
+        if (!own) throw new ProtocolError('device_state_required', 'Current own device state is unavailable.');
         authorizedDevice(own, certificateId(this.host.device.certificate, this.host.context), this.host.context, now);
         const incoming = saved.record.grantFromContact && (saved.record.grantFromContact.expiresAt ?? Infinity) > now ? saved.record.grantFromContact : undefined;
         let revisionResolved = false;
@@ -416,15 +441,19 @@ export class MessageContacts {
         const changedGrant = supplemented !== undefined && contactGrantCodec.stringify(supplemented) !== contactGrantCodec.stringify(issued!);
         const needsDelivery = supplemented !== undefined && !this.#containsLocalSignature(saved.confirmedGrantTo, supplemented)
             && !await this.#hasGrantDelivery(account, supplemented, pass, signal);
-        if (needsDelivery && !incoming) throw new ProtocolError('contact_grant_required', 'The incoming contact grant is missing or expired; authorization delivery remains pending.');
+        const needsNotification = (saved.deviceNotificationRevision ?? own.revision) < own.revision;
+        if ((needsDelivery || needsNotification) && !incoming) throw new ProtocolError('contact_grant_required', 'The incoming contact grant is missing or expired; contact delivery remains pending.');
         const { requiredDeviceRevision, ...withoutRevision } = saved;
-        const current: StoredContact = { ...(revisionResolved ? withoutRevision : saved), record: { ...saved.record, ...(changedGrant ? { grantToContact: supplemented!, updatedAt: this.#nextTime(saved.record.updatedAt) } : {}) } };
+        const current: StoredContact = { ...(revisionResolved ? withoutRevision : saved), deviceNotificationRevision: Math.max(saved.deviceNotificationRevision ?? own.revision, own.revision),
+            record: { ...saved.record, ...(changedGrant ? { grantToContact: supplemented!, updatedAt: this.#nextTime(saved.record.updatedAt) } : {}) } };
         const prepared: PreparedContactSend[] = [];
         if (changedGrant) prepared.push(await this.#sync(current, signal));
         if (needsDelivery) prepared.push(await this.host.prepareSend(account, contactGrantCodec.encode(supplemented!), incoming, undefined, signal));
-        if (notifyDeviceRevision !== undefined && incoming) prepared.push(await this.host.prepareSend(account, deviceStateChangedCodec.encode({ revision: own.revision }), incoming, undefined, signal));
-        const mutations = changedGrant || revisionResolved ? [put(contactKey(account), encodeContact(current))] : [];
-        if (mutations.length || prepared.length) await this.#commit(this.#effect(guards, mutations, prepared, ['authorization']), signal);
+        if (needsNotification) prepared.push(await this.host.prepareSend(account, deviceStateChangedCodec.encode({ revision: own.revision }), incoming, undefined, signal));
+        // The own-state guard rejects a revision change during encryption. The contact
+        // guard and outbox insert commit together, including across concurrent scans.
+        const mutations = changedGrant || revisionResolved || needsNotification || saved.deviceNotificationRevision === undefined ? [put(contactKey(account), encodeContact(current))] : [];
+        if (mutations.length || prepared.length) await this.#commit(this.#effect(guards, mutations, prepared, changedGrant || revisionResolved ? ['authorization'] : []), signal);
     }
     #containsLocalSignature(candidate: ContactGrant | undefined, issued: ContactGrant): boolean {
         const id = certificateId(this.host.device.certificate, this.host.context);

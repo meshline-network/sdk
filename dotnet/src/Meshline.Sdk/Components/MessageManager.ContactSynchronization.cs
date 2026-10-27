@@ -75,7 +75,10 @@ sealed partial class MessageManager
             if (waitingSend?.State == MessageSendState.Canceled) waiting = null;
             if (record is { State: ContactRelationshipState.Active } || waiting is not null)
             {
-                record ??= await GetOrCreateContactAsync(database, accountId, token).ConfigureAwait(false);
+                record ??= await GetOrCreateContactAsync(database, accountId, token,
+                    waiting is null ? null : ProtocolModel.FromJson<ContactConsent>(waiting.ConsentJson)!.DeviceState.Revision).ConfigureAwait(false);
+                if (record.State != ContactRelationshipState.Active && waiting is not null)
+                    record.DeviceNotificationRevision = ProtocolModel.FromJson<ContactConsent>(waiting.ConsentJson)!.DeviceState.Revision;
                 record.State = ContactRelationshipState.Active;
                 record.GrantFromJson = MergeGrant(record.GrantFromJson, grant, consent.DeviceState).ToJson();
                 if (waiting is not null)

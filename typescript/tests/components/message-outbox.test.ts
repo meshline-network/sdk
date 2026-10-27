@@ -68,11 +68,109 @@ test('home migration leaves uncertain messages at their original relay even when
     expect(record.errorMessage).toBe('unknown at old relay');
 });
 
-test('only a definitive rejection of the first submission is terminal', async () => {
+test('a nonretryable definitive rejection is terminal only on the first submission', async () => {
     const f = await fixture();
     f.transport.prepare = async () => ({ send: async () => { throw new RelayError({ code: 'device_unknown', message: 'revoked' }); }, status: async () => { throw new Error('unexpected'); } });
     await f.queue.process(id); expect((await f.queue.get(id))!.state).toBe('failed');
     await f.save({ ...f.record, state: 'submissionUnknown' }); await f.queue.process(id); expect((await f.queue.get(id))!.state).toBe('submissionUnknown');
+});
+
+test.each([undefined, 0, 45, Number.MAX_SAFE_INTEGER])('rate limiting persists its retry deadline and exact request across reopen (hint: %s)', async hint => {
+    const f = await fixture(); const original = messageSendRequestCodec.stringify(f.request); const start = f.clock.wall;
+    const deadline = hint === Number.MAX_SAFE_INTEGER ? hint : start + Math.max(15, hint ?? 0);
+    const error = new RelayError({ code: 'rate_limited', message: 'limited', ...(hint === undefined ? {} : { data: { retry_after: hint } }) }, 429);
+    const requests: string[] = []; let limited = true;
+    f.transport.prepare = async () => ({ send: async request => {
+        requests.push(messageSendRequestCodec.stringify(request));
+        if (limited) throw error;
+        return { status: 'target_accepted', acceptedAt: f.clock.wall };
+    }, status: async () => { throw new Error('An unaccepted request must be submitted'); } });
+    expect((await f.queue.process(id)).error).toBe(error);
+    expect(await f.queue.get(id)).toMatchObject({ state: 'queued', nextAttemptAt: deadline, errorMessage: 'limited' });
+    await f.store.dispose(); const reopened = new NodeSqliteStore(f.path); stores.push(reopened); await reopened.initialize({ context: context.toString(), accountId: from.certificate.account });
+    const queue = new MessageOutbox(reopened, f.clock, f.transport); await queue.recover(); limited = false;
+    expect(await queue.get(id)).toMatchObject({ state: 'queued', nextAttemptAt: deadline });
+    expect(messageSendRequestCodec.stringify((await queue.get(id))!.request)).toBe(original);
+    f.clock.wall = deadline - 1; expect(await queue.due()).toEqual([]); expect((await queue.process(id)).changes).toEqual([]);
+    expect(requests).toEqual([original]);
+    f.clock.wall = deadline; await queue.process(id);
+    expect((await queue.get(id))!.state).toBe('targetAccepted'); expect(requests).toEqual([original, original]);
+});
+
+test.each(['route_stale', 'target_not_local'].flatMap(code => ['none', 'failure', 'cancellation'].map(interruption => ({ code, interruption }))))(
+    'a rejected $code request survives $interruption during route refresh and reopen', async ({ code, interruption }) => {
+        const f = await fixture(); const original = messageSendRequestCodec.stringify(f.request); const controller = new AbortController();
+        const rejection = new RelayError({ code, message: 'routing rejected' }, 400); const discoveryFailure = new Error('Discovery unavailable');
+        let home = relayA; let refreshes = 0; let currentQueue = f.queue; const sent: { relay: string; request: string }[] = [];
+        f.transport.getHome = async (_signal, refresh) => {
+            if (refresh) {
+                refreshes++;
+                expect(await currentQueue.get(id)).toMatchObject({ state: 'queued', relayId: relayA, errorMessage: 'routing rejected' });
+                if (refreshes === 1 && interruption === 'failure') throw discoveryFailure;
+                if (refreshes === 1 && interruption === 'cancellation') { controller.abort(); throw controller.signal.reason; }
+                home = relayB; f.moveHome();
+            }
+            return home;
+        };
+        f.transport.prepare = async relay => ({ send: async request => {
+            sent.push({ relay, request: messageSendRequestCodec.stringify(request) });
+            if (relay === relayA) throw rejection;
+            return { status: 'target_accepted', acceptedAt: f.clock.wall };
+        }, status: async () => { throw new Error('A rejected request has no acceptance evidence'); } });
+        const result = await f.queue.process(id, controller.signal);
+        if (interruption === 'none') expect(result.error).toBe(rejection);
+        else expect((result.error as AggregateError).errors).toEqual([rejection, interruption === 'failure' ? discoveryFailure : controller.signal.reason]);
+        expect(await f.queue.get(id)).toMatchObject({ state: 'queued', nextAttemptAt: f.clock.wall + 15 });
+        await f.store.dispose(); const reopened = new NodeSqliteStore(f.path); stores.push(reopened);
+        await reopened.initialize({ context: context.toString(), accountId: from.certificate.account });
+        const queue = new MessageOutbox(reopened, f.clock, f.transport); await queue.recover();
+        // Inspect the reopened record during the second discovery attempt as well.
+        currentQueue = queue;
+        f.clock.wall += 15; await queue.process(id);
+        if (interruption !== 'none') { expect((await queue.get(id))!.state).toBe('queued'); f.clock.wall += 15; await queue.process(id); }
+        expect((await queue.get(id))!.state).toBe('targetAccepted'); expect((await queue.get(id))!.relayId).toBe(relayB);
+        expect(sent.map(value => value.relay)).toEqual(interruption === 'none' ? [relayA, relayB] : [relayA, relayA, relayB]);
+        expect(sent.every(value => value.request === original)).toBe(true); expect(refreshes).toBe(interruption === 'none' ? 1 : 2);
+});
+
+test.each([
+    { code: 'rate_limited', status: 429, retryAfter: 45 },
+    { code: 'route_stale', status: 400, retryAfter: undefined },
+    { code: 'target_not_local', status: 400, retryAfter: undefined },
+    { code: 'unauthorized', status: 401, retryAfter: undefined },
+].flatMap(rejection => (['submissionUnknown', 'relayAccepted'] as const).map(state => ({ ...rejection, state }))))(
+    '$state evidence and the original relay survive $code', async ({ state, code, status, retryAfter }) => {
+    const f = await fixture(); const acceptedAt = state === 'relayAccepted' ? f.clock.wall : undefined;
+    await f.save({ ...f.record, state, ...(acceptedAt === undefined ? {} : { acceptedAt }) }); f.moveHome();
+    const calls: string[] = []; let rejectRequests = true;
+    const delay = retryAfter ?? 15;
+    const error = new RelayError({ code, message: 'rejected', ...(retryAfter === undefined ? {} : { data: { retry_after: retryAfter } }) }, status);
+    const getHome = f.transport.getHome;
+    f.transport.getHome = (signal, refresh) => { expect(refresh).not.toBe(true); return getHome(signal); };
+    f.transport.prepare = async relay => ({ send: async () => { throw new Error('Do not submit at a different home'); }, status: async () => {
+        calls.push(relay); if (rejectRequests) throw error;
+        return { status: 'target_accepted', acceptedAt: acceptedAt ?? f.clock.wall };
+    } });
+    const queue = new MessageOutbox(f.store, f.clock, f.transport);
+    expect((await queue.process(id)).error).toBe(error);
+    expect(await queue.get(id)).toMatchObject({ state, relayId: relayA, nextAttemptAt: f.clock.wall + delay });
+    expect((await queue.get(id))!.acceptedAt).toBe(acceptedAt); expect(await queue.cancel(id)).toBeUndefined();
+    f.clock.wall += delay - 1; expect(await queue.due()).toEqual([]); f.clock.wall++; rejectRequests = false;
+    await queue.process(id); expect((await queue.get(id))!.state).toBe('targetAccepted'); expect(calls).toEqual([relayA, relayA]);
+});
+
+test('a rate-limited retry after an uncertain submission cannot reclassify it as unsent', async () => {
+    const f = await fixture(); const original = messageSendRequestCodec.stringify(f.request); const requests: string[] = [];
+    f.transport.prepare = async () => ({ send: async request => {
+        requests.push(messageSendRequestCodec.stringify(request));
+        if (requests.length === 1) throw new Error('Acknowledgement lost');
+        if (requests.length === 2) throw new RelayError({ code: 'rate_limited', message: 'limited', data: { retry_after: 45 } }, 429);
+        return { status: 'target_accepted', acceptedAt: f.record.request.envelope.createdAt };
+    }, status: async () => { throw new Error('The home has not moved'); } });
+    await f.queue.process(id); f.clock.wall += 15; await f.queue.process(id);
+    expect(await f.queue.get(id)).toMatchObject({ state: 'submissionUnknown', nextAttemptAt: f.clock.wall + 45 });
+    expect(await f.queue.cancel(id)).toBeUndefined(); f.clock.wall += 45; await f.queue.process(id);
+    expect((await f.queue.get(id))!.state).toBe('targetAccepted'); expect(requests).toEqual([original, original, original]);
 });
 
 test('preflight failures and home changes keep unsent messages queued', async () => {

@@ -91,6 +91,11 @@ before a device draft exists. Verify upgrades from `ResumableAccountEstablishmen
 preserve unfinished setup, protected drafts and exact pending publications. Existing
 certificates and drafts remain authoritative for their gateway declaration.
 
+`ContactDeviceNotifications` initializes each contact's notification baseline from
+the cached own device revision and preserves existing outbox requests. TypeScript
+establishes the same baseline in existing JSON contact records during initialization.
+Notifications that older versions failed to enqueue cannot be recovered during migration.
+
 ## Account establishment
 
 The [account establishment guide](dotnet/docs/guides/account-establishment.md)

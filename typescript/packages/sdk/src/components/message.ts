@@ -65,8 +65,8 @@ export class MessageManager extends ClientComponent {
     readonly #observed = new Map<string, { client: RelayClient; detach: (() => void)[] }>();
     readonly #pendingRoutes = new Set<string>(); #routeRecording = Promise.resolve(); #removeRouteListener: (() => void) | undefined;
     #sendPulse: AsyncPulse | undefined; #syncPulse: AsyncPulse | undefined; #maintenancePulse: AsyncPulse | undefined; #runtimeJobs: Promise<void>[] = [];
-    #pendingDeviceRevision: number | undefined; #deviceListeners: (() => void)[] = [];
-    #maintenanceRetry = false; readonly #notifiedContacts = new Set<string>();
+    #deviceListeners: (() => void)[] = [];
+    #maintenanceRetry = false;
     constructor(options: MessageManagerOptions) {
         super(options);
         for (const dependency of [options.relayClients, options.accountManager, options.deviceManager]) if (dependency.accountId !== this.accountId || dependency.context.toString() !== this.context.toString())
@@ -78,7 +78,7 @@ export class MessageManager extends ClientComponent {
             getState: (target, signal, refresh) => this.#getState(target, signal, refresh), prepareSend: (recipient, payload, authorization, devices, signal) => this.#prepareSend(recipient, payload, authorization, devices, signal),
             changed: changes => this.#contactChanges(changes) });
         this.#outbox = new MessageOutbox(this.#store, this.clock, {
-            getHome: async signal => { const route = await this.#account.getRoute(undefined, signal); if (!route) throw new ProtocolError('route_required', 'The account has no current route.'); return route.relayId; },
+            getHome: async (signal, refresh) => { const route = await (refresh ? this.#account.refreshRoute(undefined, signal) : this.#account.getRoute(undefined, signal)); if (!route) throw new ProtocolError('route_required', 'The account has no current route.'); return route.relayId; },
             currentHome: () => this.#account.route?.relayId,
             prepare: async (relayId, signal) => { const relay = await this.#pool.get(relayId, { mode: 'device', signer: this.#device }, signal); return {
                 send: async (request, token) => messageDeliveryStatusCodec.decode((await relay.requestHttp('POST', 'message.send', messageSendRequestCodec.encode(request), { ...(token ? { signal: token } : {}) }))!),
@@ -106,6 +106,7 @@ export class MessageManager extends ClientComponent {
     }
     protected override async onInitialize(signal: AbortSignal): Promise<void> {
         this.#account.ensureInitialized(); this.#device.ensureInitialized(); await this.#store.initialize({ context: this.context.toString(), accountId: this.accountId }, signal);
+        await this.#contacts.initializeNotificationBaselines(signal);
         await this.#outbox.recover(signal);
         for (const row of (await this.#store.read([{ collection: 'message_timelines' }], signal)).sets[0]!)
             if (row.value.hasRetentionGap === true) this.#syncStatus.observeGap(row.key, false);
@@ -233,10 +234,10 @@ export class MessageManager extends ClientComponent {
         const own = await this.#getState(this.accountId, signal); authorizedDevice(own, certificateId(this.#device.certificate, this.context), this.context, this.clock.nowSeconds());
         const initial = await this.#prepareSend(this.accountId, accountContactSyncCodec.encode({ records: [], requestSnapshot: true }), undefined, undefined, signal);
         await this.#repository.enqueue(initial.outbox, undefined, initial.guards, undefined, signal);
-        this.#sendPulse = new AsyncPulse(); this.#syncPulse = new AsyncPulse(); this.#maintenancePulse = new AsyncPulse(); this.#pendingDeviceRevision = own.revision;
-        this.#notifiedContacts.clear(); this.#maintenanceRetry = false;
+        this.#sendPulse = new AsyncPulse(); this.#syncPulse = new AsyncPulse(); this.#maintenancePulse = new AsyncPulse(); this.#maintenanceRetry = false;
+        // Subscribe before scanning persisted progress so startup and stopped-state changes are reconciled.
         this.#deviceListeners = [this.#device.on('deviceChanged', () => { this.#maintenancePulse?.pulse(); }), this.#device.on('deviceStateChanged', value => {
-            if (value.account === this.accountId) { this.#pendingDeviceRevision = Math.max(value.revision, this.#pendingDeviceRevision ?? -1); this.#notifiedContacts.clear(); this.#maintenancePulse?.pulse(); }
+            if (value.account === this.accountId) this.#maintenancePulse?.pulse();
         })];
         this.#runtimeJobs = [this.#sendLoop(this.runtimeSignal), this.#syncLoop(this.runtimeSignal), this.#poll(this.runtimeSignal), this.#maintainContacts(this.runtimeSignal)];
         for (const job of this.#runtimeJobs) job.catch(() => undefined); this.#sendPulse.pulse(); this.#syncPulse.pulse(); this.#maintenancePulse.pulse();
@@ -244,18 +245,13 @@ export class MessageManager extends ClientComponent {
     async #poll(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(15_000, signal); this.#sendPulse?.pulse(); this.#syncPulse?.pulse(); if (this.#maintenanceRetry) this.#maintenancePulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
     async #maintainContacts(signal: AbortSignal): Promise<void> {
         try { for (;;) {
-            await this.#maintenancePulse!.wait(signal); const revision = this.#pendingDeviceRevision; let failed = false;
+            await this.#maintenancePulse!.wait(signal); let failed = false;
             try {
                 const rows = await this.#store.read([{ collection: 'contacts' }], signal);
-                const requests = rows.sets[0]!.filter(row => readContact(row.value)?.record.status === 'active')
-                    .map(row => ({ account: row.key, notifyDeviceRevision: this.#notifiedContacts.has(row.key) ? undefined : revision }));
-                for await (const result of this.#contacts.maintain(requests, signal)) {
-                    if (result.success) {
-                        // A completed older pass cannot mark the newer revision's notifications as sent.
-                        if (this.#pendingDeviceRevision === revision) this.#notifiedContacts.add(result.account);
-                    } else { failed = true; this.notifyBackgroundError({ operation: 'maintain_contact', resource: result.account, error: result.error }); }
+                const accounts = rows.sets[0]!.filter(row => readContact(row.value)?.record.status === 'active').map(row => row.key);
+                for await (const result of this.#contacts.maintain(accounts, signal)) {
+                    if (!result.success) { failed = true; this.notifyBackgroundError({ operation: 'maintain_contact', resource: result.account, error: result.error }); }
                 }
-                if (!failed && this.#pendingDeviceRevision === revision) { this.#pendingDeviceRevision = undefined; this.#notifiedContacts.clear(); }
             } catch (error) { throwIfAborted(signal); failed = true; this.notifyBackgroundError({ operation: 'maintain_contacts', error }); }
             this.#maintenanceRetry = failed;
         } } catch (error) { if (!signal.aborted) throw error; }
@@ -328,7 +324,7 @@ export class MessageManager extends ClientComponent {
         try { const results = await Promise.allSettled(this.#runtimeJobs); const failures = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected'); if (failures.length) throw new AggregateError(failures.map(value => value.reason), 'Message runtime failed.'); }
         finally { for (const observed of this.#observed.values()) for (const remove of observed.detach) remove(); this.#observed.clear();
             for (const remove of this.#deviceListeners) remove(); this.#deviceListeners = []; this.#runtimeJobs = []; this.#sendPulse = this.#syncPulse = this.#maintenancePulse = undefined;
-            this.#pendingDeviceRevision = undefined; this.#notifiedContacts.clear(); this.#maintenanceRetry = false; this.#syncStatus.stop(); }
+            this.#maintenanceRetry = false; this.#syncStatus.stop(); }
     }
     protected override async onDispose(): Promise<void> { this.#removeRouteListener?.(); this.#removeRouteListener = undefined; await this.#routeRecording; if (this.#pendingRoutes.size) throw new Error('Some observed message timelines could not be persisted.'); this.#syncStatus.stop(true); this.#events.clear(); }
 }

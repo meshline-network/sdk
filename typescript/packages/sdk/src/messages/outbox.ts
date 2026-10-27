@@ -47,7 +47,7 @@ export function outboxStatus(value: OutboxRecord): MessageSendStatus {
 }
 /** Resolved before a queued message is claimed; requests themselves must not retry business operations internally. */
 export interface OutboxTransport {
-    getHome(signal?: AbortSignal): Promise<string>;
+    getHome(signal?: AbortSignal, refresh?: boolean): Promise<string>;
     prepare(relayId: string, signal?: AbortSignal): Promise<{
         send(request: MessageSendRequest, signal?: AbortSignal): Promise<MessageDeliveryStatus>;
         status(messageId: string, signal?: AbortSignal): Promise<MessageDeliveryStatus>;
@@ -90,7 +90,7 @@ export class MessageOutbox {
             .sort((a, b) => a.request.envelope.createdAt - b.request.envelope.createdAt || ordinal(a.request.envelope.messageId, b.request.envelope.messageId))
             .map(value => value.request.envelope.messageId);
     }
-    /** Errors leave a durable retry state and are returned for visible reporting by the owning runtime. */
+    /** Errors persist retry or terminal state and are returned for visible reporting by the owning runtime. */
     process(messageId: string, signal?: AbortSignal): Promise<{ readonly changes: readonly OutboxChange[]; readonly error?: unknown }> {
         return this.#gate.run(() => this.#process(messageId, signal), signal);
     }
@@ -128,13 +128,30 @@ export class MessageOutbox {
         } catch (error) {
             // A cancellation can interrupt the request after Relay acceptance; persistence deliberately ignores its signal.
             const definitive = submitted && !previousAcceptancePossible && error instanceof RelayError && error.isDefinitiveRejection;
-            const state = record.state === 'queued' ? 'queued' : acceptedAt !== undefined ? 'relayAccepted' : definitive ? 'failed' : 'submissionUnknown';
-            const current = { ...record, state, ...(acceptedAt === undefined ? {} : { acceptedAt }), errorMessage: error instanceof Error ? error.message : String(error), nextAttemptAt: this.#retryAt() } as const;
+            const routeRejected = definitive && error instanceof RelayError && ['route_stale', 'target_not_local'].includes(error.code);
+            // Unauthorized invalidates the transport session; the next attempt authenticates again.
+            const retryable = routeRejected || definitive && error instanceof RelayError && ['rate_limited', 'unauthorized'].includes(error.code);
+            let state: MessageSendState;
+            if (record.state === 'queued') state = 'queued';
+            else if (acceptedAt !== undefined) state = 'relayAccepted';
+            else if (retryable) state = 'queued';
+            else if (definitive) state = 'failed';
+            else state = 'submissionUnknown';
+            const current = { ...record, state, ...(acceptedAt === undefined ? {} : { acceptedAt }), errorMessage: error instanceof Error ? error.message : String(error), nextAttemptAt: this.#retryAt(error) } as const;
             const change = await this.#replace(record, current); if (change) changes.push(change);
+            // Retain the unaccepted request before discovery, which can fail or be interrupted.
+            if (routeRejected) {
+                try { validateRelayId(await this.transport.getHome(signal, true)); }
+                catch (refreshError) { return { changes, error: new AggregateError([error, refreshError], 'Message routing was rejected and route refresh failed.') }; }
+            }
             return { changes, error };
         }
     }
-    #retryAt(): number { const result = this.clock.nowSeconds() + 15; requireSafeInteger(result, 0); return result; }
+    #retryAt(error?: unknown): number {
+        const now = this.clock.nowSeconds(); requireSafeInteger(now, 0);
+        const delay = Math.max(15, error instanceof RelayError ? error.retryAfter ?? 0 : 0);
+        return now + Math.min(delay, Number.MAX_SAFE_INTEGER - now);
+    }
     #prune(records: readonly OutboxRecord[]): readonly StoreMutation[] {
         return records.filter(value => terminal.has(value.state))
             .sort((a, b) => b.request.envelope.createdAt - a.request.envelope.createdAt || ordinal(b.request.envelope.messageId, a.request.envelope.messageId))

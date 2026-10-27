@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { MessageManager, StateConflictError, contactRecordCodec, contactGrantCodec, certificateId, deviceStateInput, signAccount, messageSendRequestCodec, decryptMessage, contactGrantInput, type QueryReader, type MessageEvents } from '@meshline/sdk';
+import { MessageManager, StateConflictError, contactRecordCodec, contactGrantCodec, certificateId, deviceStateInput, signAccount, messageSendRequestCodec, type QueryReader, type MessageEvents } from '@meshline/sdk';
 import { MessageContacts } from '../../packages/sdk/dist/messages/contacts.js';
 import { context } from '../support/relay-fixture.js';
 import { MessagingNetwork } from '../support/messaging-network.js';
@@ -235,29 +235,6 @@ describe('Contact relationships and events', () => {
 });
 
 describe('Contact authorization maintenance', () => {
-    /** Observe durable notifications even when the outbox has not transmitted them yet. */
-    function observeDeviceNotifications(a: Awaited<ReturnType<MessagingNetwork['client']>>, recipient: string,
-        afterFirst?: () => Promise<void>) {
-        const revisions: number[] = []; const seen = new Set<string>(); const commit = a.store.commit.bind(a.store);
-        const spy = vi.spyOn(a.store, 'commit').mockImplementation(async (version, mutations, signal) => {
-            const result = await commit(version, mutations, signal);
-            for (const mutation of mutations) {
-                if (mutation.kind !== 'put' || mutation.collection !== 'message_outbox' || seen.has(mutation.key)) continue;
-                const request = messageSendRequestCodec.decode(mutation.value.request!);
-                if (request.envelope.to !== recipient) continue;
-                seen.add(mutation.key);
-                const box = request.senderBoxes?.find(value => value.deviceId === certificateId(a.device.certificate, context));
-                if (!box) continue;
-                const payload = await decryptMessage({ context, receiver: a.device, sender: a.device.certificate, envelope: request.envelope, keyBox: box });
-                if (payload['$type'] !== 'meshline.device.state.changed') continue;
-                revisions.push(payload.revision as number);
-                if (revisions.length === 1) await afterFirst?.();
-            }
-            return result;
-        });
-        return { revisions, spy };
-    }
-
     test('new devices supplement contact grants but cannot infer the complete issuance history of another device', async () => {
         const f = await fixture(); await connect(f); const { network, a, b } = f; const oldId = certificateId(a.device.certificate, context);
         await expect(a.device.removeDevice(oldId)).rejects.toMatchObject({ code: 'contact_grant_at_risk' });
@@ -292,43 +269,6 @@ describe('Contact authorization maintenance', () => {
         expect((await f.a.store.read([{ collection: 'message_outbox' }])).sets[0]!.some(row => row.value.state === 'relayAccepted')).toBe(true);
     });
 
-    test('a completed old maintenance pass cannot suppress notification of a newer device revision', async () => {
-        const f = await fixture(); await connect(f); const { a, b, network } = f;
-        await a.messages.stop(); await b.messages.stop();
-        const entered = deferred(); const release = deferred();
-        const observation = observeDeviceNotifications(a, b.accountId, async () => { entered.resolve(); await release.promise; });
-        try {
-            await a.messages.start(); await entered.promise;
-            const previous = a.device.deviceState!.revision;
-            await a.device.publishDeviceState(network.descriptor.relayId);
-            const revision = a.device.deviceState!.revision; expect(revision).toBeGreaterThan(previous);
-            release.resolve();
-            await vi.waitFor(() => expect(observation.revisions).toContain(revision));
-            expect(observation.revisions).toContain(previous);
-        } finally { release.resolve(); await a.messages.stop(); observation.spy.mockRestore(); }
-    });
-
-    test('restart clears per-pass notification successes even when another contact failed maintenance', async () => {
-        const f = await fixture(); await connect(f); const { a, b, network } = f;
-        await a.messages.stop(); await b.messages.stop();
-        const other = await network.client(23); const id = certificateId(a.device.certificate, context);
-        let grant = { grantor: a.accountId, grantee: other.accountId, signatures: {} };
-        grant = { ...grant, signatures: { [id]: await a.device.sign(contactGrantInput(grant, context)) } };
-        const snapshot = await a.store.read([]);
-        await a.store.commit(snapshot.version, [{ kind: 'put', collection: 'contacts', key: other.accountId, value: {
-            record: contactRecordCodec.encode({ account: other.accountId, status: 'active', updatedAt: network.clock.wall, grantToContact: grant }),
-        } }]);
-        const failed: string[] = []; const detach = a.messages.onLifecycle('backgroundError', value => { if (value.operation === 'maintain_contact') failed.push(value.resource!); });
-        const observation = observeDeviceNotifications(a, b.accountId);
-        try {
-            await a.messages.start();
-            await vi.waitFor(() => { expect(failed).toContain(other.accountId); expect(observation.revisions).toContain(a.device.deviceState!.revision); });
-            await a.messages.stop(); await a.device.publishDeviceState(network.descriptor.relayId);
-            const revision = a.device.deviceState!.revision;
-            await a.messages.start(); await vi.waitFor(() => expect(observation.revisions).toContain(revision));
-        } finally { await a.messages.stop(); observation.spy.mockRestore(); detach(); }
-    });
-
     test.each([false, true])('one contact maintenance pass scans once and rechecks delivery retention (pruned: %s)', async prune => {
         const f = await fixture(); await connect(f); const { a, b, network } = f;
         const c = await network.client(23); await connect({ network, a, b: c });
@@ -345,7 +285,7 @@ describe('Contact authorization maintenance', () => {
             .filter(row => messageSendRequestCodec.decode(row.value.request!).envelope.to === c.accountId);
         const read = vi.spyOn(a.store, 'read');
         try {
-            const pass = contacts.maintain([b, c].map(value => ({ account: value.accountId, notifyDeviceRevision: undefined })));
+            const pass = contacts.maintain([b, c].map(value => value.accountId));
             expect((await pass.next()).value).toEqual({ account: b.accountId, success: true });
             if (prune) {
                 expect(outgoing.length).toBeGreaterThan(0);

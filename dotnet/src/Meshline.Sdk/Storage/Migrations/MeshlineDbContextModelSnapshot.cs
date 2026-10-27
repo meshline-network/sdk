@@ -286,6 +286,9 @@ namespace Meshline.Storage.Migrations
                     b.Property<string>("ConfirmedGrantToJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<long>("DeviceNotificationRevision")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("GrantFromJson")
                         .HasColumnType("TEXT");
 

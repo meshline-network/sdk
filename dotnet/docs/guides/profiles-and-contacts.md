@@ -52,7 +52,9 @@ For invitation-based discovery, create a time-limited `ContactInvite` using `Cre
 
 ## Synchronization boundaries
 
-Contact changes and account-message synchronization positions are committed together. A direct message received without the required local contact authorization is discarded; adding the contact later does not replay that message. Contact records more than five minutes ahead of the local clock are rejected and reported through `BackgroundError`; check clock accuracy when diagnosing validation failures.
+Contact changes and account-message synchronization positions are committed together. `MessageManager` notifies contacts when its own account's verified device-state revision advances and resumes pending notifications after restart.
+
+A direct message received without the required local contact authorization is discarded; adding the contact later does not replay that message. Contact records more than five minutes ahead of the local clock are rejected and reported through `BackgroundError`; check clock accuracy when diagnosing validation failures.
 
 ## API reference
 

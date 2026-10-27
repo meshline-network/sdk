@@ -153,6 +153,54 @@ public sealed class DatabaseTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task Notification_migration_uses_own_baseline_and_preserves_contacts_and_pending_outbox(bool ownStateKnown)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var database = new TestDatabase();
+        Directory.CreateDirectory(Path.GetDirectoryName(database.Options.Path)!);
+        var pending = new MessageOutboxRecord
+        {
+            MessageId = "pending-message",
+            Recipient = "peer",
+            RelayId = "relay",
+            RequestJson = "exact-encrypted-request",
+            CreatedAt = DateTimeOffset.UnixEpoch,
+            NextAttemptAt = DateTimeOffset.UnixEpoch,
+            State = MessageSendState.SubmissionUnknown
+        };
+        await using (var previous = new MeshlineDbContext(database.Options, SqliteOpenMode.ReadWriteCreate))
+        {
+            await previous.GetService<IMigrator>().MigrateAsync("20261023152940_DeviceCreationPushGateway", token);
+            previous.Bindings.Add(new() { Id = 1, Context = "network", AccountId = "own" });
+            previous.DeviceStates.Add(new() { AccountId = "peer", DocumentJson = "peer-state", Revision = 99 });
+            if (ownStateKnown) previous.DeviceStates.Add(new() { AccountId = "own", DocumentJson = "own-state", Revision = 7 });
+            previous.MessageOutbox.Add(pending);
+            await previous.SaveChangesAsync(token);
+            await previous.Database.ExecuteSqlRawAsync("""
+                INSERT INTO Contacts (AccountId, Alias, State, UpdatedAt, GrantFromJson, GrantToJson, ConfirmedGrantToJson, RequiredDeviceRevision)
+                VALUES ('peer', 'kept alias', 0, 0, 'incoming', 'outgoing', 'confirmed', 100);
+                """, token);
+        }
+
+        await MeshlineDatabase.MigrateAsync(database.Options, token);
+
+        await using var upgraded = database.Open();
+        var contact = await upgraded.Contacts.SingleAsync(token);
+        Assert.Equal(ownStateKnown ? 7 : 0, contact.DeviceNotificationRevision);
+        Assert.Equal("kept alias", contact.Alias);
+        Assert.Equal("incoming", contact.GrantFromJson);
+        Assert.Equal("outgoing", contact.GrantToJson);
+        Assert.Equal("confirmed", contact.ConfirmedGrantToJson);
+        Assert.Equal(100, contact.RequiredDeviceRevision);
+        var restored = await upgraded.MessageOutbox.SingleAsync(token);
+        Assert.Equal(pending.MessageId, restored.MessageId);
+        Assert.Equal(pending.RequestJson, restored.RequestJson);
+        Assert.Equal(pending.State, restored.State);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task Database_cannot_be_reused_by_another_account_or_network(bool otherAccount)
     {
         await using var database = new TestDatabase();
