@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { FieldUpdate, MessageManager, certificateId, contactRecordCodec, contactGrantInput, decryptMessage, deviceCertificateCodec, messageSendRequestCodec, type JsonObject, type StoreMutation } from '@meshline/sdk';
+import { FieldUpdate, MessageManager, certificateId, contactRecordCodec, contactGrantCodec, contactGrantInput, decryptMessage, deviceCertificateCodec, messageSendRequestCodec, type ContactGrant, type JsonObject, type StoreMutation } from '@meshline/sdk';
 import { MessageContacts } from '../../packages/sdk/dist/messages/contacts.js';
 import { context } from '../support/relay-fixture.js';
 import { MessagingNetwork } from '../support/messaging-network.js';
@@ -13,19 +13,27 @@ async function putContact(client: Client, account: string, value: JsonObject) {
     const snapshot = await client.store.read([]);
     await client.store.commit(snapshot.version, [{ kind: 'put', collection: 'contacts', key: account, value }]);
 }
-async function connect(network: MessagingNetwork, a: Client, b: Client) {
-    await a.messages.start(); await b.messages.start();
-    const request = await a.messages.addContact(b.accountId);
-    await vi.waitFor(async () => expect((await a.messages.getSendStatus(request.messageId))?.state).toBe('targetAccepted'), { timeout: 5000 });
-    await b.messages.synchronize(network.descriptor.relayId); await b.messages.acceptContactRequest(a.accountId);
-    await vi.waitFor(() => expect(network.submissions.some(value => value.envelope.from === b.accountId && value.envelope.to === a.accountId)).toBe(true), { timeout: 5000 });
-    await a.messages.synchronize(network.descriptor.relayId);
-    await a.messages.stop(); await b.messages.stop();
+async function seedContacts(network: MessagingNetwork, a: Client, b: Client) {
+    // Begin after contact exchange, which is exercised by message.test.ts. Grants use
+    // the clients' real device keys so subsequent authorization and delivery are verified.
+    async function grant(from: Client, to: Client): Promise<ContactGrant> {
+        const unsigned = { grantor: from.accountId, grantee: to.accountId, signatures: {} };
+        return { ...unsigned, signatures: { [certificateId(from.device.certificate, context)]: await from.device.sign(contactGrantInput(unsigned, context)) } };
+    }
+    const outgoing = await grant(a, b); const incoming = await grant(b, a);
+    for (const [client, peer, grantToContact, grantFromContact] of [[a, b, outgoing, incoming], [b, a, incoming, outgoing]] as const) {
+        await client.device.getDeviceState(grantFromContact);
+        await putContact(client, peer.accountId, {
+            record: contactRecordCodec.encode({ account: peer.accountId, status: 'active', updatedAt: network.clock.wall, grantToContact, grantFromContact }),
+            confirmedGrantTo: contactGrantCodec.encode(grantToContact),
+            deviceNotificationRevision: client.device.deviceState!.revision,
+        });
+    }
 }
 async function fixture(network = new MessagingNetwork()) {
     networks.push(network);
     const a = await network.client(21); const b = await network.client(22);
-    await connect(network, a, b);
+    await seedContacts(network, a, b);
     const payloads = new WeakMap<Client, Map<string, JsonObject>>();
     const pollNotifications = (client: Client, recipient: string) => {
         let cache = payloads.get(client);
@@ -95,8 +103,6 @@ function notificationCommit(mutations: readonly StoreMutation[], account: string
 describe('Device-state notification lifecycle', () => {
     test('unchanged starts, foreground resumes, ordinary sends and reopened clients create no notifications', async () => {
         const { network, a, b } = await fixture();
-        expect((await contact(a, b.accountId)).deviceNotificationRevision).toBe(a.device.deviceState!.revision);
-        expect((await contact(b, a.accountId)).deviceNotificationRevision).toBe(b.device.deviceState!.revision);
         const scans = observeScans(a.accountId);
         for (let cycle = 0; cycle < 3; cycle++) {
             const before = scans.count(); await a.messages.start(); await scans.wait(before);
@@ -110,19 +116,23 @@ describe('Device-state notification lifecycle', () => {
         expect(await notifications(reopened, b.accountId)).toEqual([]);
     });
 
-    test.each(['running', 'stopped', 'reopened'] as const)('device additions, removals, renewals and gateway updates notify while %s', async mode => {
+    test.each((['running', 'stopped', 'reopened'] as const).flatMap(mode =>
+        (['addition', 'removal', 'renewal', 'gateway update', 'gateway removal'] as const).map(change => ({ mode, change }))))(
+        'device $change notifies while $mode', async ({ mode, change }) => {
         const { network, a, b, pollNotifications } = await fixture(); let current = a;
         const expected: number[] = []; let second: Client;
-        const changes = [
-            async () => { second = await network.client(21); await current.device.refreshDeviceState(); },
-            async () => { await second.device.removeDevice(certificateId(second.device.certificate, context)); await current.device.refreshDeviceState(); },
-            async () => { await current.device.renewDevice(7200); await current.device.publishDeviceState(network.descriptor.relayId); },
-            async () => { await current.device.renewDevice({ validitySeconds: 7200, pushGateway: 'https://push.example/gateway' }); await current.device.publishDeviceState(network.descriptor.relayId); },
-            async () => { await current.device.renewDevice({ validitySeconds: 7200, pushGateway: FieldUpdate.delete }); await current.device.publishDeviceState(network.descriptor.relayId); },
-        ];
+        const addDevice = async () => { second = await network.client(21); await current.device.refreshDeviceState(); };
+        const setGateway = async () => { await current.device.renewDevice({ validitySeconds: 7200, pushGateway: 'https://push.example/gateway' }); await current.device.publishDeviceState(network.descriptor.relayId); };
+        const steps = {
+            addition: [addDevice],
+            removal: [addDevice, async () => { await second.device.removeDevice(certificateId(second.device.certificate, context)); await current.device.refreshDeviceState(); }],
+            renewal: [async () => { await current.device.renewDevice(7200); await current.device.publishDeviceState(network.descriptor.relayId); }],
+            'gateway update': [setGateway],
+            'gateway removal': [setGateway, async () => { await current.device.renewDevice({ validitySeconds: 7200, pushGateway: FieldUpdate.delete }); await current.device.publishDeviceState(network.descriptor.relayId); }],
+        }[change];
         if (mode === 'running') await current.messages.start();
-        for (const change of changes) {
-            await change(); expected.push(current.device.deviceState!.revision);
+        for (const step of steps) {
+            await step(); expected.push(current.device.deviceState!.revision);
             if (mode === 'reopened') { await current.dispose(); current = await network.client(21, current.path); }
             await current.messages.start();
             await network.until(async () => (await pollNotifications(current, b.accountId)).filter(value => value.state === 'targetAccepted').length === expected.length);
@@ -216,7 +226,7 @@ describe('Durable notification recovery', () => {
     ].flatMap(rejection => ['retry', 'reopen'].map(recovery => ({ ...rejection, recovery }))))(
         'a $code notification resumes on $recovery without duplicating successful contacts', async ({ code, status, retryAfter, refreshRoute, recovery }) => {
         const network = new MessagingNetwork(); const fetch = vi.spyOn(network, 'fetch');
-        const { a, b, pollNotifications } = await fixture(network); const c = await network.client(23); await connect(network, a, c);
+        const { a, b, pollNotifications } = await fixture(network); const c = await network.client(23); await seedContacts(network, a, c);
         await a.device.publishDeviceState(network.descriptor.relayId);
         const authenticationCount = () => fetch.mock.calls.filter(([url, init]) => String(url).endsWith('/auth/device/verify')
             && JSON.parse(String(init?.body)).signer_certificate?.account === a.accountId).length;
@@ -256,7 +266,7 @@ describe('Durable notification recovery', () => {
     });
 
     test.each(['retry', 'reopen'] as const)('a failed contact resumes on %s without recreating the successful contact notification', async recovery => {
-        const { network, a, b, pollNotifications } = await fixture(); const c = await network.client(23); await connect(network, a, c);
+        const { network, a, b, pollNotifications } = await fixture(); const c = await network.client(23); await seedContacts(network, a, c);
         const baseline = a.device.deviceState!.revision; await a.device.publishDeviceState(network.descriptor.relayId);
         const commit = a.store.commit.bind(a.store); const failure = new Error('Notification transaction unavailable');
         const spy = vi.spyOn(a.store, 'commit').mockImplementation(async (version, mutations, signal) => {
@@ -326,7 +336,9 @@ describe('Durable notification recovery', () => {
 
 describe('Notification baseline upgrade', () => {
     test('older contacts retain metadata and pending requests while initialization establishes the cached baseline', async () => {
-        const { network, a, b, pollNotifications } = await fixture(); await a.messages.dispose();
+        const { network, a, b, pollNotifications } = await fixture();
+        await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'pending before upgrade' } });
+        await a.messages.dispose();
         const { deviceNotificationRevision, ...legacy } = await contact(a, b.accountId);
         await putContact(a, b.accountId, legacy);
         const before = (await a.store.read([{ collection: 'message_outbox' }])).sets;

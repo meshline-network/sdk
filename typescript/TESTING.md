@@ -43,6 +43,8 @@ Share preparation, not assertions or mutable state. Each test owns fresh resourc
 
 `MessagingNetwork`, `GroupNetwork`, `ChannelNetwork` and `ClientNetwork` remain domain fixtures. `createConversationFixture` accepts a caller-owned network and seeds incoming encrypted records through the message repository to isolate local conversation/history projections; it does not test contact negotiation or relay delivery. History-query setup stays local to its test file. These helpers are not a general scenario framework.
 
+Device-notification cases start with accepted contacts and real signed grants; contact exchange and its initial revision checkpoints are covered in `message.test.ts`. Each device change and lifecycle mode has its own case, with prerequisite transitions retained for device removal and gateway removal.
+
 Use the fixture clock for SDK timers and an explicit handshake for concurrent work. Real timeouts bound a hung test; they should not determine operation order. Internal tracker tests use `MessagingClock` directly and do not construct a client network.
 
 ## Component regression coverage

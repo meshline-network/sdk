@@ -26,6 +26,10 @@ describe('Message delivery and history', () => {
         const requests = [...a.pool.clients, ...b.pool.clients].map(client => vi.spyOn(client, 'requestHttp'));
         expect(await a.messages.getContact(b.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
         expect(await b.messages.getContact(a.accountId)).toMatchObject({ state: 'active', grantFromContact: 'valid', grantToContact: 'valid' });
+        for (const [client, peer] of [[a, b], [b, a]] as const) {
+            const row = (await client.store.read([{ collection: 'contacts', key: peer.accountId }])).sets[0]![0]!;
+            expect(row.value.deviceNotificationRevision).toBe(client.device.deviceState!.revision);
+        }
         const sent = await a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: '完整 SDK 工作流 😀' } }); expect(sent.state).toBe('queued');
         await network.until(async () => Boolean(await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId })));
         expect((await b.messages.getMessage({ sender: a.accountId, messageId: sent.messageId }))!.body!.text).toBe('完整 SDK 工作流 😀');
