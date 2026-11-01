@@ -395,8 +395,9 @@ session; guide indexes route readers by task. Keep lifecycle focused on ownershi
 synchronization on progress and fresh passes, direct messages on the outbox,
 conversations on read state, and storage on query ranges and adapters. Event/error
 contracts belong in `events-and-errors.md`; symptom-based diagnosis belongs in
-`troubleshooting.md`. Extend the relevant section instead of appending new features
-after an API reference or navigation footer. Keep runtime differences explicit and
+`troubleshooting.md`. Integrate changes into existing explanations, keep only what
+the reader needs, and link to shared contracts instead of repeating them. Repair
+history belongs in tests and change notes. Keep runtime differences explicit and
 use matching source-release documentation for package-specific behavior.
 
 The [API reference](dotnet/docs/api/README.md) is generated with the repository-local `DefaultDocumentation.Console` tool, pinned to 1.2.5 in `dotnet/docs/dotnet-tools.json`. The documentation script runs from that directory to resolve its own tool manifest; the EF migration manifest remains at `dotnet/dotnet-tools.json`. Do not edit generated pages. Change the SDK's XML comments to correct API explanations, or the generator configuration to change presentation.

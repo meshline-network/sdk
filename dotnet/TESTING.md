@@ -41,6 +41,7 @@ Choose the layer by the behavior under test, not by whether its input happens to
 - Enter `Clock.Use(new ManualClock(...))` in the calling test **before** constructing fixtures. Do not establish an `AsyncLocal` clock in an awaited fixture factory. Dispose clients, pools and background tasks before leaving the clock scope.
 - Use a separate `TestClient`, database and clock per test. `TestClient` owns its relay, pool, database and account signer, including a signer supplied to its constructor. Directly constructed pools and `HttpClient` instances retain the ownership exercised by their tests.
 - Advance `ManualClock` to drive SDK timers and expiry. Real-time waits are bounded hang detection only. Use `AsyncTest.Signal` for event handshakes and `AsyncTest.UntilAsync` for observable state; propagate unexpected background errors.
+- Cover concurrent completion orders, cancellation, failed writes and restart recovery. Drain delayed work before asserting persisted state, caches and notifications.
 - Keep actual outcome assertions in tests. `ResponseTransport` only scripts the response and selects a transport; its request-inspection callback is supplied by the test. Scripted peers intentionally validate outgoing signed SDK requests and fail on unscripted operations.
 - Preserve independent expected bytes and signatures in [protocol vector snapshots](#protocol-vector-snapshots). Never regenerate expected values with the SDK being tested.
 
@@ -60,9 +61,9 @@ Split independent contracts into separately initialized cases, even when they sh
 
 For outgoing messages, `MessageSendingTests` owns submission and retries, `SendHistoryTests` owns bounded retention and restart persistence, and `SendStatusWaitingTests` owns waiting milestones, cancellation, disposal and observer failures. The retention test also checks an active waiter across rollback and immediate terminal eviction; that is an intentional boundary regression, not duplicate happy-path coverage.
 
-Account establishment tests are grouped by contract rather than by the repair that
-introduced a case. Keep interruption sequences intact: the failure, retained state,
-restart and successful retry together prove resumability.
+Cross-component regressions are grouped by contract. Keep interruption sequences
+intact: the failure, retained state, restart and successful retry together prove
+resumability. Domain-specific cases remain with their owning component.
 
 | Contract | Test owners |
 | --- | --- |
@@ -70,28 +71,28 @@ restart and successful retry together prove resumability.
 | Profile merging, publication ordering and confirmed cache state | `Components/Profiles/LatestProfileTests` |
 | Group property updates against concurrent management history | `Components/Groups/LatestGroupTests` |
 | Channel descriptor updates and concurrent history/cache refreshes | `Components/Channels/LatestChannelTests` |
-| Public setup scenarios, options, retained/new installation, selection and failure details | `Accounts/AccountEstablishmentTests` |
-| Durable steps and replay after failed checkpoints | `Accounts/AccountEstablishmentStepTests` |
-| Validity through profile publication and workflow cleanup | `Accounts/AccountEstablishmentCompletionTests` |
-| Profile preservation, stale reads, publication outcomes and owner disposal | `Accounts/AccountProfileInitializationTests` |
-| Signing versus submission failure classification | `Accounts/AccountPublicationFailureTests` |
-| Startup reservation, cancellation and disposal | `Accounts/AccountEstablishmentLifecycleTests` |
-| Draft keys, activation receipts and failed secret access | `Accounts/AccountDevicePreparationTests`, `Accounts/LocalDataIntegrityTests`, `Accounts/DeviceKeyAccessTests` |
-| Device publication reconciliation and certificate renewal | `Accounts/DeviceAuthorizationRetryTests`, `Devices/DeviceStatePublicationTests` |
-| Handoff between standalone device operations and account setup | `Devices/DeviceAuthorizationIntegrationTests` |
-| Replacement proposals, interrupted choice checkpoints and revocation | `Accounts/DeviceReplacementTests` |
-| Route bootstrap, renewal, conflict discovery, notifications and expired-request evidence | `Accounts/AccountRouteAuthorizationTests`, `Accounts/AccountRouteRetryTests`, `Accounts/EnsureRouteTests`, `Accounts/ExpiredRouteRecoveryTests` |
-| Explicit recovery and migration | `Accounts/MigrationTests`, `Accounts/DevicePublicationBoundaryTests` |
-| Device activation and renewal through the shared pool | `Accounts/DeviceSessionBindingTests` |
+| Public setup scenarios, options, retained/new installation, selection and failure details | `Components/Accounts/AccountEstablishmentTests` |
+| Durable steps and replay after failed checkpoints | `Components/Accounts/AccountEstablishmentStepTests` |
+| Validity through profile publication and workflow cleanup | `Components/Accounts/AccountEstablishmentCompletionTests` |
+| Profile preservation, stale reads, publication outcomes and owner disposal | `Components/Accounts/AccountProfileInitializationTests` |
+| Signing versus submission failure classification | `Components/Accounts/AccountPublicationFailureTests` |
+| Startup reservation, cancellation and disposal | `Components/Accounts/AccountEstablishmentLifecycleTests` |
+| Draft keys, activation receipts and failed secret access | `Components/Accounts/AccountDevicePreparationTests`, `Components/Accounts/LocalDataIntegrityTests`, `Components/Accounts/DeviceKeyAccessTests` |
+| Device publication reconciliation and certificate renewal | `Components/Accounts/DeviceAuthorizationRetryTests`, `Components/Devices/DeviceStatePublicationTests` |
+| Handoff between standalone device operations and account setup | `Components/Devices/DeviceAuthorizationIntegrationTests` |
+| Replacement proposals, interrupted choice checkpoints and revocation | `Components/Accounts/DeviceReplacementTests` |
+| Route bootstrap, renewal, conflict discovery, notifications and expired-request evidence | `Components/Accounts/AccountRouteAuthorizationTests`, `Components/Accounts/AccountRouteRetryTests`, `Components/Accounts/EnsureRouteTests`, `Components/Accounts/ExpiredRouteRecoveryTests` |
+| Explicit recovery and migration | `Components/Accounts/MigrationTests`, `Components/Accounts/DevicePublicationBoundaryTests` |
+| Device activation and renewal through the shared pool | `Components/Accounts/DeviceSessionBindingTests` |
 | Pool reuse, certificate binding and session retirement | `Transport/RelayClientPoolTests` |
 | Session expiry, reauthentication and cancellation | `Transport/RelayAuthenticationTests` |
-| Runtime suspension, socket drainage and shutdown failures | `Accounts/RevokedDeviceRuntimeTests`, `Lifecycle/LifecycleTests`, `Components/Lifecycle/StateUpdateLifecycleTests` |
-| Contact continuity and atomic publication | `Contacts/ContactAuthorizationContinuityTests`, `Contacts/ContactContinuityBoundaryTests`, `Contacts/ContactPublicationTransactionTests` |
-| Background grant supplementation and delivery | `Contacts/BackgroundContactAuthorizationTests` |
-| Device-state notification delivery and recovery | `Contacts/DeviceStateNotificationTests` |
-| Concurrent device mutations, cold keys, session retirement and signing outside the database writer | `Devices/DeviceMutationConcurrencyTests` |
-| Push gateway creation, renewal keep/set/remove, local persistence, session rebinding and publication replay | `Devices/PushGatewayTests` |
-| Gateway intent, retained declarations, recovery and interrupted device preparation | `Accounts/PushGatewayEstablishmentTests` |
+| Runtime suspension, socket drainage and shutdown failures | `Components/Accounts/RevokedDeviceRuntimeTests`, `Components/Lifecycle/LifecycleTests`, `Components/Lifecycle/StateUpdateLifecycleTests` |
+| Contact continuity and atomic publication | `Components/Contacts/ContactAuthorizationContinuityTests`, `Components/Contacts/ContactContinuityBoundaryTests`, `Components/Contacts/ContactPublicationTransactionTests` |
+| Background grant supplementation and delivery | `Components/Contacts/BackgroundContactAuthorizationTests` |
+| Device-state notification delivery and recovery | `Components/Contacts/DeviceStateNotificationTests` |
+| Concurrent device mutations, cold keys, session retirement and signing outside the database writer | `Components/Devices/DeviceMutationConcurrencyTests` |
+| Push gateway creation, renewal keep/set/remove, local persistence, session rebinding and publication replay | `Components/Devices/PushGatewayTests` |
+| Gateway intent, retained declarations, recovery and interrupted device preparation | `Components/Accounts/PushGatewayEstablishmentTests` |
 | Push certificate signing, identity and URL validation | `Protocol/PushCertificateTests` |
 | Fresh schemas, supported upgrades and durable publication recovery | `Storage/DatabaseTests`, `Storage/LatestStateMigrationTests` |
 
