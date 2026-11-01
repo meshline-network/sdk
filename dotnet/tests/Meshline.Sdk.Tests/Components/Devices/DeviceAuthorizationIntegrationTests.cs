@@ -230,7 +230,11 @@ public sealed class DeviceAuthorizationIntegrationTests
         byte[] signature;
         try
         {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            // Setup includes key creation and signing under the aggressive parallel
+            // runner. Observe early setup failures as well as reaching the request.
+            var ready = await Task.WhenAny(entered.Task, establishment).WaitAsync(TimeSpan.FromSeconds(10), Token);
+            if (ready == establishment) await establishment;
+            Assert.True(entered.Task.IsCompletedSuccessfully, "Establishment completed without reaching device publication.");
             certificate = manager.Local!.ToJson();
             signature = await manager.SignAsync(input, Token);
             publication = Assert.Single(fixture.Relay.Requests, request => request.Method == "device.state.publish").Body!;
