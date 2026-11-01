@@ -270,15 +270,27 @@ public sealed class MessageSendingTests
         };
         var interrupt = true;
         var refreshes = 0;
+        var resumedSend = AsyncTest.Signal();
+        var resumedDiscovery = AsyncTest.Signal();
         async Task<HttpResponseMessage> Respond(OfflineRelay relay, ObservedRequest request, CancellationToken token)
         {
             if (request.Method == "account.route.resolve")
             {
                 Interlocked.Increment(ref refreshes);
-                await using var db = fixture.Database.Open();
-                Assert.Equal(MessageSendState.Queued, (await db.MessageOutbox.FindAsync([queued.MessageId], token))!.State);
+                var interrupted = Volatile.Read(ref interrupt);
+                if (!interrupted) await resumedSend.Task.WaitAsync(token);
+                try
+                {
+                    await using var db = fixture.Database.Open();
+                    var state = (await db.MessageOutbox.FindAsync([queued.MessageId], token))!.State;
+                    // The first rejection is saved before its explicit discovery.
+                    // After reopening, background discovery can overlap submission.
+                    if (interrupted) Assert.Equal(MessageSendState.Queued, state);
+                    else if (!resumedDiscovery.Task.IsCompleted) Assert.Equal(MessageSendState.Submitting, state);
+                }
+                finally { if (!interrupted) resumedDiscovery.TrySetResult(); }
                 discovering.TrySetResult();
-                if (Volatile.Read(ref interrupt))
+                if (interrupted)
                 {
                     if (interruption == "failure") throw new HttpRequestException("Discovery unavailable");
                     if (interruption == "cancellation") await Task.Delay(Timeout.InfiniteTimeSpan, token);
@@ -287,6 +299,11 @@ public sealed class MessageSendingTests
             if (request.Method == "message.send" && ProtocolModel.FromJson<MessageSendRequest>(request.Body!)!.Envelope.MessageId == queued.MessageId)
             {
                 bodies.Enqueue(request.Body!);
+                if (!Volatile.Read(ref interrupt))
+                {
+                    resumedSend.TrySetResult();
+                    await resumedDiscovery.Task.WaitAsync(token);
+                }
                 if (relay == fixture.Relay) return OfflineRelay.Error(code);
             }
             return relay.Respond(request);
@@ -316,11 +333,23 @@ public sealed class MessageSendingTests
             Assert.Null(pending.AcceptedAt);
         }
         Volatile.Write(ref interrupt, false);
+        var retryScheduled = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Client.MessageManager.BackgroundError += (_, error) =>
+        {
+            if (error.Resource == queued.MessageId) retryScheduled.TrySetResult(error.Error);
+        };
         fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(15));
         await fixture.Client.MessageManager.StartAsync(Token);
         await AsyncTest.UntilAsync(() => fixture.Client.Route!.RelayId == target.RelayId);
-        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(15));
-        var completed = await fixture.Client.MessageManager.WaitForSendStatusAsync(queued.MessageId, cancellationToken: Token).WaitAsync(TimeSpan.FromSeconds(10), Token);
+        var completion = fixture.Client.MessageManager.WaitForSendStatusAsync(queued.MessageId, cancellationToken: Token);
+        // Route discovery can finish before the old relay's send failure has saved
+        // its retry time. Advance only after that save, unless it already succeeded.
+        await Task.WhenAny(completion, retryScheduled.Task).WaitAsync(TimeSpan.FromSeconds(10), Token);
+        if (!completion.IsCompleted)
+        {
+            fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(15));
+        }
+        var completed = await completion.WaitAsync(TimeSpan.FromSeconds(10), Token);
         await fixture.Client.MessageManager.StopAsync(Token);
         Assert.Equal(MessageSendState.TargetAccepted, completed!.State);
         Assert.Equal(target.RelayId, completed.AcceptedRelayId);
