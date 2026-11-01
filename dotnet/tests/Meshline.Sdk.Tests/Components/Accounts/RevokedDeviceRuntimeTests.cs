@@ -18,8 +18,14 @@ public sealed class RevokedDeviceRuntimeTests
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
+        // This case advances metadata freshness by an hour. Keep session renewal
+        // outside that jump so asynchronous authentication cannot race the read.
+        fixture.Relay.SessionSeconds = 7200;
         await fixture.InitializeAsync();
         await fixture.Client.StartAsync(Token);
+        // Finish startup metadata reads before moving the virtual clock. A late
+        // pre-revocation refresh would otherwise record freshness at the new time.
+        await fixture.Client.DeviceManager.GetOwnDeviceStateAsync(fixture.Relay.RelayId, Token);
         var device = fixture.Client.Device!.ToJson();
         var stopped = AsyncTest.Signal();
         fixture.Client.StateChanged += (_, change) =>
