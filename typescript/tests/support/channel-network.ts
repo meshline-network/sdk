@@ -56,7 +56,7 @@ export class ChannelNetwork {
         const revision = [...channel!.descriptors.keys()].at(-1)!; const sequence = channel!.events.length;
         channel!.events.push({ sequence, descriptorRev: revision, payload, acceptedAt: this.network.clock.wall, signerDeviceId: deviceId }); channel!.certificates.set(deviceId, certificate);
         if (payload.kind === 'post') channel!.posts.set(sequence, payload.value);
-        if (this.loseResponse === method) throw new Error('Channel operation accepted but response lost');
+        if (this.loseResponse === method) throw new TypeError('Channel operation accepted but response lost');
         return payload.kind === 'post' ? response({ sequence: this.wrongSequence ? sequence + 100 : sequence }) : response();
     }
     async client(seed: number, path?: string) {

@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "1f13b49a80531ae5a71cc5f2159405f3298053fa1ca36aceccc87360ac9ceb70",
+  "sourceSha256": "f2efcd943bbc25eb77f58a01987e2c0b1e8e5deb8646b7059f3c855aacb231e5",
   "sdkBaseline": "f024be46d6ff288739d1555ef9e6607b914d571d",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -2000,6 +2000,13 @@
       "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
     },
     {
+      "symbol": "M:Meshline.Components.StateUpdateSupersededException.#ctor(System.String)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.StateUpdateSupersededException.md#Meshline.Components.StateUpdateSupersededException.StateUpdateSupersededException(string)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/state-update-error.ts",
+      "notes": "StateUpdateSupersededError completes a waiting call when a newer durable state update takes over."
+    },
+    {
       "symbol": "M:Meshline.Identity.AccountAdapter.For(System.String)",
       "documentation": "../../../dotnet/docs/api/Meshline.Identity.AccountAdapter.md#Meshline.Identity.AccountAdapter.For(string)",
       "status": "mapped-requires-behavior-review",
@@ -3563,6 +3570,21 @@
       "notes": "EF Core Up/Down/model-builder hooks are CLR infrastructure, not TypeScript exports. Each adapter owns its schema/migrate implementation; .NET migration and database compatibility are not supported."
     },
     {
+      "symbol": "M:Meshline.Storage.Migrations.LatestStatePublications.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.LatestStatePublications.md#Meshline.Storage.Migrations.LatestStatePublications.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.LatestStatePublications.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.LatestStatePublications.md#Meshline.Storage.Migrations.LatestStatePublications.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.LatestStatePublications.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.LatestStatePublications.md#Meshline.Storage.Migrations.LatestStatePublications.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
       "symbol": "M:Meshline.Storage.Migrations.ResumableAccountEstablishment.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ResumableAccountEstablishment.md#Meshline.Storage.Migrations.ResumableAccountEstablishment.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "status": "mapped-requires-behavior-review",
@@ -3981,6 +4003,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
       "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+    },
+    {
+      "symbol": "P:Meshline.Components.StateUpdateSupersededException.Resource",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.StateUpdateSupersededException.md#Meshline.Components.StateUpdateSupersededException.Resource",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/state-update-error.ts",
+      "notes": "StateUpdateSupersededError completes a waiting call when a newer durable state update takes over."
     },
     {
       "symbol": "P:Meshline.Identity.AccountAdapter.Namespace",
@@ -8232,6 +8261,13 @@
       "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
     },
     {
+      "symbol": "T:Meshline.Components.StateUpdateSupersededException",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.StateUpdateSupersededException.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/state-update-error.ts",
+      "notes": "StateUpdateSupersededError completes a waiting call when a newer durable state update takes over."
+    },
+    {
       "symbol": "T:Meshline.Identity.AccountAdapter",
       "documentation": "../../../dotnet/docs/api/Meshline.Identity.AccountAdapter.md",
       "status": "mapped-requires-behavior-review",
@@ -9619,6 +9655,11 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/storage-node/src/index.ts",
       "notes": "EF Core Up/Down/model-builder hooks are CLR infrastructure, not TypeScript exports. Each adapter owns its schema/migrate implementation; .NET migration and database compatibility are not supported."
+    },
+    {
+      "symbol": "T:Meshline.Storage.Migrations.LatestStatePublications",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.LatestStatePublications.md",
+      "status": "unmapped"
     },
     {
       "symbol": "T:Meshline.Storage.Migrations.ResumableAccountEstablishment",

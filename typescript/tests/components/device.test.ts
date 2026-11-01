@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
-    AccountManager, DeviceManager, RelayClientPool, accountDeviceStateCodec, accountPublicKey, accountRouteCodec, agreeKey,
+    AccountManager, DeviceManager, StateUpdateSupersededError, RelayClientPool, RelayError, accountDeviceStateCodec, accountPublicKey, accountRouteCodec, agreeKey,
     certificateId, concatBytes, decryptAes, deviceStateInput, encryptAes, encryptionPublicKey, encodeUtf8, getAccountId,
     relayDescriptorCodec, routeAccountInput, routeRelayInput, signAccount, systemRandom, verifyDevice,
     contactGrantInput, contactInviteInput, deviceCertificateCodec, deviceStateQueryInput, decodeBase64Url, signedDeviceStateQueryCodec, signDevice, validateDeviceStateQuery,
@@ -170,12 +170,11 @@ test('staged device removal remains visibly incomplete and does not change autho
     const count = f.requests.length; await f.manager.removeDevice(id); expect(f.requests).toHaveLength(count);
 });
 
-test('unknown device publication reuses exact bytes after restart and rejects a changed complete list', async () => {
+test('unknown device publication reuses exact bytes after restart', async () => {
     const first = await fixture(); await first.manager.initialize(); const local = await first.manager.createDevice(3600); first.behavior = 'lost';
     await expect(first.manager.publishDeviceState(first.descriptor.relayId, { certificates: [local] })).rejects.toThrow('lost');
     await first.manager.dispose(); await first.store.dispose();
     const resumed = await fixture(first.store.path); await resumed.manager.initialize();
-    await expect(resumed.manager.publishDeviceState(resumed.descriptor.relayId, { certificates: [] })).rejects.toThrow('unknown result');
     await resumed.manager.publishDeviceState(resumed.descriptor.relayId, { certificates: [local] }); expect(resumed.requests).toEqual(first.requests);
     expect(resumed.manager.getAuthorizationState(certificateId(local, context))).toBe('authorized');
 });
@@ -187,10 +186,10 @@ test('no implicit device-set reconstruction; explicit recovery may add the local
     expect(recovered.deviceState.certificates).toEqual([local]); expect(recovered.deviceState.revision).toBe(f.clock.wall * 1000);
 });
 
-test('invalid staged result preserves pending publication and definitive rejection clears it', async () => {
+test('invalid staged result preserves pending publication and definitive rejection pauses it', async () => {
     const f = await fixture(); await f.manager.initialize(); const certificate = await f.manager.createDevice(3600); f.behavior = 'bad-staging';
     await expect(f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [certificate] })).rejects.toThrow('expired'); expect((await f.pending())!.pending).toBe(true);
-    f.behavior = 'reject'; await expect(f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [certificate] })).rejects.toThrow('Rejected'); expect((await f.pending())!.pending).toBe(false);
+    f.behavior = 'reject'; await expect(f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [certificate] })).rejects.toThrow('Rejected'); expect(await f.pending()).toMatchObject({ pending: true, requestState: 2, nextAttemptAt: null });
 });
 
 test('device revocation refresh falls back to the account session and invalidates only device sessions', async () => {
@@ -354,4 +353,82 @@ test('contact-authorized device queries sign the complete proof and verify curre
     await expect(f.manager.getDeviceState({ ...grant, grantee: remote.account })).rejects.toThrow('authorize this account');
     const before = f.modes.length; f.deviceDenied = true;
     await expect(f.manager.refreshDeviceState(invite)).rejects.toMatchObject({ code: 'device_unknown' }); expect(f.modes).toHaveLength(before + 1);
+});
+
+
+test('a new complete device list replaces an unreturned publication without a late rollback', async () => {
+    const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(3600);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    const renewed = await f.manager.renewDevice(7200); const client = f.pool.clients.find(value => value.sessionMode === 'account')!;
+    const original = client.requestHttp.bind(client); const entered = deferred(); const release = deferred(); let held = false;
+    vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+        const response = await original(...args);
+        if (args[1] === 'device.state.publish' && !held) { held = true; entered.resolve(); await release.promise; }
+        return response;
+    });
+    const old = f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] }); const superseded = expect(old).rejects.toBeInstanceOf(StateUpdateSupersededError);
+    try {
+        await entered.promise;
+        const latest = await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [renewed] }); await superseded;
+        expect(latest.deviceState.certificates).toEqual([renewed]); release.resolve(); await f.manager.dispose();
+        expect(f.manager.deviceState).toEqual(latest.deviceState); expect((await f.pending())!.pending).toBe(false);
+    } finally { release.resolve(); }
+});
+
+
+test('an uncancellable key read cannot block another signer and discarded key material is cleared', async () => {
+    const first = await fixture(); await first.manager.initialize(); await first.manager.createDevice(3600);
+    await first.manager.dispose(); await first.store.dispose(); const f = await fixture(first.store.path); await f.manager.initialize();
+    const entered = deferred(); const release = deferred(); const original = f.protector.unprotect.bind(f.protector); let held = false;
+    vi.spyOn(f.protector, 'unprotect').mockImplementation(async (...args) => {
+        const key = await original(...args);
+        if (!held) { held = true; entered.resolve(); await release.promise; }
+        return key;
+    });
+    const controller = new AbortController(); const input = encodeUtf8('parallel signer');
+    const old = f.manager.sign(input, controller.signal); const canceled = expect(old).rejects.toMatchObject({ name: 'AbortError' });
+    try {
+        await entered.promise; controller.abort();
+        expect(verifyDevice(input, await f.manager.sign(input), f.manager.certificate.signingPublicKey)).toBe(true);
+        release.resolve(); await canceled;
+        expect(f.protector.recovered[0]!.every(byte => byte === 0)).toBe(true);
+    } finally { release.resolve(); }
+});
+
+test('pending removals accumulate and an explicit complete list replaces them', async () => {
+    const f = await fixture(); const peer = await fixture(); await f.manager.initialize(); await peer.manager.initialize();
+    const local = await f.manager.createDevice(3600); const other = await peer.manager.createDevice(3600);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local, other] });
+    f.behavior = 'staged'; const localId = certificateId(local, context); const otherId = certificateId(other, context);
+    await expect(f.manager.removeDevice(localId)).rejects.toThrow('staged');
+    await expect(f.manager.removeDevice(otherId)).rejects.toThrow('continuity');
+    expect((await f.pending())!.intent).toMatchObject({ ['remove:' + localId]: true, ['remove:' + otherId]: true });
+    f.behavior = 'accepted';
+    expect((await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local, other] })).status).toBe('accepted');
+    expect(f.manager.deviceState!.certificates).toEqual([local, other]); expect((await f.pending())!.pending).toBe(false);
+});
+
+test('device replacement proceeds while an old conflict lookup waits, and invalid input preserves the current intent', async () => {
+    const f = await fixture(); await f.manager.initialize(); const local = await f.manager.createDevice(3600);
+    await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    const renewed = await f.manager.renewDevice(7200); const entered = deferred(); const release = deferred();
+    f.resolveHook = async () => { entered.resolve(); await release.promise; };
+    const client = f.pool.clients.find(value => value.sessionMode === 'account')!; const original = client.requestHttp.bind(client); let rejected = false;
+    vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+        if (args[1] === 'device.state.publish' && !rejected) { rejected = true; throw new RelayError({ code: 'stale_state', message: 'Refresh devices' }); }
+        return original(...args);
+    });
+    const old = f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local] });
+    const superseded = expect(old).rejects.toBeInstanceOf(StateUpdateSupersededError);
+    try {
+        await entered.promise; const pending = await f.pending();
+        for (const revision of [-1, NaN, Number.MAX_SAFE_INTEGER + 1])
+            await expect(f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [renewed], revision })).rejects.toThrow();
+        await expect(f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [local, local] })).rejects.toThrow();
+        expect(await f.pending()).toEqual(pending);
+        const latest = await f.manager.publishDeviceState(f.descriptor.relayId, { certificates: [renewed] }); await superseded;
+        expect(latest.deviceState.certificates).toEqual([renewed]);
+        release.resolve(); await f.manager.dispose();
+        expect(f.manager.deviceState).toEqual(latest.deviceState); expect((await f.pending())!.pending).toBe(false);
+    } finally { release.resolve(); }
 });

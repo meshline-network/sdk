@@ -38,6 +38,10 @@ import type { RelaySubscription } from '../transport/subscription.js';
 import { ClientComponent, type ClientOptions } from './component.js';
 import type { DeviceManager } from './device.js';
 import type { MessageManager } from './message.js';
+import { StateUpdateCoordinator, type StateUpdateAttempt } from './state-update-coordinator.js';
+import { groupUpdateCodec, validateGroupUpdate } from '../models/group-management.js';
+import { encodeBase64Url } from '../protocol/encoding.js';
+import type { RecordKey, StoredRecord } from '../storage/store.js';
 
 function ordinal(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }
 
@@ -67,7 +71,7 @@ export interface GroupEvents {
 }
 interface Subscription { client: RelayClient; subscription: RelaySubscription; selected: Set<string>; detach: (() => void)[] }
 
-/** Verified history determines authority; local secrets and exact signed submissions survive restart. */
+/** Verified history determines authority; local secrets and pending operations survive restart. */
 export class GroupManager extends ClientComponent {
     readonly #syncStatus = new ResourceSyncTracker(this.clock, status => this.#notify('syncStatusChanged', status));
     /** Performs a fresh timeline/key/decryption pass without requiring start(); returns caughtUp or a processing block. */
@@ -84,6 +88,7 @@ export class GroupManager extends ClientComponent {
     readonly #accountMessages: MessageManager; readonly #accountSync: GroupAccountSync; #detachMessages: (() => void) | undefined;
     readonly #writes = new AsyncGate(); readonly #events = new EventHub<GroupEvents>(); readonly #subscriptions = new Map<string, Subscription>();
     #pulse: AsyncPulse | undefined; #jobs: Promise<void>[] = [];
+    readonly #updates: StateUpdateCoordinator<GroupInfo>;
     constructor(options: GroupManagerOptions) {
         super(options);
         for (const dependency of [options.relayClients, options.deviceManager, options.messageManager]) if (dependency.accountId !== this.accountId || dependency.context.toString() !== this.context.toString()) throw new ProtocolError('invalid_context', 'Group dependencies belong to another network or account.');
@@ -94,6 +99,17 @@ export class GroupManager extends ClientComponent {
         this.#accountMessages = options.messageManager;
         this.#accountSync = new GroupAccountSync({ store: this.#store, context: this.context, accountId: this.accountId, clock: this.clock, device: this.#device, messages: this.#accountMessages, secrets: this.#secrets,
             rejected: (messageId, error) => this.notifyBackgroundError({ operation: 'synchronize_group_account', resource: messageId, error }) });
+        const owner = this;
+        this.#updates = new class extends StateUpdateCoordinator<GroupInfo> {
+            protected readonly operation = 'group.update';
+            protected readonly query = { collection: 'group_operations' };
+            protected override readonly requestField = 'request';
+            protected key(resource: string): RecordKey { return { collection: 'group_operations', key: resource + '|group.update' }; }
+            protected resource(row: StoredRecord): string { return String(row.value.groupId); }
+            protected create(resource: string, intent: JsonObject): JsonObject { return { method: this.operation, groupId: resource, relayId: intent.relayId! }; }
+            protected publish(attempt: StateUpdateAttempt<GroupInfo>, signal: AbortSignal): Promise<GroupInfo> { return owner.#publishLatest(attempt, signal); }
+            protected report(resource: string, error: unknown): void { owner.notifyBackgroundError({ operation: 'synchronize_group', resource, error }); }
+        }(this.#store, this.clock);
     }
     on<K extends keyof GroupEvents>(event: K, listener: EventListener<GroupEvents[K]>): () => void { return this.#events.on(event, listener); }
     #notify<K extends keyof GroupEvents>(event: K, value: GroupEvents[K]): void { this.#events.notify(event, value, error => this.notifyBackgroundError({ operation: 'observer', resource: event, error })); }
@@ -167,12 +183,22 @@ export class GroupManager extends ClientComponent {
             return this.#synchronizeCore(relay ?? await this.#hosting(group.relayId, signal), group, signal, true);
         }, signal, manual);
     }
-    async #synchronizeCore(relay: RelayClient, group: GroupRef, signal: AbortSignal, includeKeys: boolean): Promise<SyncBlock | undefined> {
+    async #synchronizeCore(relay: RelayClient, group: GroupRef, signal: AbortSignal, includeKeys: boolean, attempt?: StateUpdateAttempt<GroupInfo>): Promise<SyncBlock | undefined> {
         let projection: GroupProjection | undefined;
+        let conflicts = 0;
         for (;;) {
-            const page = await this.#repository.synchronizePage(group, { read: async query => groupSyncPageCodec.decode((await relay.requestHttp('GET', 'group.sync', groupSequenceQueryCodec.encode(query), { signal }))!) }, signal);
+            let page;
+            try { page = await this.#repository.synchronizePage(group, { read: async query => groupSyncPageCodec.decode((await relay.requestHttp('GET', 'group.sync', groupSequenceQueryCodec.encode(query), { signal }))!) }, signal);
+            } catch (error) {
+                if (error instanceof StateConflictError && conflicts++ < 2) continue;
+                throw error;
+            }
+            conflicts = 0;
             projection = page.projection; for (const failure of page.rejected) this.notifyBackgroundError({ operation: 'synchronize_group', resource: `${group.groupId}/${failure.sequence}`, error: failure.error });
-            if (page.change) this.#notify('groupChanged', { ...this.#snapshot(group, page.change.record)!, kinds: page.change.kinds });
+            if (page.change) {
+                const change = { ...this.#snapshot(group, page.change.record)!, kinds: page.change.kinds };
+                if (attempt) attempt.deferNotification(() => this.#notify('groupChanged', change)); else this.#notify('groupChanged', change);
+            }
             if (!page.hasMore) break;
         }
         if (!includeKeys || !projection) return;
@@ -293,7 +319,47 @@ export class GroupManager extends ClientComponent {
             await this.#execute(relay, operation, false, scope); return this.#info(group, scope);
         }, scope), signal);
     }
-    updateGroup(group: GroupRef, update: GroupUpdateOptions, signal?: AbortSignal): Promise<GroupInfo> { const copy = { ...update }; return this.#manage(group, 'group.update', state => ({ kind: 'update', value: { ...copy, groupId: state.groupId, prevHash: state.managementHash, deviceSignature: new Uint8Array(64) } }), signal); }
+    /** Merges group properties with unfinished changes; later values win. */
+    async updateGroup(group: GroupRef, update: GroupUpdateOptions, signal?: AbortSignal): Promise<GroupInfo> {
+        group = { ...group }; validateGroupRef(group);
+        const candidate: GroupUpdate = { ...update, groupId: group.groupId, prevHash: 'sha256:' + encodeBase64Url(new Uint8Array(32)), deviceSignature: new Uint8Array(64) };
+        validateGroupUpdate(candidate);
+        const encoded = groupUpdateCodec.encode(candidate); const patch: JsonObject = { relayId: group.relayId };
+        for (const field of ['name', 'description', 'member_capacity', 'invite_policy']) if (field in encoded) patch[field] = encoded[field]!;
+        return this.runOperation(scope => this.#updates.submit(group.groupId, patch, scope), signal);
+    }
+    async #publishLatest(attempt: StateUpdateAttempt<GroupInfo>, signal: AbortSignal): Promise<GroupInfo> {
+        const group = { groupId: attempt.resource, relayId: String(attempt.intent.relayId) };
+        const relay = await this.#hosting(group.relayId, signal);
+        for (let retry = 0; ; retry++) {
+            await attempt.check(signal); await this.#synchronizeCore(relay, group, signal, false, attempt);
+            let request = attempt.request;
+            if (request && await this.#operations.acceptedEvent({ group, method: 'group.update', request }, signal)) return this.#info(group, signal);
+            const state = await this.#writable(group, signal);
+            if (!request || groupUpdateCodec.decode(request).prevHash !== state.managementHash) {
+                const wire: JsonObject = { $type: 'meshline.group.update', group_id: group.groupId, prev_hash: state.managementHash, device_signature: encodeBase64Url(new Uint8Array(64)) };
+                for (const field of ['name', 'description', 'member_capacity', 'invite_policy']) if (field in attempt.intent) wire[field] = attempt.intent[field]!;
+                const payload = await this.#sign({ kind: 'update', value: groupUpdateCodec.decode(wire) }, signal);
+                const current = await this.#writable(group, signal);
+                if (current.managementHash !== state.managementHash) {
+                    if (retry < 2) continue;
+                    throw new StateConflictError('Group management state changed while signing the update.');
+                }
+                this.#checkManagement(current, payload); request = groupUpdateCodec.encode(payload.value);
+                await attempt.saveRequest(request, {}, signal);
+            }
+            await attempt.check(signal);
+            try { await relay.requestHttp('PATCH', 'group.update', request, { signal }); }
+            catch (error) {
+                if (error instanceof RelayError && error.isDefinitiveRejection) await attempt.reject(request);
+                if (retry < 2 && error instanceof RelayError && ['stale_state', 'state_conflict'].includes(error.code)) continue;
+                throw error;
+            }
+            await attempt.check(signal); await this.#synchronizeCore(relay, group, signal, false, attempt); await attempt.check(signal);
+            if (!await this.#operations.acceptedEvent({ group, method: 'group.update', request }, signal)) throw new ProtocolError('unconfirmed_operation', 'Accepted group update is absent from verified history.');
+            return this.#info(group, signal);
+        }
+    }
     async closeGroup(group: GroupRef, signal?: AbortSignal): Promise<void> { await this.#manage(group, 'group.close', state => ({ kind: 'close', value: { groupId: state.groupId, prevHash: state.managementHash, deviceSignature: new Uint8Array(64) } }), signal); }
     async leaveGroup(group: GroupRef, signal?: AbortSignal): Promise<void> { await this.#manage(group, 'group.member.leave', state => ({ kind: 'memberLeave', value: { groupId: state.groupId, prevHash: state.managementHash, account: this.accountId, deviceSignature: new Uint8Array(64) } }), signal); }
     async removeMembers(group: GroupRef, accounts: readonly string[], signal?: AbortSignal): Promise<void> { const copy = [...accounts]; await this.#manage(group, 'group.member.remove', state => ({ kind: 'memberRemoval', value: { groupId: state.groupId, prevHash: state.managementHash, accounts: copy, deviceSignature: new Uint8Array(64) } }), signal); }
@@ -538,7 +604,7 @@ export class GroupManager extends ClientComponent {
     protected override async onStart(signal: AbortSignal): Promise<void> {
         void this.#device.certificate; this.#pulse = new AsyncPulse(); this.#detachMessages = this.#accountMessages.on('timelineChanged', () => this.#pulse?.pulse());
         await this.#accountSync.request(signal);
-        this.#jobs = [this.#refresh(this.runtimeSignal), this.#poll(this.runtimeSignal)]; this.#pulse.pulse();
+        this.#jobs = [this.#refresh(this.runtimeSignal), this.#poll(this.runtimeSignal)]; this.#pulse.pulse(); this.#updates.start(this.runtimeSignal);
     }
     async #poll(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(30000, signal); this.#pulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
     async #subscribe(client: RelayClient, groups: readonly string[], signal: AbortSignal): Promise<void> {
@@ -586,12 +652,12 @@ export class GroupManager extends ClientComponent {
     }
     protected override async onStop(): Promise<void> {
         this.#detachMessages?.(); this.#detachMessages = undefined;
-        const results = await Promise.allSettled(this.#jobs);
+        const results = await Promise.allSettled([...this.#jobs, this.#updates.stop()]);
         for (const observed of this.#subscriptions.values()) for (const detach of observed.detach) detach();
         results.push(...await Promise.allSettled([...this.#subscriptions.values()].map(observed => observed.subscription.dispose())));
         this.#subscriptions.clear(); this.#jobs = []; this.#pulse = undefined; this.#syncStatus.stop();
         const errors = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected').map(value => value.reason);
         if (errors.length) throw new AggregateError(errors, 'Group background processing failed.');
     }
-    protected override async onDispose(): Promise<void> { this.#syncStatus.stop(true); this.#events.clear(); }
+    protected override async onDispose(): Promise<void> { await this.#updates.drain(); this.#syncStatus.stop(true); this.#events.clear(); }
 }

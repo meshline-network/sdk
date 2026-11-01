@@ -144,7 +144,7 @@ test.each(['group.create', 'group.update', 'group.message.send'])('lost %s respo
     const action = method === 'group.create' ? owner.groups.createGroup(relayId, { name: 'recover create', memberCapacity: 10 }) : method === 'group.update' ? owner.groups.updateGroup(ref!, { name: 'accepted update' }) : owner.groups.sendMessage(ref!, { body: { contentType: 'text/plain', text: 'accepted encrypted message' } });
     await expect(action).rejects.toThrow('response lost'); const pending = (await owner.store.read([{ collection: 'group_operations' }])).sets[0]!; expect(pending).toHaveLength(1);
     await owner.dispose(); network.loseResponse = undefined; const resumed = await network.client(51, owner.path); await resumed.groups.start();
-    await network.network.until(async () => !(await resumed.store.read([{ collection: 'group_operations' }])).sets[0]!.length); await resumed.groups.stop();
+    await network.network.until(async () => !(await resumed.store.read([{ collection: 'group_operations' }])).sets[0]!.some(row => row.value.pending !== false)); await resumed.groups.stop();
     expect(network.requests.filter(value => value.method === method)).toHaveLength(1);
     expect((await all(resumed.groups.getGroups()))[0]!.group.name).toBe(method === 'group.create' ? 'recover create' : method === 'group.update' ? 'accepted update' : 'recover');
     if (method === 'group.message.send') expect((await all(resumed.groups.getMessages()))[0]!.body!.text).toBe('accepted encrypted message');
@@ -184,12 +184,12 @@ test('successful HTTP acceptance with a malformed receipt is persisted before re
     expect(network.requests.filter(value => value.method === 'group.message.send')).toHaveLength(1); expect((await all(resumed.groups.getMessages()))[0]!.body!.text).toBe('accepted despite malformed receipt');
 });
 
-test('a definitive first rejection clears the operation while rejection after uncertainty preserves it', async () => {
+test('rejected and uncertain group updates retain intent and permit replacements', async () => {
     const { network, owner, relayId } = await fixture(); const group = await owner.groups.createGroup(relayId, { name: 'reject', memberCapacity: 10 }); network.rejectMethod = 'group.update';
-    await expect(owner.groups.updateGroup(group.ref, { name: 'rejected' })).rejects.toThrow('state_conflict'); expect((await owner.store.read([{ collection: 'group_operations' }])).sets[0]).toEqual([]);
+    await expect(owner.groups.updateGroup(group.ref, { name: 'rejected' })).rejects.toThrow('state_conflict'); expect((await owner.store.read([{ collection: 'group_operations' }])).sets[0]![0]!.value).toMatchObject({ pending: true, intent: { name: 'rejected' } });
     network.rejectMethod = undefined; network.failBeforeAccept = 'group.update'; await expect(owner.groups.updateGroup(group.ref, { name: 'uncertain' })).rejects.toThrow('Connection lost');
     network.failBeforeAccept = undefined; network.rejectMethod = 'group.update'; await owner.groups.start(); await network.network.until(async () => !!owner.groups.lastBackgroundError); await owner.groups.stop();
-    expect((await owner.store.read([{ collection: 'group_operations' }])).sets[0]).toHaveLength(1); await expect(owner.groups.updateGroup(group.ref, { name: 'replacement' })).rejects.toThrow('awaiting confirmation');
+    expect((await owner.store.read([{ collection: 'group_operations' }])).sets[0]).toHaveLength(1); network.rejectMethod = undefined; expect((await owner.groups.updateGroup(group.ref, { name: 'replacement' })).group.name).toBe('replacement');
 });
 
 test('background timeline observers can stop the manager without deadlocking committed recovery', async () => {

@@ -1,6 +1,32 @@
 import { expect, test } from '@playwright/test';
 import type {} from './harness.js';
 
+test('latest merged profile intent survives IndexedDB reopen after two timeouts', async ({ page }) => {
+    await page.goto('/tests/browser/'); await page.waitForFunction(() => Boolean(window.meshlineHarness));
+    const result = await page.evaluate(async () => {
+        const network = window.meshlineHarness.createClientNetwork();
+        try {
+            const first = await network.open(); await first.client.establishAccount();
+            network.failBefore = 'profile.publish';
+            for (const patch of [{ nickname: 'old', bio: 'retained' }, { nickname: 'latest' }]) {
+                try { await first.client.profileManager.updateProfile(patch); throw new Error('Expected timeout'); }
+                catch (error) { if (!(error instanceof TypeError)) throw error; }
+            }
+            await first.dispose(); network.failBefore = undefined;
+            const resumed = await network.open(91, first.path); network.clock.tick(); await resumed.client.profileManager.start();
+            for (let count = 0; count < 100; count++) {
+                if ((await resumed.store.read([{ collection: 'signed_requests', key: 'profile.publish' }])).sets[0]![0]!.value.pending === false) break;
+                network.clock.tick(); await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            await resumed.client.profileManager.stop();
+            return { nickname: resumed.client.profile!.nickname, bio: resumed.client.profile!.bio,
+                requests: network.requests.filter(request => request.method === 'profile.publish').map(request => request.body.nickname) };
+        } finally { await network.dispose(); }
+    });
+    expect(result.nickname).toBe('latest'); expect(result.bio).toBe('retained');
+    expect(result.requests.slice(-3)).toEqual(['old', 'latest', 'latest']);
+});
+
 test('push gateway intent survives an IndexedDB reopen before any device draft exists', async ({ page }) => {
     await page.goto('/tests/browser/'); await page.waitForFunction(() => Boolean(window.meshlineHarness));
     const result = await page.evaluate(async () => {

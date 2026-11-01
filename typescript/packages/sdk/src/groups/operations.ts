@@ -61,7 +61,7 @@ const same = (a: GroupOperation, b: GroupOperation): boolean => a.group.relayId 
 /** Exact signed requests survive uncertain responses; positive receipts are durable before any follow-up I/O. */
 export class GroupOperations {
     constructor(readonly store: MeshlineStore, readonly context: NetworkContext, readonly accountId: string) { validateAccountId(accountId); }
-    async all(signal?: AbortSignal): Promise<readonly GroupOperation[]> { return (await this.store.read([{ collection: 'group_operations' }], signal)).sets[0]!.map(row => { const value = decode(row.value); if (key(value).key !== row.key) throw new ProtocolError('invalid_storage', 'Group operation key differs from its record.'); return value; }); }
+    async all(signal?: AbortSignal): Promise<readonly GroupOperation[]> { return (await this.store.read([{ collection: 'group_operations' }], signal)).sets[0]!.filter(row => row.value.method !== 'group.update').map(row => { const value = decode(row.value); if (key(value).key !== row.key) throw new ProtocolError('invalid_storage', 'Group operation key differs from its record.'); return value; }); }
     async ensureAvailable(group: GroupRef, method: GroupOperationMethod, signal?: AbortSignal): Promise<void> {
         if ((await this.store.read([key({ group, method })], signal)).sets[0]!.length) throw new StateConflictError('An earlier group operation is awaiting confirmation; start the manager to recover it.');
     }

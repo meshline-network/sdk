@@ -17,8 +17,10 @@ import type { AccountManager } from './account.js';
 import { ClientComponent, type ClientOptions } from './component.js';
 import type { AccountInitialProfile } from '../client/account-establishment.js';
 import { SubmissionOutcomeError } from './authorization-error.js';
+import { StateUpdateCoordinator, type StateUpdateAttempt } from './state-update-coordinator.js';
+import { canReuseRequest, isCurrentRequest } from '../storage/state-publication.js';
 
-/** Omitted fields are retained; null removes an optional field, including an existing empty string. */
+/** Omitted fields retain their values; null deletes optional fields. */
 export interface ProfileUpdate { readonly nickname?: string | null; readonly bio?: string | null; readonly avatar?: ContentReference | null; readonly publicDiscovery?: boolean }
 export interface ProfileEvents { readonly profileChanged: AccountProfile | undefined }
 export interface ProfileManagerOptions extends ClientOptions {
@@ -27,6 +29,7 @@ export interface ProfileManagerOptions extends ClientOptions {
 const method = 'profile.publish';
 const profileKey = (account: string): RecordKey => ({ collection: 'profiles', key: account });
 const clone = (value: AccountProfile): AccountProfile => accountProfileCodec.decode(accountProfileCodec.encode(value));
+const cloneCertificate = (value: DeviceSigner['certificate']): DeviceSigner['certificate'] => deviceCertificateCodec.decode(deviceCertificateCodec.encode(value));
 const fingerprint = (value: JsonObject | undefined): string => canonicalJson(value ?? null);
 function copyUpdate(value: ProfileUpdate): ProfileUpdate {
     for (const key of Object.keys(value)) if (!['nickname', 'bio', 'avatar', 'publicDiscovery'].includes(key)) throw new TypeError(`Unknown profile update field ${key}.`);
@@ -52,12 +55,27 @@ export class ProfileManager extends ClientComponent {
     #readsStopping = false;
     readonly #reads = new Map<string, MetadataCache<ProfileResolveResult>>();
     readonly #saveGate = new AsyncGate();
+    readonly #updates: StateUpdateCoordinator<AccountProfile>;
     constructor(options: ProfileManagerOptions) {
         super(options);
         for (const dependency of [options.relayClients, options.accountManager])
             if (dependency.accountId !== this.accountId || dependency.context.toString() !== this.context.toString())
                 throw new ProtocolError('invalid_context', 'Profile dependencies belong to another account or network.');
         this.#store = options.store; this.#pool = options.relayClients; this.#account = options.accountManager; this.#signer = options.deviceSigner;
+        const owner = this;
+        this.#updates = new class extends StateUpdateCoordinator<AccountProfile> {
+            protected readonly operation = method;
+            protected readonly query = requestKey(method);
+            protected key(): RecordKey { return requestKey(method); }
+            protected resource(): string { return owner.accountId; }
+            protected create(): JsonObject { return { relayId: '', revision: -1 }; }
+            protected publish(attempt: StateUpdateAttempt<AccountProfile>, signal: AbortSignal): Promise<AccountProfile> { return owner.#publishLatest(attempt, signal); }
+            protected report(resource: string, error: unknown): void { owner.notifyBackgroundError({ operation: 'synchronize', resource, error }); }
+            protected override retryAt(row: JsonObject, error: unknown, failures: number): number | null {
+                const next = super.retryAt(row, error, failures);
+                return next !== null && error instanceof RelayError && error.code === 'clock_skew' ? Math.max(next, Number(row.revision)) : next;
+            }
+        }(this.#store, this.clock);
     }
     get profile(): AccountProfile | undefined { return this.#profile && clone(this.#profile); }
     on<K extends keyof ProfileEvents>(event: K, listener: EventListener<ProfileEvents[K]>): () => void { return this.#events.on(event, listener); }
@@ -69,6 +87,15 @@ export class ProfileManager extends ClientComponent {
             this.#reads.set(row.key, new MetadataCache(this.clock, result));
             if (row.key === this.accountId) this.#profile = result.profile;
         }
+        await this.#importState(signal);
+    }
+    async #importState(signal: AbortSignal): Promise<void> {
+        const row = (await this.#store.read([requestKey(method)], signal)).sets[0]![0]?.value;
+        if (!row?.pending || row.intent != null || row.document == null) return;
+        const profile = accountProfileCodec.encode(accountProfileCodec.decode(row.document));
+        const intent: JsonObject = {};
+        for (const field of ['nickname', 'bio', 'avatar', 'public_discovery']) intent[field] = profile[field] ?? null;
+        await this.#updates.import(this.accountId, intent, signal);
     }
     #accept(profile: AccountProfile | undefined): boolean {
         const changed = (profile && accountProfileCodec.stringify(profile)) !== (this.#profile && accountProfileCodec.stringify(this.#profile));
@@ -96,12 +123,18 @@ export class ProfileManager extends ClientComponent {
             return result && clone(result.profile);
         }, signal);
     }
+    /** Merges profile fields with unfinished changes; later values win. */
     async updateProfile(update: ProfileUpdate, signal?: AbortSignal): Promise<AccountProfile> {
-        const copied = copyUpdate(update); let changed = false;
-        const result = await this.runOperation(scope => this.#gate.run(async () => {
-            const result = await this.#publish(copied, undefined, scope); changed = this.#accept(result); return result;
-        }, scope), signal);
-        if (changed) this.#changed(); return clone(result);
+        const copied = copyUpdate(update);
+        validateProfile(apply(copied, { account: this.accountId, publicDiscovery: false, updatedAt: 0, deviceSignature: new Uint8Array(64) }));
+        const patch: JsonObject = {};
+        for (const field of ['nickname', 'bio', 'avatar'] as const) if (copied[field] !== undefined)
+            patch[field] = field === 'avatar' && copied.avatar !== null ? contentReferenceCodec.encode(copied.avatar!) : copied[field] as string | null;
+        if (copied.publicDiscovery !== undefined) patch.public_discovery = copied.publicDiscovery;
+        const before = this.#profile && accountProfileCodec.stringify(this.#profile);
+        const result = await this.runOperation(scope => this.#updates.submit(this.accountId, patch, scope), signal);
+        if (before !== (this.#profile && accountProfileCodec.stringify(this.#profile))) this.#changed();
+        return clone(result);
     }
     /** @internal Initializes a missing profile without applying defaults over retained or remote values. */
     initializeAccountProfile(initial: AccountInitialProfile | undefined, createIfMissing: boolean, signal: AbortSignal): Promise<void> {
@@ -116,18 +149,60 @@ export class ProfileManager extends ClientComponent {
     async publishProfile(profile?: AccountProfile, signal?: AbortSignal): Promise<AccountProfile | undefined> {
         const supplied = profile && clone(profile);
         if (supplied) { validateProfile(supplied); if (supplied.account !== this.accountId) throw new ProtocolError('invalid_identity', 'Profile belongs to another account.'); }
-        let changed = false;
-        const result = await this.runOperation(scope => this.#gate.run(async () => {
+        const before = this.#profile && accountProfileCodec.stringify(this.#profile);
+        const result = await this.runOperation(async scope => {
             const snapshot = await this.#store.read([profileKey(this.accountId), requestKey(method)], scope);
             const local = snapshot.sets[0]![0]?.value;
             const signed = readSignedRequest(snapshot.sets[1]![0]?.value);
             let latest = local && profileResolveResultCodec.decode(local).profile;
-            if (signed?.pending && (!latest || signed.revision >= latest.updatedAt)) latest = accountProfileCodec.decode(signed.document);
+            if (signed?.pending && signed.document && (!latest || signed.revision >= latest.updatedAt)) latest = accountProfileCodec.decode(signed.document);
             if (supplied && (!latest || supplied.updatedAt > latest.updatedAt)) latest = supplied;
-            if (!latest) return undefined;
-            const published = await this.#publish({}, latest, scope); changed = this.#accept(published); return published;
-        }, scope), signal);
-        if (changed) this.#changed(); return result && clone(result);
+            if (!latest && !signed?.pending) return undefined;
+            return this.#updates.submit(this.accountId, latest ? { snapshot: accountProfileCodec.encode(latest) } : {}, scope);
+        }, signal);
+        if (before !== (this.#profile && accountProfileCodec.stringify(this.#profile))) this.#changed();
+        return result && clone(result);
+    }
+    async #publishLatest(attempt: StateUpdateAttempt<AccountProfile>, signal: AbortSignal): Promise<AccountProfile> {
+        const relayId = await this.#home(signal); const certificate = cloneCertificate(this.#signer.certificate);
+        const snapshot = await this.#store.read([profileKey(this.accountId), requestKey(method)], signal);
+        const saved = readSignedRequest(snapshot.sets[1]![0]?.value)!;
+        const reusable = saved.pending && canReuseRequest(saved.requestState!) ? saved.document : undefined;
+        let basis = (await this.#resolve(this.accountId, relayId, signal))?.profile;
+        for (const candidate of [attempt.intent.snapshot, snapshot.sets[0]![0]?.value.profile, reusable, attempt.request]) {
+            if (candidate == null) continue;
+            const profile = accountProfileCodec.decode(candidate);
+            if (!basis || profile.updatedAt >= basis.updatedAt) basis = profile;
+        }
+        basis ??= { account: this.accountId, publicDiscovery: false, updatedAt: 0, deviceSignature: new Uint8Array(64) };
+        const document = accountProfileCodec.encode(basis);
+        for (const field of ['nickname', 'bio', 'avatar', 'public_discovery']) {
+            if (!(field in attempt.intent)) continue;
+            if (attempt.intent[field] === null) delete document[field]; else document[field] = attempt.intent[field]!;
+        }
+        let request = accountProfileCodec.decode(document);
+        const retained = attempt.request ?? (saved.relayId === relayId ? reusable : undefined);
+        if (!retained || accountProfileCodec.stringify(request) !== canonicalJson(retained)) {
+            const updatedAt = Math.max(this.clock.nowSeconds(), Math.max(basis.updatedAt, saved.revision) + 1);
+            request = { ...request, updatedAt, deviceSignature: new Uint8Array(64) }; validateProfile(request);
+            request = { ...request, deviceSignature: (await this.#signer.sign(profileInput(request, this.context), signal)).slice() };
+        }
+        validateProfileResult({ profile: request, signerCertificate: certificate }, this.context, this.accountId);
+        const wire = accountProfileCodec.encode(request);
+        await attempt.saveRequest(wire, { relayId, revision: request.updatedAt }, signal);
+        const client = await this.#pool.get(relayId, { mode: 'device', signer: this.#signer }, signal);
+        await attempt.check(signal);
+        try { await client.requestHttp('PUT', method, wire, { signal }); }
+        catch (error) { if (error instanceof RelayError && error.isDefinitiveRejection && error.code !== 'clock_skew') await attempt.reject(wire); throw error; }
+        let changed = false;
+        await attempt.current(() => this.#saveGate.run(async () => {
+            const before = this.#profile && accountProfileCodec.stringify(this.#profile);
+            await this.#save({ profile: request, signerCertificate: certificate }, signal, false);
+            changed = before !== (this.#profile && accountProfileCodec.stringify(this.#profile));
+            this.#reads.get(this.accountId)!.recordSuccess(this.clock.monotonicMilliseconds());
+        }, signal), signal);
+        if (changed && attempt.background) attempt.deferNotification(() => this.#changed());
+        return request;
     }
     async #home(signal: AbortSignal): Promise<string> {
         const route = await this.#account.getRoute(undefined, signal);
@@ -156,8 +231,8 @@ export class ProfileManager extends ClientComponent {
             return initial.profile;
         }
         if (initializeOnly && local) throw new ProtocolError('profile_unavailable', 'A retained profile is unavailable remotely; initial values cannot replace it.');
-        if (initializeOnly && signed && !signed.pending && signed.relayId === relayId) { restored = accountProfileCodec.decode(signed.document); update = {}; }
-        if (signed?.pending && (!restored || signed.relayId === relayId)) {
+        if (initializeOnly && signed?.document && !signed.pending && signed.relayId === relayId) { restored = accountProfileCodec.decode(signed.document); update = {}; }
+        if (signed?.pending && signed.document && (!restored || signed.relayId === relayId)) {
             request = accountProfileCodec.decode(signed.document);
             if (signed.relayId !== relayId || !initializeOnly && accountProfileCodec.stringify(apply(update, request)) !== accountProfileCodec.stringify(request))
                 throw new StateConflictError('A profile publication has an unknown result. Retry the original update or resolve it first.');
@@ -166,7 +241,7 @@ export class ProfileManager extends ClientComponent {
             const cached = local && profileResolveResultCodec.decode(local).profile;
             let basis = current?.profile;
             if (basis && cached && basis.updatedAt < cached.updatedAt) throw new ProtocolError('stale_profile', 'Relay returned an older profile.');
-            for (const candidate of [cached, restored, signed?.pending ? accountProfileCodec.decode(signed.document) : undefined])
+            for (const candidate of [cached, restored, signed?.pending && signed.document ? accountProfileCodec.decode(signed.document) : undefined])
                 if (candidate && (!basis || candidate.updatedAt > basis.updatedAt)) basis = candidate;
             basis ??= { account: this.accountId, publicDiscovery: false, updatedAt: 0, deviceSignature: new Uint8Array(64) };
             request = { ...apply(update, basis), updatedAt: Math.max(this.clock.nowSeconds(), basis.updatedAt), deviceSignature: new Uint8Array(64) };
@@ -201,7 +276,7 @@ export class ProfileManager extends ClientComponent {
             this.#reads.get(this.accountId)!.recordSuccess(this.clock.monotonicMilliseconds());
         }, signal); return request;
     }
-    async #save(result: ProfileResolveResult, signal: AbortSignal): Promise<void> {
+    async #save(result: ProfileResolveResult, signal: AbortSignal, notify = true): Promise<void> {
         const profile = result.profile;
         await updateStore(this.#store, [profileKey(profile.account), requestKey(method)], snapshot => {
             const previous = snapshot.sets[0]![0]?.value;
@@ -209,16 +284,19 @@ export class ProfileManager extends ClientComponent {
                 throw new ProtocolError('stale_profile', 'Returned profile is older than the known profile.');
             const mutations: StoreMutation[] = [{ ...profileKey(profile.account), kind: 'put', value: profileResolveResultCodec.encode(result) }];
             const signed = readSignedRequest(snapshot.sets[1]![0]?.value);
-            if (profile.account === this.accountId && signed?.pending && (profile.updatedAt > signed.revision
-                || profile.updatedAt === signed.revision && accountProfileCodec.stringify(profile) === canonicalJson(signed.document)))
-                mutations.push(putSignedRequest(method, { ...signed, pending: false }));
+            if (profile.account === this.accountId && signed?.pending && (!signed.intent || isCurrentRequest(signed.requestState!)) && (profile.updatedAt > signed.revision
+                || profile.updatedAt === signed.revision && accountProfileCodec.stringify(profile) === canonicalJson(signed.document ?? null))) {
+                const { intent: _intent, ...settled } = signed;
+                mutations.push(putSignedRequest(method, { ...settled, pending: false, nextAttemptAt: null }));
+            }
             return { mutations, result: undefined };
         }, signal);
         let cache = this.#reads.get(profile.account);
         if (!cache) { cache = new MetadataCache(this.clock); this.#reads.set(profile.account, cache); }
         cache.publish(result);
-        if (profile.account === this.accountId && this.#accept(profile)) this.#changed();
+        if (profile.account === this.accountId && this.#accept(profile) && notify) this.#changed();
     }
-    protected override async onStop(): Promise<void> { this.#readsStopping = true; try { await Promise.all([...this.#reads.values()].map(cache => cache.stop())); } finally { this.#readsStopping = false; } }
-    protected override async onDispose(): Promise<void> { await Promise.all([...this.#reads.values()].map(cache => cache.stop(true))); this.#reads.clear(); this.#events.clear(); }
+    protected override async onStart(signal: AbortSignal): Promise<void> { await this.#importState(signal); this.#updates.start(this.runtimeSignal); }
+    protected override async onStop(): Promise<void> { this.#readsStopping = true; try { await Promise.all([this.#updates.stop(), ...[...this.#reads.values()].map(cache => cache.stop())]); } finally { this.#readsStopping = false; } }
+    protected override async onDispose(): Promise<void> { await this.#updates.drain(); await Promise.all([...this.#reads.values()].map(cache => cache.stop(true))); this.#reads.clear(); this.#events.clear(); }
 }

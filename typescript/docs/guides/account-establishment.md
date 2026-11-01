@@ -101,7 +101,7 @@ grant signature.
 `MessageManager` supplements and delivers known contact grants after `start()`.
 Setup does not wait for delivery. Persisted grants and outgoing messages allow
 maintenance to resume after restart, and failures remain visible through
-background errors. While a device publication is pending, new contact
+background errors. While a signed device publication remains unconfirmed, new contact
 authorization writes fail promptly; ordinary message enqueue and local reads
 remain available.
 
@@ -110,8 +110,8 @@ remain available.
 Before changes, setup reads the complete state from the original relay. Conflicts
 reread and reapply only the intended add/renew/remove, with bounded retries.
 An unresolved device request is replayed only when it matches that intent and
-has a revision newer than the verified state. Rejected signed revisions remain
-consumed; retrying preserves the exact saved revision. Every replay rechecks
+has a revision newer than the verified state. Replay preserves its exact revision;
+rejected signed revisions remain consumed. Every replay rechecks
 removal continuity. Reconcile an unrelated standalone removal through its
 original operation before resuming setup. An expired pending certificate is
 reconciled before renewing the same keys.

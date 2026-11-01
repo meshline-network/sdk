@@ -39,7 +39,7 @@ export class GroupNetwork {
             return response(sdk.groupKeyPageCodec.encode({ keys, hasMore: false }));
         }
         if (this.rejectMethod === method) return error('state_conflict');
-        if (this.failBeforeAccept === method) throw new Error('Connection lost before test relay accepted request');
+        if (this.failBeforeAccept === method) throw new TypeError('Connection lost before test relay accepted request');
         const member = hosted?.state.members.find(value => value.account === account); const administrator = member && member.role !== 'member';
         if (method === 'group.secret.rotation.prepare') {
             const request = sdk.groupRotationPrepareRequestCodec.decode(body); sdk.validateGroupRotationPrepareRequest(request);
@@ -51,7 +51,7 @@ export class GroupNetwork {
             else if (stage.expiresAt <= this.network.clock.wall || stage.owner !== account || stage.baseCommitment !== request.baseCommitment) return error('state_conflict');
             for (const [account, box] of entries) stage.boxes.set(account, box);
             const result = { prepared: stage.boxes.size, expiresAt: stage.expiresAt }; await this.afterPrepare?.();
-            if (this.loseResponse === method) throw new Error('Group operation accepted but response lost'); return response(sdk.groupRotationPrepareResultCodec.encode(this.prepareResponse?.(result) ?? result));
+            if (this.loseResponse === method) throw new TypeError('Group operation accepted but response lost'); return response(sdk.groupRotationPrepareResultCodec.encode(this.prepareResponse?.(result) ?? result));
         }
         if (method === 'group.application.list' || method === 'group.member.recovery.list') {
             if (!hosted) return error('not_found', 404); if (!administrator) return error('forbidden', 403);
@@ -76,14 +76,14 @@ export class GroupNetwork {
                 let value = this.recoveries.get(key); if (!value || sdk.groupMemberRecoveryRequestCodec.stringify(value.request) !== sdk.groupMemberRecoveryRequestCodec.stringify(request)) { value = { request, signerCertificate: certificate, acceptedAt: this.network.clock.wall, expiresAt: this.network.clock.wall + 3600 }; this.recoveries.set(key, value); }
                 result = { acceptedAt: value.acceptedAt, expiresAt: value.expiresAt };
             }
-            if (this.loseResponse === method) throw new Error('Group operation accepted but response lost'); return response(result === undefined ? undefined : sdk.groupRecoverySubmitResultCodec.encode(result));
+            if (this.loseResponse === method) throw new TypeError('Group operation accepted but response lost'); return response(result === undefined ? undefined : sdk.groupRecoverySubmitResultCodec.encode(result));
         }
         if (method === 'group.application.reject' || method === 'group.member.recovery.reject') {
             const request = sdk.groupAccountsRequestCodec.decode(body); sdk.validateGroupAccountsRequest(request); const recovery = method === 'group.member.recovery.reject';
             if (!hosted) return error('not_found', 404); if (!administrator && !(recovery && member && request.accounts.every(value => value === account))) return error('forbidden', 403);
             const rows = recovery ? this.recoveries : this.applications; if (request.accounts.some(value => !rows.has(`${id}|${value}`))) return error('not_found', 404);
             for (const target of request.accounts) rows.delete(`${id}|${target}`);
-            if (this.loseResponse === method) throw new Error('Group operation accepted but response lost'); return response();
+            if (this.loseResponse === method) throw new TypeError('Group operation accepted but response lost'); return response();
         }
         if (method.startsWith('group.invite.')) {
             if (!hosted) return error('not_found', 404); if (!member || hosted.state.bans.includes(account)) return error('forbidden', 403); const key = `${id}|${body.invite_id}`;
@@ -105,7 +105,7 @@ export class GroupNetwork {
                 this.invites.set(key, { invite, uses: 0, signerCertificate: certificate });
             } else if (method === 'group.invite.revoke') this.invites.delete(key);
             else throw new Error(`Unknown invitation fixture method ${method}`);
-            if (this.loseResponse === method) throw new Error('Group operation accepted but response lost'); return response();
+            if (this.loseResponse === method) throw new TypeError('Group operation accepted but response lost'); return response();
         }
         const payload = method === 'group.create' ? sdk.requireObject(body.create!) : method.endsWith('.approve') ? sdk.requireObject(body.approval!) : body;
         if (payload.prev_hash !== undefined && payload.prev_hash !== hosted?.state.managementHash) return error('state_conflict');
@@ -149,7 +149,7 @@ export class GroupNetwork {
         hosted.state = applied.projection; hosted.events.push(event); hosted.certificates.set(deviceId, certificate);
         if (!hosted.relayKeys.has(epoch)) hosted.relayKeys.set(epoch, sdk.systemRandom.bytes(32));
         if (this.failReadAfterSend) this.failRead = true;
-        if (this.loseResponse === method) throw new Error('Group operation accepted but response lost');
+        if (this.loseResponse === method) throw new TypeError('Group operation accepted but response lost');
         return method === 'group.message.send' ? response(this.missingSequence ? {} : { sequence: sequence + (this.wrongSequence ? 100 : 0) }) : response();
     }
     async client(seed: number, path?: string) {

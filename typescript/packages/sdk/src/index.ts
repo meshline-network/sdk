@@ -29,6 +29,7 @@ export * from './transport/client.js';
 export type { RelaySubscription, RelaySubscriptionOptions, SubscriptionMethod } from './transport/subscription.js';
 export * from './transport/pool.js';
 export * from './components/component.js';
+export * from './components/state-update-error.js';
 export * from './components/account.js';
 export * from './models/content.js';
 export * from './models/profile.js';

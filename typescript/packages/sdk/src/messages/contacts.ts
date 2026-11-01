@@ -1,3 +1,4 @@
+import { canReuseRequest } from '../storage/state-publication.js';
 import { ProtocolError, StateConflictError } from '../errors.js';
 import { validateIdentifier } from '../identity/identifiers.js';
 import { validateAccountId } from '../identity/neo.js';
@@ -130,7 +131,8 @@ export class MessageContacts {
                 }
             }
             if (grants.length) {
-                if (readSignedRequest(rows.get(recordId(publication)))?.pending) throw new ProtocolError('device_publication_pending', 'Reconcile pending device authorization before issuing contact grants.');
+                const pending = readSignedRequest(rows.get(recordId(publication)));
+                if (pending?.pending && pending.document && canReuseRequest(pending.requestState!)) throw new ProtocolError('device_publication_pending', 'Reconcile pending device authorization before issuing contact grants.');
                 const current = state(rows.get(recordId(own)));
                 if (!current) throw new ProtocolError('device_state_required', 'Current own device state is unavailable.');
                 for (const grant of grants) if ((grant.expiresAt ?? Infinity) > this.host.clock.nowSeconds()

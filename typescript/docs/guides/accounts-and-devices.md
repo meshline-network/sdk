@@ -45,7 +45,7 @@ Routes, device states and profiles reuse verified records in the existing accoun
 store. An ordinary read returns usable data immediately. A successful refresh or local
 publication defers ordinary refresh for **one hour**; failure or missing data defers it
 for **one minute**. After that interval, the next read starts a background refresh.
-There is no metadata polling or timed retry. Refresh timestamps stay in memory, so a
+Metadata reads do not poll or retry on a timer. Refresh timestamps stay in memory, so a
 restart can return persisted data while its first read refreshes it in the background.
 
 These intervals do not extend protocol validity. Route expiry, current certificate
@@ -77,6 +77,8 @@ are distinct steps. Do not treat a staged certificate as relay-authorized.
 `removeDevice(deviceId)` checks contact continuity without sending authorization
 updates itself. Message synchronization performs those updates in the background.
 Subscribe to `deviceChanged` and `deviceStateChanged` to refresh the UI.
+Route and device publications follow the [state-update contract](events-and-errors.md#cancellation-and-error-types).
+A complete certificate list replaces unfinished removals; otherwise removals accumulate by device ID.
 
 ## Declare an offline push gateway
 
@@ -139,8 +141,9 @@ so subsequent authentication uses the new certificate.
 
 Renewal stores the certificate before publication. Its return alone does not
 confirm relay acceptance. If establishment fails after renewal, resume it using
-the same store instead of reissuing the certificate. Pending device preparation
-or publication blocks another standalone renewal.
+the same store instead of reissuing the certificate. Unfinished account establishment
+or device preparation blocks standalone renewal. For a registered local device,
+an unfinished standalone publication does not block renewal.
 
 Interrupted creation retains its original gateway intent, even before a draft
 exists. Omit `pushGateway` when resuming; an explicit conflicting address is rejected.

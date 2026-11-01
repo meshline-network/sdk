@@ -36,7 +36,7 @@ defines the ownership and concurrency requirements.
 | `client_account_operations` | Client | Original setup parameters, internal operation ID and next workflow step; also explicit migration progress. |
 | `device_preparation` | Device manager | Protected draft keys and certificate before authorization; an activation receipt after those keys become the local device. |
 | `local_device`, `identity_binding/device` | Device manager | Current certificate, protected keys and device binding. |
-| `signed_requests` | Publishing manager | Exact account, device or profile request, its revision and whether its outcome is pending. Device requests also associate the operation with its explicit replacement choice. |
+| `signed_requests` | Publishing manager | Account, device or profile intent, signed request, revision and retry state. Device requests also associate establishment with its explicit replacement choice. |
 | `contacts`, `contact_requests`, `message_outbox` | Message manager | Issued grants, target-acceptance evidence and outgoing messages used to resume authorization maintenance. |
 
 The client checkpoints a step after its manager confirms completion. On retry,

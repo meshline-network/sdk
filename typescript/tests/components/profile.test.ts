@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
-    AccountManager, ProfileManager, RelayClientPool, accountProfileCodec, accountRouteCodec, certificateAccountInput, certificateDeviceInput,
+    AccountManager, ProfileManager, RelayClientPool, StateUpdateSupersededError, accountProfileCodec, accountRouteCodec, certificateAccountInput, certificateDeviceInput,
     devicePublicKey, encryptionPublicKey, accountPublicKey, getAccountId, profileInput, profileResolveResultCodec, relayDescriptorCodec,
     routeAccountInput, routeRelayInput, signAccount, signDevice, type AccountProfile, type AccountRoute, type DeviceCertificate,
     type DeviceSigner, type ProfileResolveResult, type RelayFetch, type JsonObject,
@@ -62,23 +62,25 @@ async function fixture(path?: string) {
         async pending() { return (await store.read([{ collection: 'signed_requests', key: 'profile.publish' }])).sets[0]![0]?.value; },
     };
 }
-test('profile updates preserve omitted and unknown fields, delete with null, and allow same-second acceptance', async () => {
+test('profile updates preserve omitted and unknown fields, delete with null, and advance versions within the same second', async () => {
     const f = await fixture(); f.result = f.signedProfile({ nickname: 'Alice', bio: 'bio', additionalProperties: { future: { keep: true } } });
     const first = await f.manager.updateProfile({ nickname: '爱丽丝', publicDiscovery: true });
     expect(first).toMatchObject({ nickname: '爱丽丝', bio: 'bio', publicDiscovery: true, additionalProperties: { future: { keep: true } } });
-    const second = await f.manager.updateProfile({ nickname: null, bio: '' }); expect(second.nickname).toBeUndefined(); expect(second.bio).toBe(''); expect(second.updatedAt).toBe(first.updatedAt);
+    const second = await f.manager.updateProfile({ nickname: null, bio: '' }); expect(second.nickname).toBeUndefined(); expect(second.bio).toBe(''); expect(second.updatedAt).toBeGreaterThan(first.updatedAt);
     expect((await f.pending())!.pending).toBe(false);
     const saved = await f.store.read([{ collection: 'profiles', key: accountId }, { collection: 'signed_requests', key: 'profile.publish' }]);
     expect(saved.sets[0]![0]!.revision).toBe(saved.sets[1]![0]!.revision);
     second.deviceSignature.fill(0); expect(f.manager.profile!.deviceSignature).not.toEqual(second.deviceSignature);
 });
-test('lost profile acceptance retries exact bytes after restart and rejects conflicting updates', async () => {
+test('lost profile acceptance merges a replacement after restart', async () => {
     const first = await fixture(); first.loseResponse = true;
     await expect(first.manager.updateProfile({ nickname: 'Alice' })).rejects.toThrow('lost'); expect((await first.pending())!.pending).toBe(true);
     await first.manager.dispose(); await first.account.dispose(); await first.pool.dispose(); await first.store.dispose();
     const resumed = await fixture(first.store.path); resumed.clock.wall += 60;
-    await expect(resumed.manager.updateProfile({ nickname: 'Bob' })).rejects.toThrow('unknown result');
-    await resumed.manager.updateProfile({ nickname: 'Alice' }); expect(resumed.requests).toEqual(first.requests);
+    const latest = await resumed.manager.updateProfile({ nickname: 'Bob', bio: 'new' });
+    expect(latest).toMatchObject({ nickname: 'Bob', bio: 'new' });
+    expect(latest.updatedAt).toBeGreaterThan(first.result!.profile.updatedAt);
+    expect(resumed.requests).toHaveLength(1);
     expect((await resumed.pending())!.pending).toBe(false);
 });
 test('resolved latest profile clears a matching pending write, while a same-time different profile does not', async () => {
@@ -105,7 +107,7 @@ test('profile signature and certificate account signatures are both required; ol
 });
 test('definitive rejection permits a new update and not_found retains the last valid profile', async () => {
     const f = await fixture(); f.reject = true;
-    await expect(f.manager.updateProfile({ bio: 'rejected' })).rejects.toMatchObject({ code: 'forbidden' }); expect((await f.pending())!.pending).toBe(false);
+    await expect(f.manager.updateProfile({ bio: 'rejected' })).rejects.toMatchObject({ code: 'forbidden' }); expect(await f.pending()).toMatchObject({ pending: true, requestState: 2, nextAttemptAt: null });
     f.reject = false; await f.manager.updateProfile({ bio: 'accepted' }); f.result = undefined;
     expect(await f.manager.refreshProfile()).toBeUndefined(); expect((await f.manager.getProfile())!.bio).toBe('accepted'); expect(f.manager.profile!.bio).toBe('accepted');
     expect((await f.manager.publishProfile())!.bio).toBe('accepted');
@@ -142,4 +144,25 @@ test('profile reads reuse stored results, stay nonblocking and preserve a same-t
     const blocked = deferred(); const reader = vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => { if (args[1] === 'profile.resolve') await blocked.promise; return request(...args); });
     try { expect((await resumed.getProfile())!.nickname).toBe('new'); }
     finally { blocked.resolve(); await resumed.refreshProfile(); reader.mockRestore(); }
+});
+
+
+test('a new profile update merges fields while the previous response is held and ignores its late completion', async () => {
+    const f = await fixture(); await f.manager.updateProfile({ nickname: 'initial' });
+    const client = f.pool.clients.find(value => value.sessionMode === 'device')!; const original = client.requestHttp.bind(client);
+    const entered = deferred(); const release = deferred(); let held = false;
+    vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+        const response = await original(...args);
+        if (args[1] === 'profile.publish' && !held) { held = true; entered.resolve(); await release.promise; }
+        return response;
+    });
+    const old = f.manager.updateProfile({ nickname: 'old', bio: 'retained' }); const superseded = expect(old).rejects.toBeInstanceOf(StateUpdateSupersededError);
+    try {
+        await entered.promise;
+        await expect(f.manager.updateProfile({ nickname: '\u0085' })).rejects.toThrow();
+        const latest = await f.manager.updateProfile({ nickname: 'latest' }); await superseded;
+        expect(latest).toMatchObject({ nickname: 'latest', bio: 'retained' });
+        release.resolve(); await f.manager.dispose();
+        expect(f.manager.profile).toEqual(latest); expect(await f.pending()).toMatchObject({ pending: false, document: { nickname: 'latest', bio: 'retained' } });
+    } finally { release.resolve(); }
 });

@@ -16,7 +16,7 @@ test.each([false, true])('rotation with owner-key replacement=%s activates only 
     let staged = false;
     network.afterPrepare = async () => {
         const rows = (await owner.store.read([{ collection: 'group_rotations' }, { collection: 'group_operations' }])).sets;
-        expect(rows[0]).toHaveLength(1); expect(typeof rows[0]![0]!.value.protectedSecret).toBe('string'); expect(rows[1]).toEqual([]);
+        expect(rows[0]).toHaveLength(1); expect(typeof rows[0]![0]!.value.protectedSecret).toBe('string'); expect(rows[1]!.filter(row => row.value.pending !== false)).toEqual([]);
         expect(network.groups.get(group.groupId)!.state.clientSecretCommitment).toBe(before.clientSecretCommitment);
         expect((await all(owner.groups.getMembers(group))).find(value => value.accountId === owner.accountId)!.memberEncryptionPublicKey).toEqual(before.members.find(value => value.account === owner.accountId)!.memberEncryptionPublicKey); staged = true;
     };
@@ -25,7 +25,7 @@ test.each([false, true])('rotation with owner-key replacement=%s activates only 
     const oldKey = before.members.find(value => value.account === owner.accountId)!.memberEncryptionPublicKey; const newKey = after.members.find(value => value.account === owner.accountId)!.memberEncryptionPublicKey;
     expect(canonicalJson([...oldKey]) === canonicalJson([...newKey])).toBe(!rotateOwnerMemberKey);
     expect((await all(owner.groups.getMembers(group))).find(value => value.accountId === owner.accountId)!.nickname).toBe('owner nickname');
-    expect((await owner.store.read([{ collection: 'group_rotations' }, { collection: 'group_operations' }])).sets).toEqual([[], []]);
+    expect((await owner.store.read([{ collection: 'group_rotations' }, { collection: 'group_operations' }])).sets.map((rows, index) => index === 1 ? rows.filter(row => row.value.pending !== false) : rows)).toEqual([[], []]);
     const sent = await owner.groups.sendMessage(group, { body: { contentType: 'text/plain', text: 'new client secret' } }); await peer.groups.getGroup(group); expect((await all(peer.groups.getMessages())).at(-1)!.messageId).toBe(sent.messageId);
 });
 
@@ -106,7 +106,7 @@ test('rotation prepares 65 verified members in two batches under one candidate a
     const batches = network.requests.filter(value => value.method === 'group.secret.rotation.prepare');
     expect(batches.map(value => Object.keys(value.body.client_secret_boxes!).length)).toEqual([64, 1]);
     expect(new Set(batches.map(value => value.body.client_secret_commitment)).size).toBe(1); expect(new Set(expiries).size).toBe(1);
-    expect((await owner.store.read([{ collection: 'group_rotations' }, { collection: 'group_operations' }])).sets).toEqual([[], []]);
+    expect((await owner.store.read([{ collection: 'group_rotations' }, { collection: 'group_operations' }])).sets.map((rows, index) => index === 1 ? rows.filter(row => row.value.pending !== false) : rows)).toEqual([[], []]);
 });
 
 test.each(['expired', 'count', 'changed_interval'] as const)('an invalid %s preparation response cannot publish a rotation commit', async scenario => {
@@ -123,7 +123,7 @@ test.each(['expired', 'count', 'changed_interval'] as const)('an invalid %s prep
     expect(requests.map(value => Object.keys(value.body.client_secret_boxes!).length)).toEqual(scenario === 'changed_interval' ? [64, 1] : [2]);
     expect(network.requests.filter(value => value.method === 'group.secret.rotation.commit')).toEqual([]);
     const rows = (await owner.store.read([{ collection: 'group_rotations' }, { collection: 'group_operations' }])).sets;
-    expect(rows[0]).toHaveLength(1); expect(rows[1]).toEqual([]);
+    expect(rows[0]).toHaveLength(1); expect(rows[1]!.filter(row => row.value.pending !== false)).toEqual([]);
     expect(rows[0]![0]!.value.expiresAt).toBe(scenario === 'changed_interval' ? originalExpiry : undefined);
     expect(network.groups.get(group.groupId)!.state).toEqual(before);
     // The candidate survives a bad response and remains usable with a valid retry.

@@ -54,13 +54,15 @@ Use the fixture clock for SDK timers and an explicit handshake for concurrent wo
 | `components/account-establishment.test.ts` | Suites for establishment/renewal, prerequisites, device selection/continuity, interrupted operations/conflicts, and startup/authorization loss. |
 | `components/account.test.ts` | Route reconciliation, exact replay, original-relay preservation, expired publication evidence and cache/publication concurrency. |
 | `components/device.test.ts` | Device-state acceptance, complete-state publication and atomic publication/grant guards. |
+| `components/state-update-coordinator.test.ts` | Durable replacement, field merging, admission rollback, cancellation, retry deadlines and restart recovery. |
+| `components/latest-state.test.ts` | Group/channel update concurrency, restart recovery and observer lifecycle. |
 | `components/push-gateway.test.ts` | Suites for creation/renewal, account establishment/recovery, input validation and call isolation. |
 | `protocol/push-certificate.test.ts`, `protocol/push-interop.test.ts` | Fixed push certificate/URL vectors, signature coverage, UTF-8 limits and actual C# certificate interoperability. |
 | `protocol/message-envelopes.test.ts`, `protocol/messages.test.ts`, `protocol/groups.test.ts` | Fixed envelope notification fields, signatures, tampering, retry identity, unchanged decryption and C# round trips. |
 | `components/message.test.ts` | Contact authorization maintenance, target acceptance and shared outbox scans with delivery-retention checks. |
 | `components/device-notifications.test.ts` | Device-state notification delivery, initialization, overlapping revisions, stop/start and restart recovery. |
 | `transport/pool.test.ts` | Session reuse with unchanged certificates and device-session retirement after renewal, preserving account sessions. |
-| `browser/managers.spec.ts` | IndexedDB reopen after a lost acknowledgement and a fresh installation preserving devices and profile. |
+| `browser/managers.spec.ts` | IndexedDB recovery of the latest merged intent and lost acknowledgements; fresh installations preserving devices and profile. |
 
 The supported persistence cases are a complete retained installation or a fresh
 installation. Secret-protector failures preserve retained data. Test wallets and

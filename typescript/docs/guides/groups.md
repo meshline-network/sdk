@@ -56,6 +56,7 @@ Use `updateGroup` for properties, `setRole` for non-owner role changes, and
 `transferOwnership` for an ownership transfer. `removeMembers`, `ban`, `unban`,
 `leaveGroup`, and `closeGroup` enforce the caller's verified authority.
 Omitted update fields retain their values; only nullable fields allow deletion.
+Property updates follow the [state-update contract](events-and-errors.md#cancellation-and-error-types).
 
 The owner calls `rotateSecret(group)` to rotate the epoch secret.
 `rotateOwnerMemberKey` defaults to false; pass true to rotate the owner's member

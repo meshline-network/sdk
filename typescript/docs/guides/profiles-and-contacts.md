@@ -19,9 +19,8 @@ Omitted fields retain their values. `null` deletes `nickname`, `bio`, or `avatar
 current account and can return `undefined`. Access to another account's profile
 depends on its discovery and contact authorization.
 
-A lost publication response leaves the original signed profile request pending.
-Resolve it before making a conflicting edit. A different profile with the same
-timestamp does not prove acceptance of the pending write.
+Further edits merge with unfinished changes even while an earlier call is waiting;
+see [completion and retry behavior](events-and-errors.md#cancellation-and-error-types).
 
 ## Establish a contact
 

@@ -55,18 +55,20 @@ Operations accept optional `AbortSignal`; some options objects carry `signal`.
 Cancellation preserves the signal's reason when the runtime provides it.
 On legacy React Native controllers that discarded a caller's reason, the SDK
 returns `AbortError`; it cannot reconstruct that value and does not replace the
-global controller. SDK-owned scopes preserve their cancellation reasons.
+global controller. SDK-owned scopes preserve their cancellation reasons;
+disposal uses `AbortError`.
 
 | Error | How to handle it |
 | --- | --- |
 | `AccountEstablishmentError` | Inspect `reason`, plus `deviceSelection`, `keyIssue`, or `contactIssues` when present. UI and wallet prompts belong to the caller. |
-| `AccountRouteError` | Inspect `reason` and `cause` when calling `accountManager.ensureRoute` directly. Reconcile the saved publication before changing parameters. |
+| `AccountRouteError` | Inspect `reason` and `cause` when calling `accountManager.ensureRoute` directly. |
+| `StateUpdateSupersededError` | A newer state update replaced this waiting call; await the newer call for its result. |
 | `SecretAccessError` | Protector adapters distinguish temporary unavailability, permanent loss, and unknown failure. None authorizes automatic deletion or replacement. |
 | `ProtocolError` with a code | Inspect invalid input, identity, authorization, or protocol state. |
 | `TypeError` / `RangeError` | Correct argument shape or range. |
 | `StateConflictError` | Refresh/reconcile state before choosing the next operation. |
 | `RelayError` | Inspect retained relay error metadata; distinguish permissions from authentication. |
-| `TimeoutError` | Inspect `operation`, `timeoutMilliseconds`, and the original `cause`; reconcile writes before retrying. |
+| `TimeoutError` | Inspect `operation`, `timeoutMilliseconds`, and the original `cause`; follow the operation's recovery rules. |
 | Caller abort / `AbortError` | Cancellation does not establish remote rejection or an SDK deadline. |
 | Other transport failure | Preserve the original error and pending state. |
 | Local storage/protection failure | Restore access to the original store/protector and retry without discarding state. |
@@ -76,12 +78,22 @@ and RPC waits. HTTP deadlines include response body reads. If an HTTP adapter
 returns a generic `AbortError` after the SDK deadline, the SDK restores the
 `TimeoutError` reason and retains the adapter error as `cause`.
 
-Caller aborts preserve the signal's reason where the runtime supports it; SDK
-disposal uses `AbortError`. An unrelated dependency abort is not converted to a
-timeout. Application adapters can impose their own deadlines. A lost response,
-timeout, or abort does not prove that a mutation failed remotely: reconcile the
-persisted operation before retrying. [Aborting a send wait](direct-messages.md#wait-for-an-acceptance-milestone)
+An unrelated dependency abort is not converted to a timeout. Application adapters
+can impose their own deadlines. A lost response,
+timeout, or abort does not prove that a mutation failed remotely. [Aborting a send wait](direct-messages.md#wait-for-an-acceptance-milestone)
 leaves the outgoing message active.
+
+Profile, route, device-state, group-property and channel-metadata updates persist
+the latest intent per resource. Once saved, a new call replaces the waiting attempt
+and merges unfinished fields; the last value for each field wins. The SDK prevents late
+results from replacing newer state. A completed call keeps its original outcome;
+supersession cannot undo remote acceptance.
+
+While running, the manager retries transient failures and resumes saved intent
+after restart. Permanent failures retain the intent without automatic retry; a
+new call can replace it. Cancellation preserves saved intent. Callers do not manage
+pending records. Messages, uploads and other independent operations retain their
+own completion and recovery rules.
 
 See [account establishment](account-establishment.md) for setup failure reasons,
 [transport configuration](transport.md#request-timeouts-and-cancellation), and

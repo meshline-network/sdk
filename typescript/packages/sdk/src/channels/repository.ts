@@ -135,7 +135,7 @@ export class ChannelRepository {
             return { mutations: [put(key, encodeChannelOperation(operation))], result: undefined };
         }, signal);
     }
-    async operations(signal?: AbortSignal): Promise<readonly ChannelOperation[]> { return (await this.store.read([{ collection: 'channel_operations' }], signal)).sets[0]!.map(readChannelOperation); }
+    async operations(signal?: AbortSignal): Promise<readonly ChannelOperation[]> { return (await this.store.read([{ collection: 'channel_operations' }], signal)).sets[0]!.filter(row => row.value.method !== 'channel.update').map(readChannelOperation); }
     async hasOperation(operation: ChannelOperation, signal?: AbortSignal): Promise<boolean> { return fingerprint((await this.store.read([channelOperationKey(operation)], signal)).sets[0]![0]?.value) === canonicalJson(encodeChannelOperation(operation)); }
     async acknowledgePublication(operation: ChannelOperation, sequence: number): Promise<ChannelOperation> {
         requireSafeInteger(sequence, 1); if (operation.method !== 'channel.post') throw new ProtocolError('invalid_operation', 'Only publications return sequence acknowledgements.');
@@ -230,6 +230,7 @@ export class ChannelRepository {
             // for selected posts. Confirmation must commit with the affected projection.
             if (!applied.has(event.sequence)) continue;
             for (const row of snapshot.sets[4]!) {
+                if (row.value.method === 'channel.update') continue;
                 const operation = readChannelOperation(row); const payload = operation.payload;
                 if (payload.kind === 'post' && event.payload.kind === 'post' && payload.value.messageId === event.payload.value.messageId && certificate.account === this.accountId) {
                     if (operation.acceptedSequence !== undefined && operation.acceptedSequence !== event.sequence) throw new ProtocolError('invalid_sequence', 'Publication acknowledgement differs from its verified timeline sequence.');

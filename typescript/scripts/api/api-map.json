@@ -1193,5 +1193,10 @@
     "type": "Meshline.Storage.Migrations.ResumableAccountEstablishment",
     "path": "packages/sdk/src/storage/store.ts",
     "notes": "TypeScript adapters use generic record collections with atomic CAS; workflow and preparation records need no physical-schema migration or intermediate-record compatibility. .NET database files are not interchangeable."
+  },
+  {
+    "type": "Meshline.Components.StateUpdateSupersededException",
+    "path": "packages/sdk/src/components/state-update-error.ts",
+    "notes": "StateUpdateSupersededError completes a waiting call when a newer durable state update takes over."
   }
 ]

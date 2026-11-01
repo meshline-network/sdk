@@ -9,13 +9,15 @@ import { createAbortController } from '../runtime/abort.js';
 import { awaitWithSignal, throwIfAborted } from '../runtime/clock.js';
 import { EventHub, type EventListener } from '../runtime/events.js';
 import type { MeshlineStore, RecordKey, StoreMutation } from '../storage/store.js';
-import { finishSignedRequest, putSignedRequest, readSignedRequest, requestKey, type SignedRequest } from '../storage/signed-request.js';
+import { putSignedRequest, readSignedRequest, requestKey } from '../storage/signed-request.js';
 import { updateStore } from '../storage/transaction.js';
 import type { RelayClientPool } from '../transport/pool.js';
 import { RelayError } from '../transport/relay-error.js';
 import { ClientComponent, type BackgroundFailure, type ClientOptions } from './component.js';
 import { AccountRouteError } from './account-route-error.js';
 import { SubmissionOutcomeError } from './authorization-error.js';
+import { StateUpdateCoordinator, type StateUpdateAttempt } from './state-update-coordinator.js';
+import { canReuseRequest, isCurrentRequest, PublicationRequestState } from '../storage/state-publication.js';
 
 export type AccountState = 'unknown' | 'notEstablished' | 'established';
 export interface AccountSnapshot { readonly state: AccountState; readonly route: AccountRoute | undefined }
@@ -37,7 +39,7 @@ interface RouteEntry {
     refresh: Promise<RouteResult> | undefined;
 }
 
-/** Signed route discovery and durable, explicit publication retries. */
+/** Signed route discovery and durable publication. */
 export class AccountManager extends ClientComponent {
     readonly #store: MeshlineStore;
     readonly #pool: RelayClientPool;
@@ -52,12 +54,23 @@ export class AccountManager extends ClientComponent {
     readonly #events = new EventHub<AccountEvents>();
     #state: AccountState = 'unknown';
     #route: AccountRoute | undefined;
+    readonly #updates: StateUpdateCoordinator<AccountRoute>;
 
     constructor(options: AccountManagerOptions) {
         super(options);
         if (options.relayClients.accountId !== this.accountId || options.relayClients.context.toString() !== this.context.toString())
             throw new ProtocolError('invalid_context', 'Relay pool belongs to another account or network.');
         this.#store = options.store; this.#pool = options.relayClients; this.#signer = options.accountSigner;
+        const owner = this;
+        this.#updates = new class extends StateUpdateCoordinator<AccountRoute> {
+            protected readonly operation = method;
+            protected readonly query = requestKey(method);
+            protected key(): RecordKey { return requestKey(method); }
+            protected resource(): string { return owner.accountId; }
+            protected create(_resource: string, intent: JsonObject): JsonObject { return { relayId: intent.relayId!, revision: -1 }; }
+            protected publish(attempt: StateUpdateAttempt<AccountRoute>, signal: AbortSignal): Promise<AccountRoute> { return owner.#publishLatest(attempt, signal); }
+            protected report(resource: string, error: unknown): void { owner.notifyBackgroundError({ operation: 'synchronize', resource, error }); }
+        }(this.#store, this.clock);
     }
     get state(): AccountState { return this.#state; }
     get route(): AccountRoute | undefined { return this.#route && clone(this.#route); }
@@ -98,7 +111,7 @@ export class AccountManager extends ClientComponent {
     getUnconfirmedRoute(signal?: AbortSignal): Promise<AccountRoute | undefined> {
         return this.runOperation(async scope => {
             const saved = readSignedRequest((await this.#store.read([requestKey(method)], scope)).sets[0]![0]?.value);
-            const request = saved && accountRouteCodec.decode(saved.document);
+            const request = saved?.document && accountRouteCodec.decode(saved.document);
             return request && (!this.#route || ['older', 'conflict'].includes(compareRoutes(this.#route, request))) ? request : undefined;
         }, signal);
     }
@@ -118,32 +131,36 @@ export class AccountManager extends ClientComponent {
                         if (retained && retained.relayId !== relayId) throw new AccountRouteError('relayMismatch', 'The home relay differs from the requested relay.');
                         if (refresh && fingerprint(retained && accountRouteCodec.encode(retained)) !== fingerprint(observed && accountRouteCodec.encode(observed))) return undefined;
                         const saved = readSignedRequest((await this.#store.read([requestKey(method)], scope)).sets[0]![0]?.value);
-                        const request = saved && accountRouteCodec.decode(saved.document);
-                        const unresolved = request && (!retained || ['older', 'conflict'].includes(compareRoutes(retained, request)));
+                        const request = saved?.document && accountRouteCodec.decode(saved.document);
+                        const unresolved = saved?.pending || request && (!retained || ['older', 'conflict'].includes(compareRoutes(retained, request)));
                         if (!unresolved && retained && retained.expiresAt > this.clock.nowSeconds()) {
                             if (refresh && !resolved && fingerprint(before && accountRouteCodec.encode(before)) === accountRouteCodec.stringify(retained))
                                 throw new AccountRouteError('stateUnavailable', 'Discovery did not confirm the retained route. No replacement was published.');
-                            return { route: retained, changed: false };
+                            return { route: retained };
                         }
                         if (!refresh) return undefined;
                         let revision = nextRevision(retained?.revision ?? -1);
                         if (unresolved) {
                             if (saved!.relayId !== relayId) throw new AccountRouteError('relayMismatch', 'The unfinished publication targets another relay.');
-                            if (request.expiresAt - request.updatedAt !== validitySeconds) throw new AccountRouteError('operationConflict', 'Resume with the original route lifetime.');
-                            if (request.expiresAt <= this.clock.nowSeconds() && !retained)
+                            if (request && request.expiresAt <= this.clock.nowSeconds() && !retained)
                                 throw new AccountRouteError('stateConflict', 'The initial request expired without verified original-route evidence.');
-                            revision = request.expiresAt <= this.clock.nowSeconds() ? nextRevision(Math.max(retained?.revision ?? -1, saved!.revision)) : saved!.revision;
+                            revision = !request || saved!.requestState === PublicationRequestState.Superseded || saved!.requestState === PublicationRequestState.SupersededRejected
+                                || retained && ['equivalent', 'newer'].includes(compareRoutes(retained, request)) || request.expiresAt <= this.clock.nowSeconds()
+                                || request.expiresAt - request.updatedAt !== validitySeconds ? nextRevision(Math.max(retained?.revision ?? -1, saved!.revision)) : saved!.revision;
                         }
                         if (attemptedRevision === revision) throw new AccountRouteError('stateConflict', 'This revision was rejected and discovery has not confirmed newer state.');
                         if (!this.#signer) throw new AccountRouteError('signerRequired', 'An account signer is required to authorize the route.');
-                        try { return await this.#publishCore(relayId, { validitySeconds, revision }, this.#signer, scope, Boolean(unresolved), true); }
-                        catch (error) {
-                            if (error instanceof RelayError && ['stale_state', 'state_conflict'].includes(error.code) && conflicts++ < 2) { attemptedRevision = revision; return undefined; }
-                            throw error;
-                        }
+                        return { revision, unresolved: Boolean(unresolved) };
                     }, scope);
                     if (!result) { refresh = true; continue; }
-                    if (result.changed) this.#changed();
+                    if ('route' in result) return clone(result.route!);
+                    const beforePublication = this.#route && accountRouteCodec.stringify(this.#route);
+                    try { await this.#updateRoute(relayId, { validitySeconds, revision: result.revision }, scope, result.unresolved, true); }
+                    catch (error) {
+                        if (error instanceof RelayError && ['stale_state', 'state_conflict'].includes(error.code) && conflicts++ < 2) { attemptedRevision = result.revision; refresh = true; continue; }
+                        throw error;
+                    }
+                    if (beforePublication !== (this.#route && accountRouteCodec.stringify(this.#route))) this.#changed();
                     const confirmed = this.#route!;
                     if (confirmed.relayId !== relayId) throw new AccountRouteError('relayMismatch', 'The home relay changed during authorization.');
                     if (confirmed.expiresAt <= this.clock.nowSeconds()) throw new AccountRouteError('stateUnavailable', 'The confirmed route expired before completion.');
@@ -260,91 +277,87 @@ export class AccountManager extends ClientComponent {
         if (!attempted) throw new ProtocolError('no_active_relay', 'No active relay is available for route discovery.');
         return undefined;
     }
+    /** Publishes a route, replacing any unfinished route publication. */
     async publishRoute(relayId: string, options: PublishRouteOptions): Promise<AccountRoute> {
         options = { ...options };
         validateRelayId(relayId); requireSafeInteger(options.validitySeconds, 1);
         if (options.validitySeconds > 3650 * 86400) throw new RangeError('Route validity cannot exceed 3650 days.');
         if (options.revision !== undefined) requireSafeInteger(options.revision, 0);
+        if (!this.#signer) throw new ProtocolError('signer_required', 'An account signer is required to publish a route.');
+        const before = this.#route && accountRouteCodec.stringify(this.#route);
+        const result = await this.runOperation(signal => this.#updateRoute(relayId, options, signal), options.signal);
+        if (before !== (this.#route && accountRouteCodec.stringify(this.#route))) this.#changed();
+        return clone(result);
+    }
+    #updateRoute(relayId: string, options: PublishRouteOptions, signal: AbortSignal, retryRejected = false, classify = false): Promise<AccountRoute> {
+        return this.#updates.submit(this.accountId, { relayId, validitySeconds: options.validitySeconds, revision: options.revision ?? null,
+            recovery: options.recovery ?? false, retryRejected, classify }, signal);
+    }
+    async #publishLatest(attempt: StateUpdateAttempt<AccountRoute>, signal: AbortSignal): Promise<AccountRoute> {
+        let remote: AccountRoute | undefined;
+        for (let retry = 0; ; retry++) {
+            try { return await this.#publishLatestOnce(attempt, remote, signal); }
+            catch (error) {
+                if (retry >= 2 || attempt.intent.revision !== null || !(error instanceof RelayError) || !['stale_state', 'state_conflict'].includes(error.code)) throw error;
+                await attempt.check(signal); remote = await this.#resolve(this.accountId, [], signal);
+            }
+        }
+    }
+    async #publishLatestOnce(attempt: StateUpdateAttempt<AccountRoute>, remote: AccountRoute | undefined, signal: AbortSignal): Promise<AccountRoute> {
         const signer = this.#signer;
         if (!signer) throw new ProtocolError('signer_required', 'An account signer is required to publish a route.');
-        const result = await this.runOperation(signal => this.#publicationGate.run(() => this.#publishCore(relayId, options, signer, signal), signal), options.signal);
-        if (result.changed) this.#changed();
-        return clone(result.route);
-    }
-    async #publishCore(relayId: string, options: PublishRouteOptions, signer: AccountSigner, signal: AbortSignal, retryRejected = false, classify = false): Promise<{ route: AccountRoute; changed: boolean }> {
-        const signed = await this.#prepare(relayId, options, signer, signal, retryRejected);
-        const request = accountRouteCodec.decode(signed.document);
-        const client = await this.#pool.get(relayId, { mode: 'account', signer }, signal);
-        let response;
-        try { response = await client.requestHttp('PUT', method, signed.document, { signal }); }
-        catch (error) {
-            if (error instanceof RelayError && error.isDefinitiveRejection) {
-                try { await finishSignedRequest(this.#store, method, signed); }
-                catch (storageError) { throw new AggregateError([error, storageError], 'Relay rejected publication but its durable result could not be saved.'); }
-            }
-            if (classify && !(error instanceof RelayError && error.isDefinitiveRejection) && !signal.aborted) throw new SubmissionOutcomeError('Route publication outcome is unknown.', { cause: error });
-            throw error;
+        const relayId = String(attempt.intent.relayId); const validitySeconds = Number(attempt.intent.validitySeconds);
+        const snapshot = await this.#store.read([routeKey(this.accountId), requestKey(method)], signal);
+        const known = snapshot.sets[0]![0]?.value;
+        const knownRevision = Math.max(known ? accountRouteCodec.decode(known).revision : -1, remote?.revision ?? -1);
+        const saved = readSignedRequest(snapshot.sets[1]![0]?.value)!;
+        const floor = Math.max(knownRevision, saved.revision);
+        const explicit = attempt.intent.revision === null ? undefined : Number(attempt.intent.revision);
+        let request = saved.document && (saved.pending && canReuseRequest(saved.requestState!) || attempt.intent.retryRejected === true)
+            ? accountRouteCodec.decode(saved.document) : undefined;
+        const now = this.clock.nowSeconds(); requireSafeInteger(now, 0);
+        if (!request || saved.relayId !== relayId || request.expiresAt <= now || request.expiresAt - request.updatedAt !== validitySeconds
+            || explicit !== undefined && explicit !== request.revision || request.revision < knownRevision) {
+            let revision = explicit;
+            if (attempt.intent.classify === true && revision !== undefined && revision <= floor) revision = undefined;
+            if (revision === undefined && attempt.intent.recovery === true) revision = Math.max(nextRevision(floor), now * 1000);
+            const publicKey = signer.publicKey.slice();
+            if (signer.accountId !== this.accountId || !matchesAccount(this.accountId, publicKey)) throw new ProtocolError('invalid_identity', 'Account signer identity changed.');
+            request = { account: this.accountId, accountPublicKey: publicKey, relayId, revision: nextRevision(floor, revision),
+                updatedAt: now, expiresAt: now + validitySeconds, accountSignature: new Uint8Array(64) };
+            requireSafeInteger(request.expiresAt, 0);
+            request = { ...request, accountSignature: (await signer.sign(routeAccountInput(request, this.context), signal)).slice() };
         }
+        validateRoute(request, this.context, this.clock.nowSeconds());
+        const wire = accountRouteCodec.encode(request);
+        const revision = request.revision;
+        await attempt.current(() => updateStore(this.#store, [routeKey(this.accountId), requestKey(method)], current => {
+            if (fingerprint(current.sets[0]![0]?.value) !== fingerprint(known)) throw new StateConflictError('The route changed while it was being signed.');
+            return { mutations: [{ ...requestKey(method), kind: 'put', value: { ...current.sets[1]![0]!.value, document: wire, relayId, revision, requestState: PublicationRequestState.Prepared, pending: true } }], result: undefined };
+        }, signal), signal);
+        const client = await this.#pool.get(relayId, { mode: 'account', signer }, signal); await attempt.check(signal);
         let route: AccountRoute;
         try {
+            const response = await client.requestHttp('PUT', method, wire, { signal });
             if (response === undefined) throw new ProtocolError('invalid_response', 'Route publication returned no acknowledgement.');
             route = accountRouteCodec.decode(response);
             const acknowledged = accountRouteCodec.encode(route); delete acknowledged.relay_signature;
-            if (canonicalJson(acknowledged) !== accountRouteCodec.stringify(request)) throw new ProtocolError('invalid_response', 'Relay modified the submitted route.');
+            if (canonicalJson(acknowledged) !== canonicalJson(wire)) throw new ProtocolError('invalid_response', 'Relay modified the submitted route.');
             await this.#verifyRelay(route, signal);
         } catch (error) {
-            if (classify && !signal.aborted) throw new SubmissionOutcomeError('Route acknowledgement could not be verified.', { cause: error });
+            if (error instanceof RelayError && error.isDefinitiveRejection) await attempt.reject(wire);
+            else if (attempt.intent.classify === true && !signal.aborted) throw new SubmissionOutcomeError('Route publication outcome is unknown.', { cause: error });
             throw error;
         }
         let changed = false;
-        await this.#saveGate.run(async () => {
+        await attempt.current(() => this.#saveGate.run(async () => {
             await this.#save(route, signal);
             const entry = this.#entry(this.accountId); entry.publication++;
             entry.refreshAfter = this.clock.monotonicMilliseconds() + routeFreshness;
             changed = this.#cache(entry, route);
-        }, signal);
-        return { route, changed };
-    }
-    async #prepare(relayId: string, options: PublishRouteOptions, signer: AccountSigner, signal: AbortSignal, retryRejected = false): Promise<SignedRequest> {
-        const queries = [routeKey(this.accountId), requestKey(method)];
-        const snapshot = await this.#store.read(queries, signal);
-        const previous = snapshot.sets[0]![0]?.value;
-        const saved = snapshot.sets[1]![0]?.value;
-        const known = previous === undefined ? undefined : accountRouteCodec.decode(previous);
-        const signed = readSignedRequest(saved);
-        const knownRevision = Math.max(known?.revision ?? -1, signed?.revision ?? -1);
-        const pending = signed && (signed.pending || retryRejected && options.revision === signed.revision) ? accountRouteCodec.decode(signed.document) : undefined;
-        const now = this.clock.nowSeconds(); requireSafeInteger(now, 0);
-        let revision = options.revision;
-        if (options.recovery && revision === undefined && (!pending || signed!.relayId !== relayId || pending.expiresAt <= now))
-            revision = Math.max(nextRevision(knownRevision), now * 1000);
-        else if (revision === undefined && pending && signed!.relayId === relayId && pending.expiresAt <= now) revision = nextRevision(knownRevision);
-        if (signed && pending && (revision === undefined || revision === signed.revision)) {
-            const route = pending!;
-            validateRoute(route, this.context, now);
-            if (route.account !== this.accountId || signed.relayId !== relayId || route.relayId !== relayId || route.revision !== signed.revision
-                || route.expiresAt - route.updatedAt !== options.validitySeconds)
-                throw new StateConflictError('A route publication has an unknown result. Retry the original publication or resolve it first.');
-            if (!signed.pending) await updateStore(this.#store, queries, current => {
-                if (fingerprint(current.sets[1]![0]?.value) !== fingerprint(saved)) throw new StateConflictError('The unfinished route request changed.');
-                return { mutations: [putSignedRequest(method, { ...signed, pending: true })], result: undefined };
-            }, signal);
-            return { ...signed, pending: true };
-        }
-        const publicKey = signer.publicKey.slice();
-        if (signer.accountId !== this.accountId || !matchesAccount(this.accountId, publicKey)) throw new ProtocolError('invalid_identity', 'Account signer identity changed.');
-        let request: AccountRoute = { account: this.accountId, accountPublicKey: publicKey, relayId, revision: nextRevision(knownRevision, revision),
-            updatedAt: now, expiresAt: now + options.validitySeconds, accountSignature: new Uint8Array(64) };
-        requireSafeInteger(request.expiresAt, 0);
-        request = { ...request, accountSignature: (await signer.sign(routeAccountInput(request, this.context), signal)).slice() };
-        validateRoute(request, this.context, this.clock.nowSeconds());
-        const prepared: SignedRequest = { relayId, revision: request.revision, document: accountRouteCodec.encode(request), pending: true };
-        await updateStore(this.#store, queries, current => {
-            if (fingerprint(current.sets[0]![0]?.value) !== fingerprint(previous) || fingerprint(current.sets[1]![0]?.value) !== fingerprint(saved))
-                throw new StateConflictError('The route changed while it was being signed. Resolve current state before retrying.');
-            return { mutations: [putSignedRequest(method, prepared)], result: undefined };
-        }, signal);
-        return prepared;
+        }, signal), signal);
+        if (changed && attempt.background) attempt.deferNotification(() => this.#changed());
+        return route;
     }
     async #verifyRelay(route: AccountRoute, signal: AbortSignal): Promise<void> {
         validateRoute(route, this.context, this.clock.nowSeconds());
@@ -362,15 +375,18 @@ export class AccountManager extends ClientComponent {
             }
             const mutations: StoreMutation[] = [{ kind: 'put', ...routeKey(route.account), value: accountRouteCodec.encode(route) }];
             const signed = readSignedRequest(snapshot.sets[1]![0]?.value);
-            if (signed?.pending) {
+            if (signed?.pending && signed.document && (!signed.intent || isCurrentRequest(signed.requestState!))) {
                 const request = accountRouteCodec.decode(signed.document);
-                if (request.account === route.account && ['equivalent', 'newer'].includes(compareRoutes(route, request)))
-                    mutations.push(putSignedRequest(method, { ...signed, pending: false }));
+                if (request.account === route.account && ['equivalent', 'newer'].includes(compareRoutes(route, request))) {
+                    const { intent: _intent, ...settled } = signed;
+                    mutations.push(putSignedRequest(method, { ...settled, pending: false, nextAttemptAt: null }));
+                }
             }
             return { mutations, result: undefined };
         }, signal);
     }
-    protected override onStop(): Promise<void> { return this.#stopRefreshes(); }
+    protected override async onStart(): Promise<void> { this.#updates.start(this.runtimeSignal); }
+    protected override async onStop(): Promise<void> { await Promise.all([this.#updates.stop(), this.#stopRefreshes()]); }
     #stopRefreshes(): Promise<void> {
         return this.#stoppingRefreshes ??= Promise.resolve().then(async () => {
             const pending = [...this.#refreshes];
@@ -379,6 +395,6 @@ export class AccountManager extends ClientComponent {
         }).finally(() => { this.#refreshLifetime = createAbortController(); this.#stoppingRefreshes = undefined; });
     }
     protected override async onDispose(): Promise<void> {
-        await this.#stopRefreshes(); this.#routes.clear(); this.#events.clear();
+        await this.#updates.drain(); await this.#stopRefreshes(); this.#routes.clear(); this.#events.clear();
     }
 }

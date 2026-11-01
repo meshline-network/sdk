@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
-    AccountManager, NetworkContext, RelayClientPool, accountPublicKey, getAccountId, accountRouteCodec, canonicalJson, parseJson, requireObject,
+    AccountManager, StateUpdateSupersededError, NetworkContext, RelayClientPool, RelayError, accountPublicKey, getAccountId, accountRouteCodec, canonicalJson, parseJson, requireObject,
     relayDescriptorCodec, routeAccountInput, routeRelayInput, signAccount, type AccountRoute, type AccountSigner, type JsonObject, type RelayFetch,
 } from '@meshline/sdk';
 import { NodeSqliteStore } from '@meshline/storage-node';
@@ -93,8 +93,6 @@ test('unknown publication outcome survives restart and explicit retry sends the 
     expect((await first.pending())!.pending).toBe(true); expect(first.requests).toHaveLength(1);
     await first.manager.dispose(); await first.pool.dispose(); await first.store.dispose();
     const resumed = await fixture(first.store.path); await resumed.manager.initialize(); resumed.clock.wall += 25;
-    await expect(resumed.manager.publishRoute(resumed.descriptor.relayId, { validitySeconds: 7200 })).rejects.toThrow('unknown result');
-    expect(resumed.requests).toEqual([]);
     await resumed.manager.publishRoute(resumed.descriptor.relayId, { validitySeconds: 3600 });
     expect(resumed.requests).toEqual(first.requests); expect(resumed.routeSigns).toBe(0); expect((await resumed.pending())!.pending).toBe(false);
 });
@@ -107,10 +105,10 @@ test('resolving an accepted route settles a lost acknowledgement and later not_f
     expect(await f.manager.getRoute()).toEqual(route); expect(f.manager.route).toEqual(route);
 });
 
-test('definitive rejection retires the pending request and the next publication advances revision', async () => {
+test('definitive rejection pauses the pending intent and the next publication advances revision', async () => {
     const f = await fixture(); await f.manager.initialize(); f.behavior = 'reject';
     await expect(f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 })).rejects.toMatchObject({ code: 'forbidden' });
-    expect((await f.pending())!.pending).toBe(false); f.behavior = 'ok';
+    expect(await f.pending()).toMatchObject({ pending: true, requestState: 2, nextAttemptAt: null }); f.behavior = 'ok';
     expect((await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 7200 })).revision).toBe(1);
     expect(f.routeSigns).toBe(2);
 });
@@ -388,4 +386,50 @@ test('a pending route observer cannot conceal other observer failures or change 
         expect(f.manager.lastBackgroundError).toMatchObject({ operation: 'observer', resource: 'accountChanged', error: failures[1] });
         await f.manager.dispose(); expect(f.manager.lifecycleState).toBe('disposed');
     } finally { release(); }
+});
+
+
+test('new route intent replaces a call still waiting for account signing', async () => {
+    const f = await fixture(); await f.manager.initialize(); const entered = deferred(); const release = deferred(); let held = false;
+    f.signHook = async () => { if (!held) { held = true; entered.resolve(); await release.promise; } };
+    const old = f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 }); const superseded = expect(old).rejects.toBeInstanceOf(StateUpdateSupersededError);
+    try {
+        await entered.promise;
+        const latest = await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 7200 }); await superseded;
+        expect(latest.expiresAt - latest.updatedAt).toBe(7200); expect(f.requests).toHaveLength(1);
+        release.resolve(); await f.manager.dispose(); expect(f.manager.route).toEqual(latest);
+    } finally { release.resolve(); }
+});
+
+test('a new route lifetime replaces a timed out publication after restart', async () => {
+    const f = await fixture(); await f.manager.initialize(); f.behavior = 'lost';
+    await expect(f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 })).rejects.toThrow('lost');
+    const floor = f.route!.revision; await f.manager.dispose(); await f.pool.dispose(); await f.store.dispose();
+    const resumed = await fixture(f.store.path); await resumed.manager.initialize();
+    const latest = await resumed.manager.publishRoute(resumed.descriptor.relayId, { validitySeconds: 7200 });
+    expect(latest.revision).toBeGreaterThan(floor); expect(latest.expiresAt - latest.updatedAt).toBe(7200);
+    expect(resumed.requests).toHaveLength(1);
+});
+
+test('route replacement proceeds while an old conflict lookup waits, and invalid revisions do not supersede it', async () => {
+    const f = await fixture(); await f.manager.initialize(); await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 3600 });
+    const entered = deferred(); const release = deferred(); const previous = f.route;
+    f.resolveHook = async () => { entered.resolve(); await release.promise; return previous; };
+    const client = f.pool.clients.find(value => value.sessionMode === 'account')!; const original = client.requestHttp.bind(client); let rejected = false;
+    vi.spyOn(client, 'requestHttp').mockImplementation(async (...args) => {
+        if (args[1] === 'account.route.publish' && !rejected) { rejected = true; throw new RelayError({ code: 'stale_state', message: 'Refresh route' }); }
+        return original(...args);
+    });
+    const old = f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 7200 });
+    const superseded = expect(old).rejects.toBeInstanceOf(StateUpdateSupersededError);
+    try {
+        await entered.promise; const pending = await f.pending();
+        for (const revision of [-1, NaN, Number.MAX_SAFE_INTEGER + 1])
+            await expect(f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 7200, revision })).rejects.toThrow();
+        expect(await f.pending()).toEqual(pending);
+        const latest = await f.manager.publishRoute(f.descriptor.relayId, { validitySeconds: 10800 }); await superseded;
+        expect(latest.expiresAt - latest.updatedAt).toBe(10800);
+        release.resolve(); await f.manager.dispose();
+        expect(f.manager.route).toEqual(latest); expect((await f.pending())!.pending).toBe(false);
+    } finally { release.resolve(); }
 });

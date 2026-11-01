@@ -13,7 +13,8 @@
 | `submissionOutcomeUnknown` | A publication may have succeeded without a verified response | Retry explicit establishment with the original options and store; the SDK reconciles or reuses the saved request. |
 | Send returns but the peer has no message yet | The return is an outbox status, or background work is stopped | Start the client, inspect `getSendStatus`, and observe `sendStatusChanged`. |
 | Page does not show a new arrival | The reader holds a fixed snapshot | Dispose it and open a new reader. |
-| Profile edit or migration reports a conflict | An earlier request is uncertain or authoritative state changed | Let the original operation reconcile; inspect the current state before choosing another edit or target. |
+| A state update is superseded | A newer call for the same resource took over | Await the newer call; see [completion semantics](events-and-errors.md#cancellation-and-error-types). |
+| Migration reports a conflict | Authoritative state changed or an incompatible target is pending | Resume the original migration and inspect the current state before choosing another target. |
 | New device cannot decrypt old group messages | Historical secrets are unavailable on that device | Keep another authorized device running for key synchronization; recovery alone cannot recreate missing historical keys. |
 | Group approval does not complete a pending request | Approval does not verify the original candidate, or history/key processing failed | Keep the original store/protector, inspect background errors, and verify the correct application's approval. |
 | Expo cannot find `MeshlineRelaySocket` | Expo Go or an old native binary lacks the module | Rebuild the native app after installing the adapter. |
@@ -21,14 +22,14 @@
 | Browser relay traffic carries cookies | Ambient WebSocket policy or the known Windows WebKit fetch issue | Use a cookie-free relay origin and review [browser limits](../platforms.md#browser). |
 | Authentication stays rejected after a public request succeeds | A public request does not reauthorize the device | Check route/device authorization and establish a newly authenticated session. |
 | Synchronization is `blocked` | The latest pass could not complete | Inspect `blockReason` and `error`, correct the cause, and retry a [fresh pass](synchronization.md#run-a-foreground-pass). Missing group keys require key recovery. |
-| A request times out | An SDK-owned request deadline expired | Inspect `TimeoutError.operation`, `timeoutMilliseconds`, and `cause`; reconcile pending writes before retrying. See [error contracts](events-and-errors.md#cancellation-and-error-types). |
+| A request times out | An SDK-owned request deadline expired | Inspect `TimeoutError.operation`, `timeoutMilliseconds`, and `cause`; follow the operation's [recovery rules](events-and-errors.md#cancellation-and-error-types). |
 | Send wait ends without success | The send failed, was canceled, or its record is unavailable | Inspect the result: `failed`/`canceled` end waits; `undefined` means unknown or evicted. See [send waiting](direct-messages.md#wait-for-an-acceptance-milestone). |
 
 ## Resume without discarding state
 
-Keep the original database, secret protector, and pending operation IDs. Do not
-turn every failure into account recovery or a new send. Await shutdown when
-possible and resume against retained cursors and outbox records.
+Keep the original database and secret protector so the SDK can resume retained
+operations. Do not turn every failure into account recovery or a new send.
+Await shutdown when possible before reopening the store.
 
 HTTP polling can succeed while WebSocket notifications are unavailable. A connected
 socket or completed startup does not establish caught-up history; use

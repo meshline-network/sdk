@@ -1,3 +1,5 @@
+import { StateUpdateCoordinator, type StateUpdateAttempt } from './state-update-coordinator.js';
+import type { RecordKey, StoredRecord } from '../storage/store.js';
 import { relayLimits } from '../transport/discovery.js';
 import { systemRandom, verifyDevice, type RandomSource } from '../crypto/primitives.js';
 import { ProtocolError, StateConflictError } from '../errors.js';
@@ -14,7 +16,7 @@ import { certificateId } from '../models/identity.js';
 import { ChannelRepository, type ChannelChanges, type ChannelInfo, type ChannelOperation, type ChannelPostChange, type ChannelPostInfo, type ChannelReader } from '../channels/repository.js';
 import { snapshotReader } from '../messages/repository.js';
 import { nextRevision } from '../protocol/context.js';
-import { canonicalJson, requireObject, requireSafeInteger } from '../protocol/json.js';
+import { canonicalJson, requireObject, requireSafeInteger, type JsonObject } from '../protocol/json.js';
 import type { ResourceSyncStatus } from '../models/resource-sync.js';
 import { historyArguments, historySelection, type HistoryRange } from '../models/history.js';
 import { ResourceSyncTracker } from '../runtime/resource-sync.js';
@@ -46,7 +48,7 @@ export interface ChannelEvents {
 }
 interface Subscription { client: RelayClient; subscription: RelaySubscription; selected: Set<string>; detach: (() => void)[] }
 
-/** Public channels with verified historical permissions, durable exact requests and explicit runtime ownership. */
+/** Public channels with verified history, mutation permissions and durable publications. */
 export class ChannelManager extends ClientComponent {
     readonly #syncStatus = new ResourceSyncTracker(this.clock, status => this.#notify('syncStatusChanged', status));
     /** Performs a fresh descriptor/forward-timeline pass without requiring start() or changing follow state. */
@@ -59,6 +61,7 @@ export class ChannelManager extends ClientComponent {
         validateIdentifier('channel', channelId); return this.runOperation(async () => this.#syncStatus.get(channelId), signal);
     }
     readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #device: DeviceManager; readonly #random: RandomSource;
+    readonly #updates: StateUpdateCoordinator<ChannelInfo>;
     readonly #repository: ChannelRepository; readonly #writes = new AsyncGate(); readonly #events = new EventHub<ChannelEvents>();
     #readsStopping = false;
     readonly #descriptors = new Map<string, MetadataCache<ChannelDescriptor>>();
@@ -67,6 +70,17 @@ export class ChannelManager extends ClientComponent {
         super(options); for (const dependency of [options.relayClients, options.deviceManager]) if (dependency.accountId !== this.accountId || dependency.context.toString() !== this.context.toString()) throw new ProtocolError('invalid_context', 'Channel dependencies belong to another network or account.');
         this.#store = options.store; this.#pool = options.relayClients; this.#device = options.deviceManager; this.#random = options.random ?? systemRandom;
         this.#repository = new ChannelRepository(this.#store, this.context, this.accountId);
+        const owner = this;
+        this.#updates = new class extends StateUpdateCoordinator<ChannelInfo> {
+            protected readonly operation = 'channel.update';
+            protected readonly query = { collection: 'channel_operations' };
+            protected override readonly requestField = 'payload';
+            protected key(resource: string): RecordKey { return { collection: 'channel_operations', key: resource + '|channel.update' }; }
+            protected resource(row: StoredRecord): string { return String(row.value.channelId); }
+            protected create(resource: string, intent: JsonObject): JsonObject { return { method: this.operation, channelId: resource, relayId: intent.relayId! }; }
+            protected publish(attempt: StateUpdateAttempt<ChannelInfo>, signal: AbortSignal): Promise<ChannelInfo> { return owner.#publishLatest(attempt, signal); }
+            protected report(resource: string, error: unknown): void { owner.notifyBackgroundError({ operation: 'synchronize_channel', resource, error }); }
+        }(this.#store, this.clock);
     }
     on<K extends keyof ChannelEvents>(event: K, listener: EventListener<ChannelEvents[K]>): () => void { return this.#events.on(event, listener); }
     #notify<K extends keyof ChannelEvents>(event: K, value: ChannelEvents[K]): void { this.#events.notify(event, value, error => this.notifyBackgroundError({ operation: 'observer', resource: event, error })); }
@@ -178,15 +192,63 @@ export class ChannelManager extends ClientComponent {
             return this.#info(channel, scope);
         }, signal);
     }
+    /** Merges channel metadata with unfinished changes; a moderator list replaces the whole list. */
     updateChannel(channel: ChannelRef, update: ChannelUpdate, signal?: AbortSignal): Promise<ChannelInfo> {
-        channel = { ...channel }; validateChannelRef(channel); const copy = { ...update, ...(Array.isArray(update.moderators) ? { moderators: [...update.moderators] } : {}) };
-        if (copy.name === null) throw new TypeError('Channel name cannot be deleted.');
-        return this.runOperation(scope => this.#writes.run(async () => {
-            const relay = await this.#hosting(channel.relayId, scope); const current = (await this.#resolve(relay, channel, undefined, scope)).descriptor; this.#canWrite(current, true);
-            const { description, moderators, ...base } = current; const nextDescription = copy.description === undefined ? description : copy.description; const nextModerators = copy.moderators === undefined ? moderators : copy.moderators;
-            const payload = await this.#sign({ kind: 'descriptor', value: { ...base, name: copy.name ?? current.name, ...(nextDescription == null ? {} : { description: nextDescription }), ...(nextModerators == null ? {} : { moderators: nextModerators }), revision: nextRevision(current.revision), updatedAt: this.clock.nowSeconds() } }, scope);
-            const operation: ChannelOperation = { channel, method: 'channel.update', payload }; await this.#saveOperation(operation, scope); await this.#publishDescriptor(relay, operation, false, scope); return this.#info(channel, scope);
-        }, scope), signal);
+        channel = { ...channel }; validateChannelRef(channel);
+        const nonce = new Uint8Array(16);
+        const candidate: ChannelDescriptor = { channelId: deriveResourceId('channel', this.accountId, channel.relayId, nonce, this.context),
+            relayId: channel.relayId, creator: this.accountId, nonce, name: update.name ?? 'channel',
+            ...(update.description == null ? {} : { description: update.description }),
+            ...(update.moderators == null ? {} : { moderators: [...update.moderators] }),
+            revision: 0, status: 'active', createdAt: 0, updatedAt: 0, deviceSignature: new Uint8Array(64) };
+        if (update.name === null) throw new TypeError('Channel name cannot be deleted.');
+        validateChannelPayload({ kind: 'descriptor', value: candidate }, this.context);
+        const patch: JsonObject = { relayId: channel.relayId };
+        for (const field of ['name', 'description', 'moderators'] as const) if (update[field] !== undefined)
+            patch[field] = field === 'moderators' && update.moderators !== null ? [...update.moderators!] : update[field] as string | null;
+        return this.runOperation(scope => this.#updates.submit(channel.channelId, patch, scope), signal);
+    }
+    async #publishLatest(attempt: StateUpdateAttempt<ChannelInfo>, signal: AbortSignal): Promise<ChannelInfo> {
+        const channel = { channelId: attempt.resource, relayId: String(attempt.intent.relayId) };
+        const relay = await this.#hosting(channel.relayId, signal);
+        for (let retry = 0; ; retry++) {
+            await attempt.check(signal);
+            const resolved = await this.#resolve(relay, channel, undefined, signal);
+            const current = resolved.descriptor;
+            const retained = attempt.request && channelDescriptorCodec.decode(attempt.request);
+            if (retained && current.revision >= retained.revision) {
+                const accepted = retained.revision === current.revision ? resolved : await this.#resolve(relay, channel, retained.revision, signal);
+                if (channelDescriptorCodec.stringify(accepted.descriptor) === channelDescriptorCodec.stringify(retained))
+                    return this.#saveLatest(attempt, channel, resolved, signal);
+            }
+            this.#canWrite(current, true);
+            const wire = channelDescriptorCodec.encode(current);
+            for (const field of ['name', 'description', 'moderators']) {
+                if (!(field in attempt.intent)) continue;
+                if (attempt.intent[field] === null) delete wire[field]; else wire[field] = attempt.intent[field]!;
+            }
+            let descriptor: ChannelDescriptor;
+            if (retained && retained.revision === current.revision + 1 && ['name', 'description', 'moderators'].every(field =>
+                canonicalJson(attempt.request![field] ?? null) === canonicalJson(wire[field] ?? null))) descriptor = retained;
+            else descriptor = (await this.#sign({ kind: 'descriptor', value: { ...channelDescriptorCodec.decode(wire), revision: nextRevision(current.revision), updatedAt: this.clock.nowSeconds() } }, signal)).value;
+            const request = channelDescriptorCodec.encode(descriptor);
+            await attempt.saveRequest(request, {}, signal); await attempt.check(signal);
+            try { await relay.requestHttp('PUT', 'channel.update', request, { signal }); }
+            catch (error) {
+                if (error instanceof RelayError && error.isDefinitiveRejection) await attempt.reject(request);
+                if (retry < 2 && error instanceof RelayError && ['stale_state', 'state_conflict'].includes(error.code)) continue;
+                throw error;
+            }
+            return this.#saveLatest(attempt, channel, { descriptor, signerCertificate: this.#device.certificate }, signal);
+        }
+    }
+    async #saveLatest(attempt: StateUpdateAttempt<ChannelInfo>, channel: ChannelRef, result: ChannelResolveResult, signal: AbortSignal): Promise<ChannelInfo> {
+        await attempt.current(async () => {
+            const changed = await this.#repository.saveDescriptor(channel, result, undefined, signal);
+            await this.#loadDescriptor(channel, signal, this.clock.monotonicMilliseconds());
+            if (changed) attempt.deferNotification(() => this.#notify('channelChanged', changed));
+        }, signal);
+        return this.#info(channel, signal);
     }
     closeChannel(channel: ChannelRef, signal?: AbortSignal): Promise<void> {
         channel = { ...channel }; validateChannelRef(channel);
@@ -249,7 +311,7 @@ export class ChannelManager extends ClientComponent {
         channel = { ...channel }; validateChannelRef(channel); const changed = await this.runOperation(scope => this.#repository.follow(channel, false, scope), signal); if (changed) this.#notify('followChanged', { channel, isFollowed: false }); this.#pulse?.pulse();
     }
     getFollowed(relayId?: string, signal?: AbortSignal): Promise<QueryReader<ChannelInfo>> { if (relayId !== undefined) validateRelayId(relayId); return this.runOperation(async scope => snapshotReader((await this.#repository.followed(relayId, scope)).map(record => ({ ref: record.channel, isFollowed: record.isFollowed, ...(record.descriptor ? { descriptor: record.descriptor } : {}) }))), signal); }
-    protected override async onStart(): Promise<void> { void this.#device.certificate; this.#pulse = new AsyncPulse(); this.#jobs = [this.#refresh(this.runtimeSignal), this.#poll(this.runtimeSignal)]; this.#pulse.pulse(); }
+    protected override async onStart(): Promise<void> { void this.#device.certificate; this.#pulse = new AsyncPulse(); this.#jobs = [this.#refresh(this.runtimeSignal), this.#poll(this.runtimeSignal)]; this.#pulse.pulse(); this.#updates.start(this.runtimeSignal); }
     async #poll(signal: AbortSignal): Promise<void> { try { for (;;) { await this.clock.delay(30000, signal); this.#pulse?.pulse(); } } catch (error) { if (!signal.aborted) throw error; } }
     async #recover(signal: AbortSignal): Promise<void> {
         await this.#writes.run(async () => { for (const operation of await this.#repository.operations(signal)) {
@@ -315,5 +377,5 @@ export class ChannelManager extends ClientComponent {
         const errors = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected').map(value => value.reason);
         if (errors.length) throw new AggregateError(errors, 'Channel background processing failed.');
     }
-    protected override async onDispose(): Promise<void> { await Promise.all([...this.#descriptors.values()].map(cache => cache.stop(true))); this.#descriptors.clear(); this.#syncStatus.stop(true); this.#events.clear(); }
+    protected override async onDispose(): Promise<void> { await this.#updates.drain(); await Promise.all([...this.#descriptors.values()].map(cache => cache.stop(true))); this.#descriptors.clear(); this.#syncStatus.stop(true); this.#events.clear(); }
 }

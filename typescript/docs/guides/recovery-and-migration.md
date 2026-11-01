@@ -34,6 +34,7 @@ their protection material.
 The `recover` function in [workflows.ts](../../examples/workflows.ts) calls recovery
 on an initialized client, then starts it. Keep user authorization and account
 signer access in the application's recovery flow.
+Complete establishment, recovery or migration before issuing standalone state updates.
 
 Preserve pending signed requests after a lost response. Interruption does not
 prove rejection: a relay may already have accepted the request. Reopen with the

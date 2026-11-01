@@ -1,3 +1,4 @@
+import { canReuseRequest } from '../storage/state-publication.js';
 import { encryptMessage, decryptMessage } from '../crypto/messages.js';
 import { systemRandom, type RandomSource } from '../crypto/primitives.js';
 import { ProtocolError } from '../errors.js';
@@ -146,7 +147,7 @@ export class MessageManager extends ClientComponent {
         const remote = self ? own : accountDeviceStateCodec.decode(snapshot.sets[2]![0]?.value!); const now = this.clock.nowSeconds();
         validateDeviceState(own, this.context); validateDeviceState(remote, this.context);
         const pendingState = readSignedRequest(snapshot.sets.at(-1)![0]?.value);
-        if (pendingState?.pending && ['meshline.contact.consent', 'meshline.contact.grant'].includes(String(payload['$type'])))
+        if (pendingState?.pending && pendingState.document && canReuseRequest(pendingState.requestState!) && ['meshline.contact.consent', 'meshline.contact.grant'].includes(String(payload['$type'])))
             throw new ProtocolError('device_publication_pending', 'Reconcile pending device authorization before issuing contact grants.');
         if (route.account !== this.accountId || own.account !== this.accountId || remote.account !== recipient || route.expiresAt <= now) throw new ProtocolError('invalid_authorization', 'Message routing or device state is outside its account scope or validity.');
         authorizedDevice(own, certificateId(this.#device.certificate, this.context), this.context, now);

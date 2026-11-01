@@ -22,7 +22,8 @@ export async function publishAnnouncement(client: MeshlineClient, relayId: strin
 ```
 
 Channel creation accepts optional description and moderators.
-`updateChannel` changes metadata; `closeChannel` closes the channel.
+`updateChannel` changes metadata using the [state-update contract](events-and-errors.md#cancellation-and-error-types);
+`closeChannel` closes the channel.
 Mutation permissions depend on the verified channel state and the caller's role.
 
 In updates, omitted fields stay unchanged. `null` clears fields whose update type
@@ -54,7 +55,7 @@ Verified signed history governs descriptors, post edits, deletion, and historica
 permissions. Refresh stored snapshots after changes instead of assuming every
 notification is a newly created post.
 
-A lost response may leave an accepted publication pending locally. The SDK retains
+A lost response may leave an accepted post pending locally. The SDK retains
 the original signed request and reconciles verified history; known acceptance is
 not reposted. Inconsistent acceptance evidence remains a visible failure rather
 than causing a new publication. Keep pending state across restarts.
