@@ -153,9 +153,6 @@ public sealed class PushGatewayTests
         var submitted = Assert.Single(fixture.Relay.Requests, request => request.Method == "device.state.publish").Body;
         await fixture.ReopenAsync();
         Assert.Equal(updated.ToJson(), fixture.Client.Device!.ToJson());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Client.DeviceManager.RenewDeviceAsync(
-            new DeviceRenewalOptions { Validity = TimeSpan.FromDays(7), PushGateway = Gateway }, Token));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Client.DeviceManager.RenewDeviceAsync(TimeSpan.FromDays(7), Token));
         fixture.Relay.Handler = null;
 
         var result = await fixture.Client.DeviceManager.PublishDeviceStateAsync(fixture.Relay.RelayId, [updated], cancellationToken: Token);

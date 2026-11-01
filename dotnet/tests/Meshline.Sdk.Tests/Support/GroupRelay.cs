@@ -139,6 +139,12 @@ internal sealed class GroupRelay(TestClient fixture)
                 AddKeys();
                 return Accepted(request);
             case "group.update":
+                var properties = ProtocolModel.FromJson<GroupUpdate>(request.Body!)!;
+                var lastManagement = Events.Last(value => value.Payload is not GroupMessageEnvelope).Payload;
+                var expectedHash = "sha256:" + System.Buffers.Text.Base64Url.EncodeToString(SHA256.HashData(lastManagement.GetSigningInput(TestNetwork.Context)));
+                if (properties.PrevHash != expectedHash) return OfflineRelay.Error("state_conflict");
+                Append(properties);
+                return Accepted(request);
             case "group.role.update":
             case "group.member.ban":
             case "group.member.unban":

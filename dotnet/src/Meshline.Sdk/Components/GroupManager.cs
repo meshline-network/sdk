@@ -218,16 +218,17 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// Applies group metadata changes through a signed management-chain operation.
     /// </summary>
     /// <param name="group">The group identifier and hosting relay.</param>
-    /// <param name="update">The field assignments and deletions to apply; unspecified fields remain unchanged.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <param name="update">Field assignments and deletions. Omitted fields retain existing values and unfinished edits; later changes to the same field win.</param>
+    /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>The updated locally synchronized group information.</returns>
+    /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, or an earlier operation must be confirmed before proceeding. The group is not writable by this account or the required group history or secret is unavailable.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. No usable local device or session is available, the group is not writable by this account, or its verified management history is unavailable.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
-    /// <exception cref="InvalidDataException">Relay evidence or returned state is missing, inconsistent, or fails protocol validation. The management chain or requested membership, role, capacity, or actor authorization conflicts with verified group state.</exception>
+    /// <exception cref="InvalidDataException">Relay evidence or returned state is missing, inconsistent, or fails protocol validation. The management chain, requested capacity, or actor authorization conflicts with verified group state.</exception>
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     /// <exception cref="DecoderFallbackException">A relay response contains bytes that are not valid UTF-8.</exception>
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
@@ -235,13 +236,8 @@ public sealed partial class GroupManager(ClientOptions options, DatabaseOptions 
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails.</exception>
     /// <exception cref="NotSupportedException">The relay does not host groups, or the verified management history contains an unsupported operation.</exception>
     /// <exception cref="ArgumentException">A required group field is deleted, or the resulting signed update violates protocol constraints.</exception>
-    public Task<GroupInfo> UpdateGroupAsync(GroupRef group, ClientUpdate update, CancellationToken cancellationToken = default) => RunAsync(async token =>
-    {
-        if (update.Name.IsDeleted || update.MemberCapacity.IsDeleted || update.InvitePolicy.IsDeleted) throw new ArgumentException("The group name, member capacity, and invitation policy cannot be deleted.", nameof(update));
-        await ManageAsync(group, "group.update", state =>
-            new Models.Protocol.GroupUpdate { GroupId = group.GroupId, PrevHash = state.ManagementHash!, Name = update.Name, Description = update.Description, MemberCapacity = update.MemberCapacity, InvitePolicy = update.InvitePolicy, DeviceSignature = [] }, token).ConfigureAwait(false);
-        return await ReadGroupAsync(group, token).ConfigureAwait(false);
-    }, cancellationToken);
+    public Task<GroupInfo> UpdateGroupAsync(GroupRef group, ClientUpdate update, CancellationToken cancellationToken = default) =>
+        UpdateLatestGroupAsync(group, update, cancellationToken);
 
     /// <summary>
     /// Closes the group through a signed management-chain operation.

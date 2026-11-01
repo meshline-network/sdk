@@ -33,6 +33,7 @@ Lifecycle\-managed components and events for accounts, devices, profiles, contac
 | [MessageReceivedEventArgs](Meshline.Components.MessageReceivedEventArgs.md 'Meshline\.Components\.MessageReceivedEventArgs') | Contains direct messages received and committed to local storage\. |
 | [MessageSendStatusChangedEventArgs](Meshline.Components.MessageSendStatusChangedEventArgs.md 'Meshline\.Components\.MessageSendStatusChangedEventArgs') | Contains the updated state of a direct\-message outbox operation\. |
 | [ProfileManager](Meshline.Components.ProfileManager.md 'Meshline\.Components\.ProfileManager') | Resolves, verifies, caches, and publishes account profiles\. |
+| [StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException') | A newer state update has replaced a pending publication\. |
 
 | Enums | |
 | :--- | :--- |

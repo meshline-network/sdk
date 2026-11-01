@@ -153,7 +153,7 @@ sealed partial class AccountManager
     }
 
     /// <inheritdoc/>
-    protected override Task OnStopAsync() => StopRouteRefreshesAsync();
+    protected override Task OnStopAsync() => Task.WhenAll(_updates?.StopAsync() ?? Task.CompletedTask, StopRouteRefreshesAsync());
 
     Task StopRouteRefreshesAsync()
     {
@@ -186,6 +186,7 @@ sealed partial class AccountManager
     /// <inheritdoc/>
     protected override async ValueTask DisposeAsyncCore()
     {
+        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
         Task stopping;
         lock (_routeCacheGate)
         {

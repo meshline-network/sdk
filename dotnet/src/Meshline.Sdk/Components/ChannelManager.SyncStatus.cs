@@ -63,6 +63,7 @@ sealed partial class ChannelManager
     /// <inheritdoc/>
     protected override async ValueTask DisposeAsyncCore()
     {
+        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
         _syncStatus.Stop(OnSyncStatusChanged, resetAll: true);
         await StopDescriptorsAsync(dispose: true).ConfigureAwait(false);
         await base.DisposeAsyncCore().ConfigureAwait(false);

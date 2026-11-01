@@ -161,7 +161,7 @@ sealed partial class GroupManager
         var info = new GroupKeyRecoveryInfo
         {
             Group = group,
-            Request = ProtocolModel.FromJson<GroupMemberRecoveryRequest>(operation.RequestJson)!,
+            Request = ProtocolModel.FromJson<GroupMemberRecoveryRequest>(operation.RequestJson!)!,
             SignerCertificate = Certificate,
             AcceptedAt = DateTimeOffset.FromUnixTimeSeconds(result.AcceptedAt),
             ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(result.ExpiresAt)

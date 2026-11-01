@@ -150,6 +150,7 @@ sealed partial class DeviceManager
                 certificates.Add(certificate);
                 if (pending is not null)
                 {
+                    if (pending.DocumentJson is null) throw new DeviceStatePublicationException(DeviceStatePublicationFailure.PendingRequestConflict, "A newer device intent is awaiting preparation.");
                     stage = DeviceAuthorizationStage.Publishing;
                     var request = ProtocolModel.FromJson<AccountDeviceState>(pending.DocumentJson)!;
                     // Reuse only the exact pending operation for this authorization.

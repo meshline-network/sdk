@@ -45,7 +45,10 @@ public sealed class ContactPublicationTransactionTests
         Assert.DoesNotContain(fixture.Relay.Requests, value => value.Method == "device.state.publish");
         await using (var verify = fixture.Database.Open())
         {
-            Assert.False((await verify.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).Pending);
+            var publication = await verify.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token);
+            Assert.True(publication.Pending);
+            Assert.Null(publication.NextAttemptAt);
+            Assert.Equal(PublicationRequestState.None, publication.RequestState);
             Assert.Equal(request.MessageId, (await verify.ContactRequests.SingleAsync(Token)).MessageId);
         }
         // No barrier was committed: cancellation and the next removal can proceed.

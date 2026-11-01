@@ -575,7 +575,7 @@ public sealed class AccountEstablishmentTests
         {
             operationId = (await db.AccountEstablishments.SingleAsync(Token)).OperationId;
             prepared = await db.LocalDevices.SingleAsync(Token);
-            pending = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson;
+            pending = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson!;
         }
         var retries = Enumerable.Range(0, 3).Select(_ => fixture.Client.EstablishAccountAsync(cancellationToken: Token)).ToArray();
         Assert.All(retries, task => Assert.False(task.IsCompleted));

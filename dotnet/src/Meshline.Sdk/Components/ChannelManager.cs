@@ -55,6 +55,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
         await using var database = new MeshlineDbContext(databaseOptions);
         await EnsureDatabaseBindingAsync(database, cancellationToken).ConfigureAwait(false);
         await LoadDescriptorsAsync(database, cancellationToken).ConfigureAwait(false);
+        _ = Updates;
     }
 
     /// <summary>
@@ -144,12 +145,13 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// Publishes a new channel descriptor revision with the supplied field updates as the channel owner.
     /// </summary>
     /// <param name="channel">The channel identifier and hosting relay.</param>
-    /// <param name="update">The field assignments and deletions to apply; unspecified fields remain unchanged.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <param name="update">Field assignments and deletions. Omitted fields retain existing values and unfinished edits; later changes to the same field win.</param>
+    /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>The channel information after publishing the descriptor update.</returns>
+    /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The local device or its signing keys are unavailable, or no active relay can provide the required session. The channel is closed.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
@@ -160,34 +162,11 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// <exception cref="DbUpdateException">Persisting local changes fails, including database constraint or optimistic-concurrency failures.</exception>
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails.</exception>
     /// <exception cref="NotSupportedException">The hosting relay does not advertise channel hosting.</exception>
-    /// <exception cref="ArgumentException">The channel metadata, post content, or field update violates protocol constraints.</exception>
+    /// <exception cref="ArgumentException">A required channel field is deleted or a supplied property violates protocol constraints.</exception>
     /// <exception cref="UnauthorizedAccessException">The current account is not permitted to publish or modify this channel resource.</exception>
     /// <exception cref="OverflowException">Incrementing the known descriptor revision exceeds the range of a signed 64-bit integer.</exception>
-    public async Task<ChannelInfo> UpdateChannelAsync(ChannelRef channel, ChannelUpdate update, CancellationToken cancellationToken = default)
-    {
-        EnsureInitialized();
-        using var operation = BeginOperation(ref cancellationToken);
-        if (update.Name.IsDeleted) throw new ArgumentException("A channel name cannot be deleted.", nameof(update));
-        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var relay = await GetHostingRelayAsync(channel.RelayId, cancellationToken).ConfigureAwait(false);
-            var current = (await ResolveDescriptorAsync(relay, channel, null, cancellationToken).ConfigureAwait(false)).Descriptor;
-            EnsureCanWrite(current, ownerOnly: true);
-            var request = await SignAsync(current with
-            {
-                Name = update.Name.IsSpecified ? update.Name.Value : current.Name,
-                Description = update.Description.IsDeleted ? null : update.Description.IsSpecified ? update.Description.Value : current.Description,
-                Moderators = update.Moderators.IsDeleted ? null : update.Moderators.IsSpecified ? [.. update.Moderators.Value] : current.Moderators,
-                Revision = checked(current.Revision + 1),
-                UpdatedAt = Clock.UtcNow.ToUnixTimeSeconds()
-            }, cancellationToken).ConfigureAwait(false);
-            var pending = await SaveOperationAsync(channel.RelayId, channel.ChannelId, "channel.update", request, cancellationToken).ConfigureAwait(false);
-            await PublishDescriptorAsync(relay, channel, pending, request, request, recovering: false, cancellationToken).ConfigureAwait(false);
-            return await ReadChannelAsync(channel, cancellationToken).ConfigureAwait(false);
-        }
-        finally { _writeGate.Release(); }
-    }
+    public Task<ChannelInfo> UpdateChannelAsync(ChannelRef channel, ChannelUpdate update, CancellationToken cancellationToken = default) =>
+        UpdateLatestChannelAsync(channel, update, cancellationToken);
 
     /// <summary>
     /// Publishes a closed channel descriptor as the channel owner.
@@ -591,7 +570,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     {
         if (request.Validate(Context) is { } violation) throw new ArgumentException(violation.Message, nameof(request));
         await using var database = new MeshlineDbContext(databaseOptions);
-        if (await database.ChannelOperations.AnyAsync(value => value.RelayId == relayId && value.ResourceId == resource, cancellationToken).ConfigureAwait(false))
+        if (await database.ChannelOperations.AnyAsync(value => value.RelayId == relayId && value.ResourceId == resource && value.Method != "channel.update", cancellationToken).ConfigureAwait(false))
         {
             QueueRefresh();
             throw new InvalidOperationException("An earlier operation on this resource is unfinished. Start the component and let it recover before submitting a new operation.");
@@ -674,7 +653,6 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
             var httpMethod = operation.Method switch
             {
                 "channel.create" => HttpMethod.Post,
-                "channel.update" => HttpMethod.Put,
                 "channel.close" or "channel.post.delete" => HttpMethod.Delete,
                 "channel.post.edit" => HttpMethod.Patch,
                 _ => throw new InvalidDataException("The stored channel operation has an unexpected method.")

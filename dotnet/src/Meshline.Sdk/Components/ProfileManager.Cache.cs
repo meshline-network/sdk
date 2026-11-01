@@ -52,7 +52,7 @@ sealed partial class ProfileManager
             return result;
         }, error => ReportBackgroundError(BackgroundOperation.Synchronize, accountId, error), cancellationToken, force);
 
-    async Task SaveProfileAsync(ProfileResolveResult result, CancellationToken cancellationToken, long? publication = null, bool published = false)
+    async Task SaveProfileAsync(ProfileResolveResult result, CancellationToken cancellationToken, long? publication = null, bool published = false, bool notify = true)
     {
         var changed = false;
         await _profileSaveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -65,7 +65,7 @@ sealed partial class ProfileManager
             if (result.Profile.Account == AccountId) { changed = Profile?.ToJson() != result.Profile.ToJson(); Profile = result.Profile; }
         }
         finally { _profileSaveGate.Release(); }
-        if (changed) ProfileChanged?.Invoke(this, EventArgs.Empty);
+        if (changed && notify) ProfileChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Awaits profile refresh, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
@@ -86,7 +86,12 @@ sealed partial class ProfileManager
         finally { lock (_profileCacheGate) _profilesStopping = dispose; }
     }
     /// <inheritdoc/>
-    protected override Task OnStopAsync() => StopProfilesAsync();
+    protected override Task OnStopAsync() => Task.WhenAll(_updates?.StopAsync() ?? Task.CompletedTask, StopProfilesAsync());
     /// <inheritdoc/>
-    protected override async ValueTask DisposeAsyncCore() { await StopProfilesAsync(dispose: true).ConfigureAwait(false); await base.DisposeAsyncCore().ConfigureAwait(false); }
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
+        await StopProfilesAsync(dispose: true).ConfigureAwait(false);
+        await base.DisposeAsyncCore().ConfigureAwait(false);
+    }
 }

@@ -2543,19 +2543,22 @@ The group identifier and hosting relay\.
 
 `update` [GroupUpdate](Meshline.Models.Client.GroupUpdate.md 'Meshline\.Models\.Client\.GroupUpdate')
 
-The field assignments and deletions to apply; unspecified fields remain unchanged\.
+Field assignments and deletions\. Omitted fields retain existing values and unfinished edits; later changes to the same field win\.
 
 <a name='Meshline.Components.GroupManager.UpdateGroupAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.GroupUpdate,System.Threading.CancellationToken).cancellationToken'></a>
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that can cancel the operation\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[GroupInfo](Meshline.Models.Client.GroupInfo.md 'Meshline\.Models\.Client\.GroupInfo')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
 The updated locally synchronized group information\.
 
 #### Exceptions
+
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The caller cancels the operation or a component or relay lifetime ends\.
@@ -2564,7 +2567,7 @@ The caller cancels the operation or a component or relay lifetime ends\.
 An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. No usable local device or session is available, or an earlier operation must be confirmed before proceeding\. The group is not writable by this account or the required group history or secret is unavailable\.
+This component or a required component has not completed initialization\. No usable local device or session is available, the group is not writable by this account, or its verified management history is unavailable\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.
@@ -2576,7 +2579,7 @@ Relay discovery, authentication, or the HTTP request fails at the transport laye
 The relay rejects the operation with a structured protocol error that is not handled by this method\.
 
 [System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
-Relay evidence or returned state is missing, inconsistent, or fails protocol validation\. The management chain or requested membership, role, capacity, or actor authorization conflicts with verified group state\.
+Relay evidence or returned state is missing, inconsistent, or fails protocol validation\. The management chain, requested capacity, or actor authorization conflicts with verified group state\.
 
 [System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
 A stored or received protocol document cannot be serialized or deserialized\.

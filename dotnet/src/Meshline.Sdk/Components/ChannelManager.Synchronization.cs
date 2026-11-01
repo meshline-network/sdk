@@ -31,6 +31,8 @@ sealed partial class ChannelManager
         _refresh = RefreshFollowedAsync(RuntimeCancellationToken);
         _poll = PollFollowedAsync(RuntimeCancellationToken);
         QueueRefresh();
+        cancellationToken.ThrowIfCancellationRequested();
+        Updates.Start(RuntimeCancellationToken);
         return Task.CompletedTask;
     }
 
@@ -38,6 +40,8 @@ sealed partial class ChannelManager
     protected override async Task OnStopAsync()
     {
         List<Exception> failures = [];
+        try { if (_updates is { } updates) await updates.StopAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
         try { await Task.WhenAll(_refresh, _poll, StopDescriptorsAsync()).ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
         _refresh = _poll = Task.CompletedTask;
@@ -157,12 +161,12 @@ sealed partial class ChannelManager
         {
             List<ChannelOperationRecord> operations;
             await using (var database = new MeshlineDbContext(databaseOptions))
-                operations = await database.ChannelOperations.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+                operations = await database.ChannelOperations.AsNoTracking().Where(value => value.Method != "channel.update").ToListAsync(cancellationToken).ConfigureAwait(false);
             foreach (var operation in operations)
             {
                 try
                 {
-                    var request = ProtocolModel.FromJson<TypedProtocolModel>(operation.DocumentJson)!;
+                    var request = ProtocolModel.FromJson<TypedProtocolModel>(operation.DocumentJson!)!;
                     var relay = await GetHostingRelayAsync(operation.RelayId, cancellationToken).ConfigureAwait(false);
                     if (request is ChannelDescriptor descriptor)
                     {

@@ -47,7 +47,7 @@ sealed class ChannelPostRecord
 }
 
 [Table("ChannelOperations"), PrimaryKey(nameof(RelayId), nameof(ResourceId), nameof(Method))]
-sealed class ChannelOperationRecord
+sealed class ChannelOperationRecord : IStatePublication
 {
     [MaxLength(42)]
     public required string RelayId { get; set; }
@@ -55,5 +55,12 @@ sealed class ChannelOperationRecord
     public required string ResourceId { get; set; }
     [MaxLength(32)]
     public required string Method { get; set; }
-    public required string DocumentJson { get; set; }
+    public string? DocumentJson { get; set; }
+    public string? IntentJson { get; set; }
+    [ConcurrencyCheck]
+    public long Generation { get; set; }
+    public PublicationRequestState RequestState { get; set; } = PublicationRequestState.Prepared;
+    public bool Pending { get; set; } = true;
+    public DateTimeOffset? NextAttemptAt { get; set; }
+    string? IStatePublication.RequestJson { get => DocumentJson; set => DocumentJson = value; }
 }

@@ -37,6 +37,8 @@ internal sealed class ChannelRelay(TestClient fixture)
             case "channel.create":
             case "channel.update":
                 var update = ProtocolModel.FromJson<ChannelDescriptor>(request.Body!)!;
+                if (request.Method == "channel.update" && update.Revision != Descriptors.Keys.DefaultIfEmpty(-1).Max() + 1)
+                    return OfflineRelay.Error("state_conflict");
                 Descriptors[update.Revision] = update;
                 Append(update);
                 return Accepted();

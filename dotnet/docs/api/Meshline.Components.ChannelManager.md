@@ -1192,19 +1192,22 @@ The channel identifier and hosting relay\.
 
 `update` [ChannelUpdate](Meshline.Models.Client.ChannelUpdate.md 'Meshline\.Models\.Client\.ChannelUpdate')
 
-The field assignments and deletions to apply; unspecified fields remain unchanged\.
+Field assignments and deletions\. Omitted fields retain existing values and unfinished edits; later changes to the same field win\.
 
 <a name='Meshline.Components.ChannelManager.UpdateChannelAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.ChannelUpdate,System.Threading.CancellationToken).cancellationToken'></a>
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that can cancel the operation\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ChannelInfo](Meshline.Models.Client.ChannelInfo.md 'Meshline\.Models\.Client\.ChannelInfo')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
 The channel information after publishing the descriptor update\.
 
 #### Exceptions
+
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The caller cancels the operation or a component or relay lifetime ends\.
@@ -1213,7 +1216,7 @@ The caller cancels the operation or a component or relay lifetime ends\.
 An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\. The channel is closed, a previous operation is unfinished, or the accepted post or expected descriptor revision is no longer available\.
+This component or a required component has not completed initialization\. The local device or its signing keys are unavailable, or no active relay can provide the required session\. The channel is closed\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.
@@ -1246,7 +1249,7 @@ The local device key cannot be validated against its certificate, or cryptograph
 The hosting relay does not advertise channel hosting\.
 
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
-The channel metadata, post content, or field update violates protocol constraints\.
+A required channel field is deleted or a supplied property violates protocol constraints\.
 
 [System\.UnauthorizedAccessException](https://learn.microsoft.com/en-us/dotnet/api/system.unauthorizedaccessexception 'System\.UnauthorizedAccessException')<br>
 The current account is not permitted to publish or modify this channel resource\.

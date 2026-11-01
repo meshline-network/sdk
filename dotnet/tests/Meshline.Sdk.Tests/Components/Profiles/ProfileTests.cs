@@ -43,7 +43,7 @@ public sealed class ProfileTests
         {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
             var published = await manager.UpdateProfileAsync(new() { Nickname = "after" }, Token);
-            Assert.Equal(previous.UpdatedAt, published.UpdatedAt);
+            Assert.True(published.UpdatedAt > previous.UpdatedAt);
             Assert.Equal("after", (await manager.GetProfileAsync(cancellationToken: Token))!.Nickname);
         }
         finally { release.TrySetResult(); }
@@ -87,7 +87,7 @@ public sealed class ProfileTests
     }
 
     [Fact]
-    public async Task Profile_unknown_result_retries_the_identical_signed_payload()
+    public async Task Profile_unknown_result_is_replaced_and_the_latest_signed_payload_survives_restart()
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
@@ -106,13 +106,17 @@ public sealed class ProfileTests
 
         var first = fixture.Relay.Requests.Single(r => r.Method == "profile.publish").Body;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Client.ProfileManager.UpdateProfileAsync(new() { Nickname = "Bob" }, Token));
+        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.Client.ProfileManager.UpdateProfileAsync(new() { Nickname = "Bob", Bio = "retained" }, Token));
+        var latest = fixture.Relay.Requests.Last(r => r.Method == "profile.publish").Body;
+        Assert.NotEqual(first, latest);
 
         fail = false;
 
         await fixture.ReopenAsync();
-        await fixture.Client.ProfileManager.UpdateProfileAsync(new() { Nickname = "Alice" }, Token);
+        var result = await fixture.Client.ProfileManager.UpdateProfileAsync(new(), Token);
 
-        Assert.All(fixture.Relay.Requests.Where(r => r.Method == "profile.publish"), r => Assert.Equal(first, r.Body));
+        Assert.Equal(latest, fixture.Relay.Requests.Last(r => r.Method == "profile.publish").Body);
+        Assert.Equal("Bob", result.Nickname);
+        Assert.Equal("retained", result.Bio);
     }
 }

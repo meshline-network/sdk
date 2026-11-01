@@ -25,16 +25,22 @@ sealed class AccountProfileRecord
 }
 
 [Table("SignedRequests")]
-sealed class SignedRequestRecord
+sealed class SignedRequestRecord : IStatePublication
 {
     [Key, MaxLength(128)]
     public required string Method { get; set; }
     [MaxLength(42)]
     public required string RelayId { get; set; }
-    public required string DocumentJson { get; set; }
+    public string? DocumentJson { get; set; }
     [MaxLength(64)]
     public string? OperationKey { get; set; }
     [ConcurrencyCheck]
     public long Revision { get; set; }
     public bool Pending { get; set; }
+    public string? IntentJson { get; set; }
+    [ConcurrencyCheck]
+    public long Generation { get; set; }
+    public PublicationRequestState RequestState { get; set; } = PublicationRequestState.Prepared;
+    public DateTimeOffset? NextAttemptAt { get; set; }
+    string? IStatePublication.RequestJson { get => DocumentJson; set => DocumentJson = value; }
 }

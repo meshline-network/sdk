@@ -53,7 +53,12 @@ An interactive UI can request one page at a time instead of exhausting history i
 
 ## Manage a channel
 
-`UpdateChannelAsync` changes descriptor fields. `EditPostAsync` and `DeletePostAsync` take a `ChannelPostRef`, which identifies the actual post. `ReportPostAsync` submits a reason for a post report. Relay authorization and validation still apply; the existence of a method does not grant moderation privileges to every caller.
+`UpdateChannelAsync` changes descriptor fields as the channel owner, following the
+shared [completion and retry rules](events-and-errors.md#cancellation-and-error-types).
+The moderator list is replaced as a whole. `EditPostAsync` and `DeletePostAsync` take
+a `ChannelPostRef`; posts, edits, deletion and reports remain independent operations.
+`ReportPostAsync` submits a reason for a post report. Relay authorization and validation
+still apply; the existence of a method does not grant moderation privileges to every caller.
 
 `CloseChannelAsync` closes the channel and is distinct from unfollowing. Public channel content has different privacy properties from encrypted direct messages and groups. Applications must account for relay retention and deletion semantics when displaying historical posts; a local cache is not proof that a post is still retrievable from the network.
 

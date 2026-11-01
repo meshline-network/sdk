@@ -86,7 +86,7 @@ public sealed class AccountEstablishmentStepTests
         string signed;
         await using (var db = fixture.Database.Open())
         {
-            signed = (await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token)).DocumentJson;
+            signed = (await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token)).DocumentJson!;
             await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_setup BEFORE INSERT ON AccountEstablishment BEGIN SELECT RAISE(ABORT, 'unexpected setup'); END;", Token);
         }
         fixture.Relay.Handler = null;
@@ -167,7 +167,7 @@ public sealed class AccountEstablishmentStepTests
             Assert.Equal(boundary == "accepted-route" ? AccountEstablishmentStep.EnsuringRoute : AccountEstablishmentStep.AuthorizingDevice, setup.Step);
             operationId = setup.OperationId;
             prepared = await db.LocalDevices.SingleAsync(Token);
-            publication = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson;
+            publication = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson!;
             Assert.Equal(operationId, (await db.DevicePreparations.SingleAsync(Token)).ActivatedOperationId);
             Assert.False(await db.DevicePreparations.AnyAsync(value => value.OperationId != null, Token));
             await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_step;", Token);

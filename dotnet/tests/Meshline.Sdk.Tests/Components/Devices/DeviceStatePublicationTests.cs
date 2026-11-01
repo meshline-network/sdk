@@ -42,9 +42,6 @@ public sealed class DeviceStatePublicationTests
         var signer = new RecordingSigner(fixture.Account);
         await using var client = new MeshlineClient(fixture.Relay.Options(fixture.Account), fixture.Database.Options, fixture.Pool, fixture.Protector, signer);
         await client.InitializeAsync(Token);
-        // A different complete list must not displace an unresolved signed request.
-        await Assert.ThrowsAsync<InvalidOperationException>(() => client.DeviceManager.PublishDeviceStateAsync(fixture.Relay.RelayId, [], cancellationToken: Token));
-
         var retried = await client.DeviceManager.PublishDeviceStateAsync(fixture.Relay.RelayId, [certificate], cancellationToken: Token);
 
         Assert.Equal(DeviceStatePublishStatus.Staged, retried.Status);
@@ -69,7 +66,7 @@ public sealed class DeviceStatePublicationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Only_definitive_rejection_finishes_a_failed_publication(bool expiredStaging)
+    public async Task Rejection_invalidates_the_request_but_preserves_the_latest_intent(bool expiredStaging)
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
@@ -87,7 +84,10 @@ public sealed class DeviceStatePublicationTests
             await Assert.ThrowsAsync<RelayException>(() => fixture.Client.DeviceManager.PublishDeviceStateAsync(fixture.Relay.RelayId, [fixture.Client.Device!], cancellationToken: Token));
 
         await using var db = fixture.Database.Open();
-        Assert.Equal(expiredStaging, (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).Pending);
+        var publication = await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token);
+        Assert.True(publication.Pending);
+        Assert.NotNull(publication.IntentJson);
+        Assert.Equal(expiredStaging ? PublicationRequestState.Prepared : PublicationRequestState.Rejected, publication.RequestState);
         Assert.Equal(previous, (await db.DeviceStates.SingleAsync(Token)).DocumentJson);
         Assert.Equal(previous, fixture.Client.DeviceState!.ToJson());
     }

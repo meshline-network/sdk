@@ -52,7 +52,7 @@ sealed partial class DeviceManager
             throw new DeviceStatePublicationException(DeviceStatePublicationFailure.StateChanged,
                 "A newer or conflicting device state was observed before publication.");
         var signed = await database.SignedRequests.AsNoTracking().SingleOrDefaultAsync(value => value.Method == "device.state.publish", cancellationToken).ConfigureAwait(false);
-        var pending = signed is { Pending: true }
+        var pending = signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded }
             ? ProtocolModel.FromJson<AccountDeviceState>(signed.DocumentJson)! : null;
         var retryPending = pending is not null && signed!.RelayId == relayId && pending.Revision == revision
             && MatchesCertificates(pending, certificates);
@@ -71,7 +71,7 @@ sealed partial class DeviceManager
                 throw new DeviceStatePublicationException(DeviceStatePublicationFailure.StateChanged,
                     "A newer or conflicting device state was observed while signing the publication.");
             signed = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "device.state.publish", cancellationToken).ConfigureAwait(false);
-            if (signed is { Pending: true } && signed.Revision > basis
+            if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && signed.Revision > basis
                 && (signed.RelayId != relayId || signed.DocumentJson != request.ToJson()))
                 throw new DeviceStatePublicationException(DeviceStatePublicationFailure.PendingRequestConflict,
                     "A different device-state submission is still unresolved. Reconcile it before changing its intent.");
@@ -99,7 +99,7 @@ sealed partial class DeviceManager
         IReadOnlyList<DeviceCertificate> certificates, long revision, CancellationToken cancellationToken)
     {
         var signer = accountSigner ?? throw new InvalidOperationException("An account signer is required to publish device state.");
-        var request = signed is { Pending: true } && signed.RelayId == relayId && signed.Revision == revision
+        var request = signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && signed.RelayId == relayId && signed.Revision == revision
             ? ProtocolModel.FromJson<AccountDeviceState>(signed.DocumentJson)! : null;
         if (request is null || !MatchesCertificates(request, certificates))
         {
@@ -119,10 +119,10 @@ sealed partial class DeviceManager
     }
 
     static async Task<SignedRequestRecord> SaveDeviceStatePublicationAsync(MeshlineDbContext database, SignedRequestRecord? signed,
-        string relayId, AccountDeviceState request, CancellationToken cancellationToken, string? operationKey = null)
+        string relayId, AccountDeviceState request, CancellationToken cancellationToken, string? operationKey = null, long? generation = null)
     {
         var json = request.ToJson();
-        if (signed is { Pending: true } && signed.RelayId == relayId && signed.DocumentJson == json) return signed;
+        if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && signed.RelayId == relayId && signed.DocumentJson == json && (generation is null || signed.Generation == generation && signed.RequestState == PublicationRequestState.Prepared)) return signed;
         if (signed is null)
         {
             signed = new() { Method = "device.state.publish", RelayId = relayId, DocumentJson = json, Revision = request.Revision, Pending = true, OperationKey = operationKey };
@@ -136,15 +136,17 @@ sealed partial class DeviceManager
             signed.Pending = true;
             signed.OperationKey = operationKey;
         }
+        signed.RequestState = PublicationRequestState.Prepared;
         await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return signed;
     }
 
     async Task<DeviceStatePublishResult> SubmitDeviceStatePublicationAsync(MeshlineDbContext database, SignedRequestRecord signed,
-        AccountDeviceState request, CancellationToken cancellationToken, bool classifySubmissionFailure = false)
+        AccountDeviceState request, CancellationToken cancellationToken, bool classifySubmissionFailure = false, StateUpdateAttempt? attempt = null)
     {
         DeviceStatePublishResponse response;
         var relayClient = await relayClients.GetAsync(signed.RelayId, accountSigner!, cancellationToken).ConfigureAwait(false);
+        if (attempt is not null) await attempt.CheckAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             try
@@ -153,8 +155,16 @@ sealed partial class DeviceManager
             }
             catch (RelayException exception) when (exception.Error.IsDefinitiveRejection())
             {
-                signed.Pending = false;
-                await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+                async Task RejectAsync()
+                {
+                    signed.Pending = false;
+                    await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                if (attempt is null) await RejectAsync().ConfigureAwait(false);
+                else
+                {
+                    await attempt.CurrentAsync(() => StateUpdateJson.RejectAsync(databaseOptions, "device.state.publish", request.ToJson()), CancellationToken.None).ConfigureAwait(false);
+                }
                 if (classifySubmissionFailure && !IsDeviceStateConflict(exception))
                     throw new DeviceAuthorizationException(DeviceAuthorizationFailure.PublicationRejected,
                         "The relay rejected device authorization.", exception);
@@ -163,8 +173,7 @@ sealed partial class DeviceManager
             DateTimeOffset? stagedUntil = response.StagedUntil is { } seconds ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null;
             if (response.Status == DeviceStatePublishStatus.Accepted)
             {
-                await SaveDeviceStateAsync(request, cancellationToken).ConfigureAwait(false);
-                CacheDeviceState(request, Clock.UtcNow);
+                await SaveDeviceStateAsync(request, cancellationToken, attempt, published: true).ConfigureAwait(false);
             }
             else if (stagedUntil is null || stagedUntil <= Clock.UtcNow)
                 throw new InvalidDataException("The relay returned a missing or expired staging interval.");

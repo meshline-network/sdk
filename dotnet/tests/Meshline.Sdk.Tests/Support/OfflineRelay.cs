@@ -214,6 +214,8 @@ internal sealed class OfflineRelay : HttpMessageHandler, IRelayRegistry
                 if (profileSigner.Account != publishedProfile.Account
                     || !Org.BouncyCastle.Math.EC.Rfc8032.Ed25519.Verify(publishedProfile.DeviceSignature.AsSpan(), profileSigner.SigningPublicKey.AsSpan(), publishedProfile.GetSigningInput(Context)))
                     return Error("invalid_signature");
+                if (Profiles.TryGetValue(publishedProfile.Account, out var previousProfile) && previousProfile.Profile.UpdatedAt > publishedProfile.UpdatedAt)
+                    return Error("stale_state");
                 Profiles[publishedProfile.Account] = new()
                 {
                     Profile = publishedProfile,

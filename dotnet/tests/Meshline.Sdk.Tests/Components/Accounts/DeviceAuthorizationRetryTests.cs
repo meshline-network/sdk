@@ -100,7 +100,7 @@ public sealed class DeviceAuthorizationRetryTests
         string signed;
         await using (var db = fixture.Database.Open())
         {
-            signed = (await db.SignedRequests.SingleAsync(row => row.Method == "device.state.publish", Token)).DocumentJson;
+            signed = (await db.SignedRequests.SingleAsync(row => row.Method == "device.state.publish", Token)).DocumentJson!;
             if (unfinishedSetup)
             {
                 db.AccountEstablishments.Add(new() { OperationId = Guid.NewGuid(), RelayId = fixture.Relay.RelayId });
@@ -219,7 +219,7 @@ public sealed class DeviceAuthorizationRetryTests
         byte[] encryptionKey;
         await using (var db = fixture.Database.Open())
         {
-            pending = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson;
+            pending = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson!;
             var local = await db.LocalDevices.SingleAsync(Token);
             signingKey = await fixture.Protector.UnprotectAsync(local.ProtectedSigningKey,
                 $"Meshline/device-signing/v1/{TestNetwork.Context}/{fixture.Account.AccountId}/{local.DeviceId}", Token);

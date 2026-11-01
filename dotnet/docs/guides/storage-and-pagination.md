@@ -15,8 +15,13 @@ Schema migrations are applied explicitly. Use the SDK migration entry point inst
 `ResumableAccountEstablishment` upgrades `InitialCreate` while retaining device
 keys, pending signed publications and history. Intermediate development schemas
 and incomplete setup records from older workflow formats are outside this upgrade
-path. Current operations retain their protected keys, saved intent and exact pending
-requests across restarts; a checkpoint never replaces current authorization checks.
+path. The latest-state publication schema targets fresh databases and does not
+backfill publications from older development schemas; see the [schema maintenance
+policy](../../../MAINTENANCE.md#database-schema-changes).
+
+Operations retain protected keys, pending work and retry schedules across restarts.
+Use SDK APIs to resume or replace work; do not edit internal records. Persisted intent
+and checkpoints do not replace authorization checks or relay confirmation.
 
 Use one active client per database and transfer ownership only after disposal; see
 [lifecycle](lifecycle.md#session-order). Retain the database, device keys and

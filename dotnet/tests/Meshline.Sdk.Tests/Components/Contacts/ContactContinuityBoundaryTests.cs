@@ -125,7 +125,7 @@ public sealed class ContactContinuityBoundaryTests
             await Assert.ThrowsAsync<HttpRequestException>(() => removal);
             string pendingRequest;
             await using (var database = fixture.Database.Open())
-                pendingRequest = (await database.SignedRequests.SingleAsync(value => value.Method == "device.state.publish" && value.Pending, Token)).DocumentJson;
+                pendingRequest = (await database.SignedRequests.SingleAsync(value => value.Method == "device.state.publish" && value.Pending, Token)).DocumentJson!;
             await fixture.ReopenAsync();
             await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Client.MessageManager.AddContactAsync(peer.AccountId, cancellationToken: Token));
             fixture.Relay.Handler = null;

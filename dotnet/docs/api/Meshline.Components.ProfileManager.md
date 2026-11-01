@@ -196,7 +196,7 @@ The requested account uses an unsupported namespace\.
 
 ## ProfileManager\.PublishProfileAsync\(AccountProfile, CancellationToken\) Method
 
-Republishes the newest available profile for this account, including an optional supplied snapshot\.
+Republishes the newest available profile for this account, retaining unfinished field changes\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountProfile?> PublishProfileAsync(Meshline.Models.Protocol.AccountProfile? profile=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -213,13 +213,16 @@ An optional profile snapshot for this account to consider alongside cached state
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that can cancel the operation\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountProfile](Meshline.Models.Protocol.AccountProfile.md 'Meshline\.Models\.Protocol\.AccountProfile')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
 The republished profile, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') if no profile was available to publish\.
 
 #### Exceptions
+
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The caller cancels the operation or a component or relay lifetime ends\.
@@ -228,7 +231,7 @@ The caller cancels the operation or a component or relay lifetime ends\.
 An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\. A pending profile publication conflicts with the requested content\.
+This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.
@@ -258,7 +261,7 @@ Persisting local changes fails, including database constraint or optimistic\-con
 The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\.
 
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
-The profile belongs to another account, a required public\-discovery field is deleted, or the resulting profile fails validation\.
+The supplied profile belongs to another account or fails protocol validation\.
 
 <a name='Meshline.Components.ProfileManager.RefreshProfileAsync(string,System.Threading.CancellationToken)'></a>
 
@@ -346,19 +349,22 @@ public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountProfile> Upda
 
 `update` [ProfileUpdate](Meshline.Models.Client.ProfileUpdate.md 'Meshline\.Models\.Client\.ProfileUpdate')
 
-The field assignments and deletions to apply; unspecified fields remain unchanged\.
+Field assignments and deletions\. Omitted fields retain existing values and unfinished edits; later changes to the same field win\.
 
 <a name='Meshline.Components.ProfileManager.UpdateProfileAsync(Meshline.Models.Client.ProfileUpdate,System.Threading.CancellationToken).cancellationToken'></a>
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that can cancel the operation\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountProfile](Meshline.Models.Protocol.AccountProfile.md 'Meshline\.Models\.Protocol\.AccountProfile')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
 The signed profile published after applying the updates\.
 
 #### Exceptions
+
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The caller cancels the operation or a component or relay lifetime ends\.
@@ -367,7 +373,7 @@ The caller cancels the operation or a component or relay lifetime ends\.
 An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\. A pending profile publication conflicts with the requested content\.
+This component or a required component has not completed initialization\. The account has no resolvable home route or a usable device\-authenticated session cannot be established\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.
@@ -397,7 +403,7 @@ Persisting local changes fails, including database constraint or optimistic\-con
 The local device key cannot be validated against its certificate, or cryptographic signing or verification fails\.
 
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
-The profile belongs to another account, a required public\-discovery field is deleted, or the resulting profile fails validation\.
+The required public\-discovery field is deleted or a supplied profile field fails validation\.
 ### Events
 
 <a name='Meshline.Components.ProfileManager.ProfileChanged'></a>

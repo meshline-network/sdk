@@ -5,12 +5,95 @@ using Meshline.Storage;
 using Meshline.Tests.Support;
 using Meshline.Transport;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 namespace Meshline.Tests.Components.Accounts;
 
 public sealed class EnsureRouteTests
 {
     static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Foreground_ensure_notifies_once_and_can_publish_again_from_its_callback(bool publishAgain)
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync(false);
+        await fixture.Client.EstablishAccountAsync(new() { RouteValidity = TimeSpan.FromSeconds(1) }, Token);
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(2));
+        var manager = fixture.Client.AccountManager;
+        var original = manager.Route!;
+        var changes = new List<AccountRoute>();
+        AccountRoute? callbackRoute = null;
+        manager.AccountChanged += (_, _) =>
+        {
+            if (manager.State != AccountState.Established || manager.Route!.Revision <= original.Revision) return;
+            changes.Add(manager.Route);
+            if (publishAgain && changes.Count == 1)
+                callbackRoute = manager.PublishRouteAsync(fixture.Relay.RelayId, TimeSpan.FromDays(8), cancellationToken: Token)
+                    .WaitAsync(TimeSpan.FromSeconds(5), Token).GetAwaiter().GetResult();
+        };
+
+        var result = await manager.EnsureRouteAsync(fixture.Relay.RelayId, TimeSpan.FromDays(7), Token);
+
+        Assert.Equal(publishAgain ? 2 : 1, changes.Count);
+        Assert.Equal(original.Revision + 1, changes[0].Revision);
+        Assert.Equal(manager.Route!.ToJson(), result.ToJson());
+        if (publishAgain) Assert.Equal(callbackRoute!.ToJson(), result.ToJson());
+        await using var database = fixture.Database.Open();
+        Assert.False((await database.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token)).Pending);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Background_route_retry_raises_account_changed_after_ensure_failure(bool reopen, bool accepted)
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync(false);
+        await fixture.Client.EstablishAccountAsync(new() { RouteValidity = TimeSpan.FromSeconds(1) }, Token);
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(2));
+        fixture.Relay.Handler = (request, _) =>
+        {
+            if (request.Method == "account.route.publish")
+            {
+                if (accepted) fixture.Relay.Respond(request).Dispose();
+                throw new TimeoutException("route publication outcome is unknown");
+            }
+            return Task.FromResult(fixture.Relay.Respond(request));
+        };
+        var failure = await Assert.ThrowsAsync<AccountRouteException>(() => fixture.Client.AccountManager.EnsureRouteAsync(
+            fixture.Relay.RelayId, TimeSpan.FromDays(7), Token));
+        Assert.Equal(AccountRouteFailure.SubmissionUnknown, failure.Failure);
+        string requestJson;
+        await using (var database = fixture.Database.Open())
+            requestJson = (await database.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token)).DocumentJson!;
+
+        if (reopen) await fixture.ReopenAsync();
+        fixture.Relay.Handler = null;
+        fixture.Relay.Requests.Clear();
+        var manager = fixture.Client.AccountManager;
+        var changes = new ConcurrentQueue<AccountRoute>();
+        manager.AccountChanged += (_, _) => changes.Enqueue(manager.Route!);
+        await manager.StartAsync(Token);
+        await AsyncTest.UntilAsync(() => fixture.Relay.Clock.HasTimerDueWithin(TimeSpan.FromSeconds(1)));
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(1));
+        await AsyncTest.UntilAsync(async () =>
+        {
+            await using var database = fixture.Database.Open();
+            return !(await database.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token)).Pending;
+        });
+        // Drain the publisher as well as its caller before checking notifications.
+        await fixture.Client.DisposeAsync();
+
+        Assert.Equal(requestJson, Assert.Single(fixture.Relay.Requests, value => value.Method == "account.route.publish").Body);
+        Assert.Equal(manager.Route!.ToJson(), Assert.Single(changes).ToJson());
+    }
 
     [Theory]
     [InlineData(false)]
@@ -200,12 +283,13 @@ public sealed class EnsureRouteTests
     }
 
     [Fact]
-    public async Task Waiting_for_publication_rechecks_route_expiry_and_serializes_concurrent_ensures()
+    public async Task Concurrent_ensures_take_over_an_unfinished_publication_without_waiting_for_its_response()
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
         await fixture.InitializeAsync(false);
         await fixture.Client.EstablishAccountAsync(new() { RouteValidity = TimeSpan.FromSeconds(1) }, Token);
+        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(2));
         var entered = AsyncTest.Signal();
         var release = AsyncTest.Signal();
         var publications = 0;
@@ -219,20 +303,17 @@ public sealed class EnsureRouteTests
             }
             return fixture.Relay.Respond(request);
         };
-        var publishing = fixture.Client.AccountManager.PublishRouteAsync(fixture.Relay.RelayId, TimeSpan.FromDays(7), cancellationToken: Token);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
-        var ensuring = Enumerable.Range(0, 4).Select(_ => fixture.Client.AccountManager.EnsureRouteAsync(
-            fixture.Relay.RelayId, TimeSpan.FromDays(7), Token)).ToArray();
-        Assert.All(ensuring, task => Assert.False(task.IsCompleted));
-        // Expire the retained route while the ensure calls wait on the gate.
-        fixture.Relay.Clock.Advance(TimeSpan.FromSeconds(2));
-        release.TrySetResult();
-        await Assert.ThrowsAsync<RelayException>(() => publishing);
-        var routes = await Task.WhenAll(ensuring).WaitAsync(TimeSpan.FromSeconds(10), Token);
-
-        Assert.All(routes, route => Assert.True(route.ExpiresAt > Clock.UtcNow.ToUnixTimeSeconds()));
-        Assert.All(routes, route => Assert.Equal(fixture.Client.Route!.ToJson(), route.ToJson()));
-        Assert.Equal(2, publications);
+        var publishing = fixture.Client.AccountManager.EnsureRouteAsync(fixture.Relay.RelayId, TimeSpan.FromDays(7), Token);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            var route = await fixture.Client.AccountManager.EnsureRouteAsync(fixture.Relay.RelayId, TimeSpan.FromDays(8), Token).WaitAsync(TimeSpan.FromSeconds(5), Token);
+            await Assert.ThrowsAsync<StateUpdateSupersededException>(() => publishing);
+            Assert.Equal((long)TimeSpan.FromDays(8).TotalSeconds, route.ExpiresAt - route.UpdatedAt);
+            Assert.Equal(fixture.Client.Route!.ToJson(), route.ToJson());
+            Assert.Equal(2, publications);
+        }
+        finally { release.TrySetResult(); }
     }
 
     [Fact]

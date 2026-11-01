@@ -96,6 +96,12 @@ the cached own device revision and preserves existing outbox requests. TypeScrip
 establishes the same baseline in existing JSON contact records during initialization.
 Notifications that older versions failed to enqueue cannot be recovered during migration.
 
+The .NET `LatestStatePublications` migration adds durable intent and retry state to
+the existing publication tables. It targets fresh databases without backfilling older
+publications. Preserve generation checks when changing publication writes; the row
+contract is defined by [IStatePublication](dotnet/src/Meshline.Sdk/Storage/IStatePublication.cs)
+and [PublicationRequestState](dotnet/src/Meshline.Sdk/Storage/PublicationRequestState.cs).
+
 ## Account establishment
 
 The [account establishment guide](dotnet/docs/guides/account-establishment.md)
@@ -178,10 +184,11 @@ draft is pending. Renewal keeps the original identity and keys. Any key-access
 failure preserves all records; partial permanent loss is outside the supported
 all-retained-or-all-absent local-data contract.
 
-Before device mutation, read complete verified state directly from the original
+Before device authorization in setup, read complete verified state directly from the original
 relay. Apply only the local add/renew and explicit remove intent, and publish at the
 observed revision plus one. Conflicts reread and merge within a bounded retry loop.
-Only `Pending` requests are replayable; preserve their exact signed content and
+Reuse a pending request only when its request state permits replay and its signed
+content still matches the intended certificates and relay preconditions; preserve
 certificate ordering. Reconcile an unknown publication before renewing an expired
 certificate. Reconciliation does not consume the conflict retry budget, and an
 accepted expired certificate is not successful authorization. If renewal expires
@@ -194,12 +201,14 @@ the newly established session. Recovery and relay migration use their own revisi
 rules but share device preparation/publication and final authorization checks.
 
 `EnsureRouteAsync` derives bootstrap, renewal and replay from verified routes and
-signed requests. Discovery runs outside the publication gate; revision selection
-and submission share the explicit publication gate. Recheck expiry after acquiring
-it and preserve newer state published by discovery callbacks. A valid route without
+signed requests. Discovery runs outside the ensure gate; local decisions recheck
+retained state under that gate. The state coordinator then durably admits publication
+and guards results by generation. Signing and transport do not hold either gate.
+Preserve newer state published by discovery callbacks. A valid route without
 unfinished work needs no network read or signer.
 
-Unexpired unknown route submissions retain the exact document. After discovery,
+Unexpired unknown route submissions reuse the exact document while it matches the
+latest relay and validity; a new validity can supersede it. After discovery,
 an expired request can be superseded on the same relay only with retained verified
 original-route evidence. Choose a revision above both route and saved request;
 retain that floor even if a successor is rejected. A saved request revision or a

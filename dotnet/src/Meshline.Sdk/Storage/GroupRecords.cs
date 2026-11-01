@@ -96,11 +96,17 @@ sealed class GroupEventRecord
 }
 
 [Table("GroupOperations"), PrimaryKey(nameof(GroupId), nameof(Method))]
-sealed class GroupOperationRecord
+sealed class GroupOperationRecord : IStatePublication
 {
     public required string GroupId { get; set; }
     public required string Method { get; set; }
-    public required string RequestJson { get; set; }
+    public string? RequestJson { get; set; }
+    public string? IntentJson { get; set; }
+    [ConcurrencyCheck]
+    public long Generation { get; set; }
+    public PublicationRequestState RequestState { get; set; } = PublicationRequestState.Prepared;
+    public bool Pending { get; set; } = true;
+    public DateTimeOffset? NextAttemptAt { get; set; }
 }
 
 [Table("GroupRotations")]

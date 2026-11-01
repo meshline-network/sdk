@@ -1,3 +1,4 @@
+using Meshline.Storage;
 using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Tests.Support;
@@ -54,7 +55,7 @@ public sealed class ExpiredRouteRecoveryTests
         }
         string saved;
         await using (var db = fixture.Database.Open())
-            saved = (await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token)).DocumentJson;
+            saved = (await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token)).DocumentJson!;
         fixture.Relay.Handler = null;
         await fixture.ReopenAsync();
         fixture.Relay.Requests.Clear();
@@ -97,7 +98,9 @@ public sealed class ExpiredRouteRecoveryTests
         {
             var rejected = await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token);
             Assert.Equal(2, rejected.Revision);
-            Assert.False(rejected.Pending);
+            Assert.True(rejected.Pending);
+            Assert.NotNull(rejected.IntentJson);
+            Assert.Equal(PublicationRequestState.Rejected, rejected.RequestState);
         }
         fixture.Relay.Clock.Advance(TimeSpan.FromMinutes(6));
         fixture.Relay.Handler = null;

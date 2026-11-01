@@ -23,6 +23,8 @@ Paths in the table and code references below are relative to `tests/Meshline.Sdk
 | `Components/Groups/` | Group workflows, membership, admission, invitations, rotation, recovery and persisted-ciphertext vector recovery. |
 | `Components/Channels/` | Channel lifecycle, signed projections, history and recovery. |
 | `Components/Lifecycle/` | Component start/stop, cancellation, draining and background errors. |
+| `Components/StateUpdateCoordinatorTests.cs` | Shared state admission, merging, retry scheduling, cancellation and durable recovery. |
+| `Components/LatestStateUpdateTests.cs` | Route/device publication and shared-route discovery through manager APIs. |
 | `ClockScopeTests.cs` | The SDK's shared clock scope, nesting and execution-flow isolation. |
 | `Support/` | Reusable setup and scripted peers; contains no test classes. |
 | `Conformance/` | Native adapters for the shared SDK behavior scenarios. |
@@ -50,6 +52,8 @@ Choose the layer by the behavior under test, not by whether its input happens to
 
 `OfflineRelay` and `MemorySocket` exercise actual transport code without network I/O. `GroupRelay` and `ChannelRelay` provide domain scripts. Their state is per test; avoid shared mutable fixtures or a universal scenario framework.
 
+`TestStateUpdateCoordinator` scripts shared admission and retry behavior against SQLite; protocol behavior belongs in manager tests.
+
 ## Regression ownership
 
 Split independent contracts into separately initialized cases, even when they share preparation. History range validation, caller mutation, snapshot behavior, restart continuation and overload compatibility have separate tests. Keep dependent transaction/recovery sequences together so the test still proves atomicity or continuity.
@@ -62,6 +66,10 @@ restart and successful retry together prove resumability.
 
 | Contract | Test owners |
 | --- | --- |
+| Shared state admission, replacement and retry recovery | `Components/StateUpdateCoordinatorTests`, `Components/LatestStateUpdateTests` |
+| Profile merging, publication ordering and confirmed cache state | `Components/Profiles/LatestProfileTests` |
+| Group property updates against concurrent management history | `Components/Groups/LatestGroupTests` |
+| Channel descriptor updates and concurrent history/cache refreshes | `Components/Channels/LatestChannelTests` |
 | Public setup scenarios, options, retained/new installation, selection and failure details | `Accounts/AccountEstablishmentTests` |
 | Durable steps and replay after failed checkpoints | `Accounts/AccountEstablishmentStepTests` |
 | Validity through profile publication and workflow cleanup | `Accounts/AccountEstablishmentCompletionTests` |
@@ -72,20 +80,20 @@ restart and successful retry together prove resumability.
 | Device publication reconciliation and certificate renewal | `Accounts/DeviceAuthorizationRetryTests`, `Devices/DeviceStatePublicationTests` |
 | Handoff between standalone device operations and account setup | `Devices/DeviceAuthorizationIntegrationTests` |
 | Replacement proposals, interrupted choice checkpoints and revocation | `Accounts/DeviceReplacementTests` |
-| Route bootstrap, renewal, conflict discovery and expired-request evidence | `Accounts/AccountRouteAuthorizationTests`, `Accounts/AccountRouteRetryTests`, `Accounts/EnsureRouteTests`, `Accounts/ExpiredRouteRecoveryTests` |
+| Route bootstrap, renewal, conflict discovery, notifications and expired-request evidence | `Accounts/AccountRouteAuthorizationTests`, `Accounts/AccountRouteRetryTests`, `Accounts/EnsureRouteTests`, `Accounts/ExpiredRouteRecoveryTests` |
 | Explicit recovery and migration | `Accounts/MigrationTests`, `Accounts/DevicePublicationBoundaryTests` |
 | Device activation and renewal through the shared pool | `Accounts/DeviceSessionBindingTests` |
 | Pool reuse, certificate binding and session retirement | `Transport/RelayClientPoolTests` |
 | Session expiry, reauthentication and cancellation | `Transport/RelayAuthenticationTests` |
-| Runtime suspension, socket drainage and shutdown failures | `Accounts/RevokedDeviceRuntimeTests`, `Lifecycle/LifecycleTests` |
+| Runtime suspension, socket drainage and shutdown failures | `Accounts/RevokedDeviceRuntimeTests`, `Lifecycle/LifecycleTests`, `Components/Lifecycle/StateUpdateLifecycleTests` |
 | Contact continuity and atomic publication | `Contacts/ContactAuthorizationContinuityTests`, `Contacts/ContactContinuityBoundaryTests`, `Contacts/ContactPublicationTransactionTests` |
 | Background grant supplementation and delivery | `Contacts/BackgroundContactAuthorizationTests` |
 | Device-state notification delivery and recovery | `Contacts/DeviceStateNotificationTests` |
-| Standalone mutation serialization and signing without holding the database writer | `Devices/DeviceMutationConcurrencyTests` |
+| Concurrent device mutations, cold keys, session retirement and signing outside the database writer | `Devices/DeviceMutationConcurrencyTests` |
 | Push gateway creation, renewal keep/set/remove, local persistence, session rebinding and publication replay | `Devices/PushGatewayTests` |
 | Gateway intent, retained declarations, recovery and interrupted device preparation | `Accounts/PushGatewayEstablishmentTests` |
 | Push certificate signing, identity and URL validation | `Protocol/PushCertificateTests` |
-| Fresh schema, direct upgrade from `InitialCreate` and gateway intent migration preserving unfinished setup | `Storage/DatabaseTests` |
+| Fresh schemas, supported upgrades and durable publication recovery | `Storage/DatabaseTests`, `Storage/LatestStateMigrationTests` |
 
 Preserve these boundary assertions when reorganizing cases:
 

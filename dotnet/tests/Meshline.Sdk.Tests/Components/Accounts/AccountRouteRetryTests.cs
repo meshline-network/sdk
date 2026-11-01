@@ -126,7 +126,7 @@ public sealed class AccountRouteRetryTests
             await using (var db = fixture.Database.Open())
             {
                 var submitted = await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token);
-                var proposed = ProtocolModel.FromJson<AccountRoute>(submitted.DocumentJson)!;
+                var proposed = ProtocolModel.FromJson<AccountRoute>(submitted.DocumentJson!)!;
                 winner = proposed with { Revision = proposed.Revision + 1, AccountSignature = [] };
                 winner = fixture.Relay.SignRoute(winner with { AccountSignature = [.. fixture.Account.Sign(winner.GetAccountSigningInput(TestNetwork.Context))] });
                 fixture.Relay.Routes[fixture.Account.AccountId] = winner;

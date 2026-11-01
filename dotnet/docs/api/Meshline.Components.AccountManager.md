@@ -133,7 +133,7 @@ public Meshline.Components.AccountState State { get; }
 
 ## AccountManager\.EnsureRouteAsync\(string, TimeSpan, CancellationToken\) Method
 
-Ensures a valid route to the same home relay, reconciling unfinished publications before reporting success\.
+Ensures a valid home\-relay route, reconciling any unfinished publication\.
 
 ```csharp
 public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountRoute> EnsureRouteAsync(string relayId, System.TimeSpan validity, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
@@ -144,28 +144,31 @@ public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountRoute> Ensure
 
 `relayId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
 
-The original or initial home relay's canonical identifier; this operation never selects another relay\.
+The original or initial home relay's canonical identifier\.
 
 <a name='Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken).validity'></a>
 
 `validity` [System\.TimeSpan](https://learn.microsoft.com/en-us/dotnet/api/system.timespan 'System\.TimeSpan')
 
-The lifetime of a newly published route, from one second through 3650 days\. Existing valid routes are retained; unfinished requests require their original lifetime\.
+The lifetime of a newly published route, from one second through 3650 days\. Existing valid routes are retained; a changed lifetime replaces an unfinished request\.
 
 <a name='Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken).cancellationToken'></a>
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that cancels waiting or publication\. Cancellation does not undo an accepted request; repeat the operation to reconcile it\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountRoute](Meshline.Models.Protocol.AccountRoute.md 'Meshline\.Models\.Protocol\.AccountRoute')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
-The verified, unexpired route after any unfinished publication has been reconciled\.
+The verified, unexpired home route\.
 
 #### Exceptions
 
 [AccountRouteException](Meshline.Components.AccountRouteException.md 'Meshline\.Components\.AccountRouteException')<br>
-Route authorization could not complete\. The reason distinguishes signing, relay, parameter, state and unknown\-submission failures\.
+Route authorization could not complete\. The reason distinguishes signing, relay, state and unknown\-submission failures\.
+
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
 
 [System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
 The relay identifier is invalid\.
@@ -186,12 +189,8 @@ Initialization is incomplete or no active relay is available\.
 Local publication state cannot be committed\.
 
 ### Remarks
-An unexpired verified route with no unresolved publication is reused without network I/O or signing\.<br>
-Before publication, discovery must complete successfully\. A missing response does not invalidate an unexpired retained route\.<br>
-Unexpired unfinished submissions retain their original signed document\. After discovery, an expired request can be superseded only with a retained verified route to the same relay; an initial request alone does not establish that relay's authority\.<br>
-First publication requires authoritative or unexpired staged device state at the relay; use MeshlineClient\.EstablishAccountAsync for complete setup\.<br>
-This operation does not authorize a device, initialize a profile, migrate relays, or start synchronization\.<br>
-Use one account manager per local account session; explicit publications and ensure calls share its publication gate\.
+Reuses an unexpired verified route when no publication is pending; otherwise discovery must succeed before publication\.<br>
+First publication requires accepted or unexpired staged device state\. Use [EstablishAccountAsync\(AccountEstablishmentOptions, CancellationToken\)](Meshline.MeshlineClient.md#Meshline.MeshlineClient.EstablishAccountAsync(Meshline.Models.Client.AccountEstablishmentOptions,System.Threading.CancellationToken) 'Meshline\.MeshlineClient\.EstablishAccountAsync\(Meshline\.Models\.Client\.AccountEstablishmentOptions, System\.Threading\.CancellationToken\)') for complete account setup\.
 
 <a name='Meshline.Components.AccountManager.GetRouteAsync(string,System.Threading.CancellationToken)'></a>
 
@@ -302,13 +301,16 @@ Whether to select a recovery revision when no revision is supplied\.
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that can cancel the operation\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[AccountRoute](Meshline.Models.Protocol.AccountRoute.md 'Meshline\.Models\.Protocol\.AccountRoute')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
 The published route with the relay's verified signature\.
 
 #### Exceptions
+
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The caller cancels the operation or a component or relay lifetime ends\.
@@ -317,7 +319,7 @@ The caller cancels the operation or a component or relay lifetime ends\.
 An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. An account signer is unavailable, the relay is not active, or an unresolved publication would be replaced by different input\.
+This component or a required component has not completed initialization\. An account signer is unavailable or the relay is not active\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.

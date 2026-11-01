@@ -16,9 +16,9 @@ database ownership.
 | Operation | Meaning |
 | --- | --- |
 | `InitializeAsync` | Load local state once. A failed initialization leaves the component uninitialized so its cause can be corrected before retrying. |
-| `StartAsync` | Start component background work after authorization checks. Completion does not wait for WebSocket readiness or prove that all history has synchronized. |
+| `StartAsync` | Start component background work and resume durable retries after authorization checks. Completion does not wait for pending publications, WebSocket readiness or history synchronization. |
 | `StopAsync` | Stop background processing and drain pending refreshes, including those triggered by reads before start or after a previous stop. It drains runtime device sessions and preserves the database for a later session. |
-| `DisposeAsync` | End the component lifetime, release owned resources, and drain active work. A disposed component cannot be reused. |
+| `DisposeAsync` | End the component lifetime, release owned resources, and drain active work, including superseded attempts and cancellation callbacks. A disposed component cannot be reused. |
 
 Observe `LifecycleState` and `StateChanged` for lifecycle changes. Pass cancellation tokens to awaited operations. Shutdown itself must still be awaited when the application's ordinary operation token is canceled; the examples call `StopAsync` without that canceled token.
 
@@ -48,7 +48,8 @@ including startup waiting for account establishment. Concurrent disposals share
 cancellation and serialize cleanup. Always await disposal: cancellation alone does
 not mean active work has drained. After an error, `Disposed` is terminal and repeated
 disposal is harmless; if resource cleanup failed before reaching that state, correct
-the cause and retry disposal. New tracked operations remain blocked.
+the cause and retry disposal. A signer, key store or transport that ignores cancellation
+can delay disposal. New tracked operations remain blocked.
 
 ## Reopen an authorized device
 

@@ -33,6 +33,7 @@ sealed partial class GroupManager
         messageManager.EnsureInitialized();
         await using var database = new MeshlineDbContext(databaseOptions);
         await EnsureDatabaseBindingAsync(database, cancellationToken).ConfigureAwait(false);
+        _ = Updates;
     }
 
     /// <inheritdoc/>
@@ -59,6 +60,8 @@ sealed partial class GroupManager
         _refresh = RefreshGroupsAsync(RuntimeCancellationToken);
         _poll = PollGroupsAsync(RuntimeCancellationToken);
         Wake();
+        cancellationToken.ThrowIfCancellationRequested();
+        Updates.Start(RuntimeCancellationToken);
     }
 
     /// <inheritdoc/>
@@ -66,6 +69,8 @@ sealed partial class GroupManager
     {
         messageManager.TimelineChanged -= OnAccountTimelineChanged;
         List<Exception> failures = [];
+        try { if (_updates is { } updates) await updates.StopAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
         try { await Task.WhenAll(_refresh, _poll).ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
         _refresh = _poll = Task.CompletedTask;
@@ -142,7 +147,7 @@ sealed partial class GroupManager
     async Task RecoverOperationsAsync(CancellationToken cancellationToken)
     {
         await using var database = new MeshlineDbContext(databaseOptions);
-        var operations = await database.GroupOperations.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var operations = await database.GroupOperations.AsNoTracking().Where(value => value.Method != "group.update").ToListAsync(cancellationToken).ConfigureAwait(false);
         foreach (var operation in operations)
         {
             try

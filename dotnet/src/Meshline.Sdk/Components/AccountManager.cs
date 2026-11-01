@@ -1,6 +1,5 @@
 using Meshline.Identity;
 using Meshline.Interactions;
-using Meshline.Models;
 using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Models.Registry;
@@ -74,6 +73,7 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
             var entry = GetRouteEntry(cached.Account);
             CacheRoute(entry, cached);
         }
+        _ = Updates;
     }
 
     /// <summary>
@@ -121,11 +121,12 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
     /// <param name="validity">The validity duration, from one second through 3650 days.</param>
     /// <param name="revision">An explicit newer revision, or <see langword="null"/> for automatic revision selection.</param>
     /// <param name="isRecovery">Whether to select a recovery revision when no revision is supplied.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>The published route with the relay's verified signature.</returns>
+    /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. An account signer is unavailable, the relay is not active, or an unresolved publication would be replaced by different input.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. An account signer is unavailable or the relay is not active.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
@@ -137,118 +138,8 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
     /// <exception cref="CryptographicException">The account signer produced a route whose identity or account signature is invalid, or signature verification fails.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The route validity is outside one second through 3650 days, or the selected revision is not a newer nonnegative safe integer.</exception>
     /// <exception cref="ArgumentException">The relay identifier is invalid or the account signer belongs to another account.</exception>
-    public async Task<AccountRoute> PublishRouteAsync(string relayId, TimeSpan validity, long? revision = null, bool isRecovery = false, CancellationToken cancellationToken = default)
-    {
-        EnsureInitialized();
-        using var operation = BeginOperation(ref cancellationToken);
-        if (validity < TimeSpan.FromSeconds(1) || validity > TimeSpan.FromDays(3650))
-            throw new ArgumentOutOfRangeException(nameof(validity));
-        if (accountSigner is null)
-            throw new InvalidOperationException("An account signer is required to publish an account route.");
-        await _publicationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        (AccountRoute Route, bool Changed) result;
-        try { result = await PublishRouteCoreAsync(relayId, validity, revision, isRecovery, cancellationToken).ConfigureAwait(false); }
-        finally { _publicationGate.Release(); }
-        if (result.Changed) AccountChanged?.Invoke(this, EventArgs.Empty);
-        return result.Route;
-    }
-
-    // Callers hold the publication gate through revision selection and submission.
-    async Task<(AccountRoute Route, bool Changed)> PublishRouteCoreAsync(string relayId, TimeSpan validity,
-        long? revision, bool isRecovery, CancellationToken cancellationToken, bool retryRejected = false, bool classifySubmissionFailure = false)
-    {
-        var signer = accountSigner ?? throw new InvalidOperationException("An account signer is required to publish an account route.");
-        AccountRoute result;
-        bool changed;
-        await using var database = new MeshlineDbContext(databaseOptions);
-        var signed = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "account.route.publish", cancellationToken).ConfigureAwait(false);
-        var known = await database.AccountRoutes.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false);
-        // Expired attempts can be superseded after discovery. Keep every saved
-        // revision as a floor even after rejection; a predecessor may be unknown.
-        var expiredRejection = retryRejected && signed is { Pending: false }
-            && ProtocolModel.FromJson<AccountRoute>(signed.DocumentJson)!.ExpiresAt <= Clock.UtcNow.ToUnixTimeSeconds();
-        var knownRevision = Math.Max(known?.Revision ?? -1, signed?.Revision ?? -1);
-        var pending = signed is { Pending: true } ? ProtocolModel.FromJson<AccountRoute>(signed.DocumentJson)! : null;
-        if (isRecovery && revision is null && (pending is null || signed!.RelayId != relayId || pending.ExpiresAt <= Clock.UtcNow.ToUnixTimeSeconds()))
-            revision = Math.Max(knownRevision + 1, Clock.UtcNow.ToUnixTimeMilliseconds());
-        else if (revision is null && pending is not null && signed!.RelayId == relayId && pending.ExpiresAt <= Clock.UtcNow.ToUnixTimeSeconds())
-            revision = AccountRoute.GetNextRevision(null, knownRevision);
-        AccountRoute request;
-        if (signed is not null && (signed.Pending || retryRejected && !expiredRejection) && (revision is null || revision == signed.Revision))
-        {
-            request = ProtocolModel.FromJson<AccountRoute>(signed.DocumentJson)!;
-            if (signed.RelayId != relayId || revision is { } specified && specified != request.Revision || request.ExpiresAt - request.UpdatedAt != (long)validity.TotalSeconds)
-                throw new InvalidOperationException("A route publication has an unknown result. Retry the original publication or resolve the account route first.");
-            if (!signed.Pending)
-            {
-                signed.Pending = true;
-                await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        else
-        {
-            var next = AccountRoute.GetNextRevision(revision, knownRevision);
-            var now = Clock.UtcNow.ToUnixTimeSeconds();
-            request = new AccountRoute { Account = AccountId, AccountPublicKey = signer.PublicKey, Revision = next, RelayId = relayId, UpdatedAt = now, ExpiresAt = checked(now + (long)validity.TotalSeconds), AccountSignature = [] };
-            request = request with { AccountSignature = [.. await signer.SignAsync(request.GetAccountSigningInput(Context), cancellationToken).ConfigureAwait(false)] };
-            if (request.Validate(Context) is { } violation)
-                throw new CryptographicException(violation.Message);
-            if (signed is null)
-            {
-                signed = new SignedRequestRecord { Method = "account.route.publish", RelayId = relayId, DocumentJson = request.ToJson(), Revision = next, Pending = true };
-                database.SignedRequests.Add(signed);
-            }
-            else
-            {
-                signed.RelayId = relayId;
-                signed.DocumentJson = request.ToJson();
-                signed.Revision = next;
-                signed.Pending = true;
-            }
-            await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-        var relayClient = await relayClients.GetAsync(relayId, signer, cancellationToken).ConfigureAwait(false);
-        try
-        {
-            try
-            {
-                result = await relayClient.SendHttpAsync<AccountRoute>(HttpMethod.Put, "account.route.publish", request, cancellationToken: cancellationToken).ConfigureAwait(false);
-            }
-            catch (RelayException exception) when (exception.Error.IsDefinitiveRejection())
-            {
-                signed.Pending = false;
-                await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
-                throw;
-            }
-            if ((result with { RelaySignature = null }).ToJson() != request.ToJson())
-                throw new InvalidDataException("The relay modified the submitted route instead of only adding its signature.");
-            await VerifyRouteRelayAsync(result, cancellationToken).ConfigureAwait(false);
-            await _routeSaveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                await SaveRouteAsync(result, cancellationToken).ConfigureAwait(false);
-                lock (_routeCacheGate)
-                {
-                    var entry = GetRouteEntry(AccountId);
-                    entry.Publication++;
-                    entry.RefreshAfter = Clock.UtcNow + RouteFreshness;
-                    changed = CacheRoute(entry, result);
-                }
-            }
-            finally { _routeSaveGate.Release(); }
-            return (result, changed);
-        }
-        catch (Exception exception) when (classifySubmissionFailure
-            && (exception is HttpRequestException or TimeoutException or RelayException or InvalidDataException or CryptographicException
-                || exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
-            && (exception is not RelayException relay || !relay.Error.IsDefinitiveRejection()))
-        {
-            // Signing and session acquisition precede this boundary. Only failures
-            // after sending the publication can leave its relay outcome unknown.
-            throw new AccountRouteException(AccountRouteFailure.SubmissionUnknown,
-                "The route publication outcome is unknown. Retry with the retained signed request.", exception);
-        }
-    }
+    public Task<AccountRoute> PublishRouteAsync(string relayId, TimeSpan validity, long? revision = null, bool isRecovery = false, CancellationToken cancellationToken = default) =>
+        UpdateRouteAsync(relayId, validity, revision, isRecovery, cancellationToken);
 
     async Task<AccountRoute?> ResolveRouteAsync(string accountId, CancellationToken cancellationToken)
     {
@@ -319,9 +210,13 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
         else
             database.AccountRoutes.Add(new AccountRouteRecord { AccountId = route.Account, DocumentJson = route.ToJson(), Revision = route.Revision });
         var pending = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "account.route.publish", cancellationToken).ConfigureAwait(false);
-        if (pending is { Pending: true } && ProtocolModel.FromJson<AccountRoute>(pending.DocumentJson) is { } request && request.Account == route.Account
+        if (pending is { Pending: true, DocumentJson: not null } && (pending.IntentJson is null || pending.RequestState.IsCurrent())
+            && ProtocolModel.FromJson<AccountRoute>(pending.DocumentJson) is { } request && request.Account == route.Account
             && route.CompareWith(request) is RouteComparison.Equivalent or RouteComparison.Newer)
+        {
             pending.Pending = false;
+            pending.IntentJson = null;
+        }
         await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }

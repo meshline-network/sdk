@@ -36,7 +36,7 @@ public sealed class DeviceReplacementTests
         await Assert.ThrowsAsync<AccountEstablishmentException>(() => fixture.Client.EstablishAccountAsync(new() { ReplaceDeviceId = firstId }, Token));
         string signed;
         await using (var db = fixture.Database.Open())
-            signed = (await db.SignedRequests.SingleAsync(row => row.Method == "device.state.publish", Token)).DocumentJson;
+            signed = (await db.SignedRequests.SingleAsync(row => row.Method == "device.state.publish", Token)).DocumentJson!;
         await fixture.ReopenAsync();
         fixture.Relay.Handler = null;
         fixture.Relay.Requests.Clear();
@@ -77,7 +77,7 @@ public sealed class DeviceReplacementTests
         await using (var db = fixture.Database.Open())
         {
             operationId = (await db.AccountEstablishments.SingleAsync(Token)).OperationId;
-            rejected = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson;
+            rejected = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson!;
             await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_choice BEFORE UPDATE OF PendingReplaceDeviceId ON AccountEstablishment WHEN NEW.PendingReplaceDeviceId IS NOT NULL BEGIN SELECT RAISE(ABORT, 'choice interrupted'); END;", Token);
         }
         fixture.Relay.Handler = null;
@@ -222,7 +222,7 @@ public sealed class DeviceReplacementTests
             Assert.Equal(secondId, setup.PendingReplaceDeviceId);
             Assert.False(setup.DeviceAuthorizationConfirmed);
             var request = await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token);
-            signed = request.DocumentJson;
+            signed = request.DocumentJson!;
             proposedExecution = request.OperationKey;
             Assert.NotNull(proposedExecution);
             Assert.NotEqual(originalExecution, proposedExecution);
@@ -267,7 +267,7 @@ public sealed class DeviceReplacementTests
         string signed;
         await using (var db = fixture.Database.Open())
         {
-            signed = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson;
+            signed = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson!;
             await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_rejection BEFORE UPDATE OF PendingReplaceDeviceId ON AccountEstablishment WHEN NEW.PendingReplaceDeviceId IS NULL BEGIN SELECT RAISE(ABORT, 'rejection interrupted'); END;", Token);
         }
         fixture.Relay.Handler = null;

@@ -76,12 +76,12 @@ sealed partial class GroupManager
 
     static ProtocolModel ReadOperationRequest(GroupOperationRecord operation) => operation.Method switch
     {
-        "group.create" => ProtocolModel.FromJson<GroupCreateRequest>(operation.RequestJson)!,
-        "group.application.approve" => ProtocolModel.FromJson<GroupApplicationApproveRequest>(operation.RequestJson)!,
-        "group.member.recovery.approve" => ProtocolModel.FromJson<GroupRecoveryApproveRequest>(operation.RequestJson)!,
-        "group.invite.revoke" => ProtocolModel.FromJson<GroupInviteQuery>(operation.RequestJson)!,
-        "group.application.reject" or "group.member.recovery.reject" => ProtocolModel.FromJson<GroupAccountsRequest>(operation.RequestJson)!,
-        _ => ProtocolModel.FromJson<TypedProtocolModel>(operation.RequestJson)!
+        "group.create" => ProtocolModel.FromJson<GroupCreateRequest>(operation.RequestJson!)!,
+        "group.application.approve" => ProtocolModel.FromJson<GroupApplicationApproveRequest>(operation.RequestJson!)!,
+        "group.member.recovery.approve" => ProtocolModel.FromJson<GroupRecoveryApproveRequest>(operation.RequestJson!)!,
+        "group.invite.revoke" => ProtocolModel.FromJson<GroupInviteQuery>(operation.RequestJson!)!,
+        "group.application.reject" or "group.member.recovery.reject" => ProtocolModel.FromJson<GroupAccountsRequest>(operation.RequestJson!)!,
+        _ => ProtocolModel.FromJson<TypedProtocolModel>(operation.RequestJson!)!
     };
 
     static TypedProtocolModel? GetTimelinePayload(ProtocolModel request) => request switch
@@ -96,7 +96,6 @@ sealed partial class GroupManager
 
     static HttpMethod GetOperationHttpMethod(string method) => method switch
     {
-        "group.update" => HttpMethod.Patch,
         "group.member.ban" or "group.role.update" => HttpMethod.Put,
         "group.close" or "group.member.leave" or "group.member.remove" or "group.member.unban"
             or "group.invite.revoke" or "group.application.reject" or "group.member.recovery.reject" => HttpMethod.Delete,
@@ -174,14 +173,22 @@ sealed partial class GroupManager
 
     async Task CheckManagementAsync(GroupRef group, GroupManagementOperation operation, CancellationToken cancellationToken)
     {
+        if (!await TryCheckManagementAsync(group, operation, cancellationToken).ConfigureAwait(false))
+            throw new InvalidDataException("The group management chain or actor authorization is invalid.");
+    }
+
+    async Task<bool> TryCheckManagementAsync(GroupRef group, GroupManagementOperation operation, CancellationToken cancellationToken)
+    {
         await using var database = new MeshlineDbContext(databaseOptions);
         var record = await database.Groups.SingleAsync(value => value.GroupId == group.GroupId, cancellationToken).ConfigureAwait(false);
         if (record.Status != GroupStatus.Active || record.LocallyClosed || record.Membership != GroupMembershipState.Member) throw new InvalidOperationException("The group is not writable by this account.");
+        if (operation.PrevHash != record.ManagementHash) return false;
         var members = await database.GroupMembers.Where(value => value.GroupId == group.GroupId).ToDictionaryAsync(value => value.AccountId, StringComparer.Ordinal, cancellationToken).ConfigureAwait(false);
         var bans = await database.GroupBans.Where(value => value.GroupId == group.GroupId).ToDictionaryAsync(value => value.AccountId, StringComparer.Ordinal, cancellationToken).ConfigureAwait(false);
         var advances = operation is GroupApplicationApproval or GroupMemberLeave or GroupMemberRemoval or GroupMemberRecoveryApproval or GroupSecretRotation
             || operation is GroupMemberBan ban && ban.Accounts.Any(members.ContainsKey);
         ApplyManagement(database, record, members, bans, new() { Sequence = record.Sequence + 1, Epoch = record.Epoch + (advances ? 1 : 0), AcceptedAt = Clock.UtcNow.ToUnixTimeSeconds(), Payload = operation }, Options.AccountId);
+        return true;
     }
 
     async Task SendUnsignedAsync(GroupRef group, string method, ProtocolModel request, CancellationToken cancellationToken)

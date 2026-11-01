@@ -27,7 +27,7 @@ public sealed class AccountDevicePreparationTests
         await using (var db = fixture.Database.Open())
         {
             prepared = await db.LocalDevices.SingleAsync(Token);
-            pending = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson;
+            pending = (await db.SignedRequests.SingleAsync(value => value.Method == "device.state.publish", Token)).DocumentJson!;
             var receipt = await db.DevicePreparations.SingleAsync(Token);
             Assert.Equal((await db.AccountEstablishments.SingleAsync(Token)).OperationId, receipt.ActivatedOperationId);
             Assert.Null(receipt.OperationId);

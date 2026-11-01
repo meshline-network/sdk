@@ -55,7 +55,12 @@ The methods represent separate user actions, not automatic approval of every req
 
 ## Membership, roles, and closure
 
-`GetMembersAsync` and `GetBansAsync` query local views. Administrative operations include removal, banning, unbanning, role changes, and ownership transfer. `SetNicknameAsync` updates the local account's group nickname. Permission depends on current role and operation; consult the method's documented preconditions and structured relay errors.
+`GetMembersAsync` and `GetBansAsync` query local views. Administrative operations
+include removal, banning, unbanning, role changes and ownership transfer.
+`UpdateGroupAsync` changes metadata using the shared [completion and retry rules](events-and-errors.md#cancellation-and-error-types);
+other group commands remain independent. `SetNicknameAsync` updates the local account's
+group nickname. Permission depends on current role and operation; consult the
+method's documented preconditions and structured relay errors.
 
 `LeaveGroupAsync` changes this account's membership; `CloseGroupAsync` closes the group. Closure is not a promise that the network retains readable ciphertext forever. Locally stored content and relay-retained content have different lifetimes.
 
@@ -81,7 +86,7 @@ public static Task ApproveGroupKeyRecoveryAsync(
 
 An administrator inspects `GetKeyRecoveryRequestsAsync` and approves or rejects particular accounts. `KeyRecoveryChanged` reports recovery changes. `RotateSecretAsync` rotates group secret material and can optionally rotate the owner's member key. Rotation and recovery require the documented role and state; they do not guarantee restoration of every historical message after secrets or relay payloads are lost.
 
-Group synchronization consumes the locally stored account-message stream with a durable cursor and commits group changes with that cursor. Keep `MessageManager` running alongside `GroupManager`; `MeshlineClient` coordinates both. Interrupted group operations retain confirmation state. If an operation reports that an earlier request is awaiting confirmation, let the running component recover it before submitting another operation of that kind.
+Group synchronization consumes the locally stored account-message stream with a durable cursor and commits group changes with that cursor. Keep `MessageManager` running alongside `GroupManager`; `MeshlineClient` coordinates both. Interrupted independent commands retain confirmation state. If a command reports that an earlier request is awaiting confirmation, let the running component recover it before submitting another command of that kind.
 
 For foreground refreshes and completion status, see [synchronization](synchronization.md).
 

@@ -29,7 +29,15 @@ public sealed class AccountPublicationFailureTests
         Assert.IsType<TimeoutException>(error.InnerException);
         Assert.DoesNotContain(fixture.Relay.Requests, request => request.Method == method);
         await using var db = fixture.Database.Open();
-        Assert.False(await db.SignedRequests.AnyAsync(record => record.Method == method, Token));
+        var publication = await db.SignedRequests.SingleOrDefaultAsync(record => record.Method == method, Token);
+        if (domain == "meshline.account.route")
+        {
+            Assert.NotNull(publication);
+            Assert.True(publication.Pending);
+            Assert.NotNull(publication.IntentJson);
+            Assert.Null(publication.DocumentJson);
+        }
+        else Assert.Null(publication);
         Assert.Equal(AccountEstablishmentReason.AccountStateUnavailable, error.Reason);
         var operation = await db.AccountEstablishments.SingleAsync(Token);
         var device = client.Device!;

@@ -43,7 +43,7 @@ An account signer is needed for publication or account\-authenticated replay\.
 
 `OperationConflict` 2
 
-The requested lifetime differs from the unfinished publication\.
+Retained for compatibility; not returned by [EnsureRouteAsync\(string, TimeSpan, CancellationToken\)](Meshline.Components.AccountManager.md#Meshline.Components.AccountManager.EnsureRouteAsync(string,System.TimeSpan,System.Threading.CancellationToken) 'Meshline\.Components\.AccountManager\.EnsureRouteAsync\(string, System\.TimeSpan, System\.Threading\.CancellationToken\)')\.
 
 <a name='Meshline.Components.AccountRouteFailure.StateConflict'></a>
 

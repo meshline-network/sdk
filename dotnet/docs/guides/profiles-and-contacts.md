@@ -6,7 +6,11 @@
 
 Use an initialized, authorized client with access to its home relay. `GetProfileAsync` resolves the current or another account's profile; `client.Profile` exposes the current account's cached profile. Profile changes are reported by `ProfileChanged`.
 
-`FieldUpdate<T>` distinguishes an omitted field, an assigned value, and explicit deletion. An omitted update leaves the existing value unchanged; assigning `FieldUpdate<T>.Delete` removes an optional field. Required fields such as `PublicDiscovery` cannot be deleted.
+`FieldUpdate<T>` distinguishes omission, assignment and deletion. Omitted fields
+retain existing values and unfinished edits; `FieldUpdate<T>.Delete` removes an optional
+field. Required fields such as `PublicDiscovery` cannot be deleted. Profile updates
+follow the shared [completion and retry rules](events-and-errors.md#cancellation-and-error-types).
+`PublishProfileAsync` republishes the newest available profile, including unfinished edits.
 
 <!-- snippet: profile -->
 ```csharp

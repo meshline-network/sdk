@@ -44,7 +44,7 @@ sealed partial class ChannelManager
         FollowChanged?.Invoke(this, new(channel.ChannelId, followed));
     }
 
-    async Task SaveDescriptorAsync(ChannelRef channel, ChannelResolveResult result, CancellationToken cancellationToken, ChannelOperationRecord? completedOperation = null)
+    async Task SaveDescriptorAsync(ChannelRef channel, ChannelResolveResult result, CancellationToken cancellationToken, ChannelOperationRecord? completedOperation = null, bool notify = true, bool published = false)
     {
         ChannelInfo? changed = null;
         await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -57,10 +57,10 @@ sealed partial class ChannelManager
             if (completedOperation is not null) await RemoveOperationAsync(database, completedOperation, cancellationToken).ConfigureAwait(false);
             await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            if (result.Descriptor.Revision == record.Revision) CacheDescriptor(channel, result, completedOperation is null ? null : Clock.UtcNow);
+            if (result.Descriptor.Revision == record.Revision) CacheDescriptor(channel, result, completedOperation is not null || published ? Clock.UtcNow : null);
         }
         finally { _stateGate.Release(); }
-        if (changed is not null) ChannelChanged?.Invoke(this, changed);
+        if (changed is not null && notify) ChannelChanged?.Invoke(this, changed);
     }
 
     static async Task<ChannelRecord> GetChannelRecordAsync(MeshlineDbContext database, ChannelRef channel, CancellationToken cancellationToken)
@@ -147,76 +147,93 @@ sealed partial class ChannelManager
     {
         var descriptors = new Dictionary<long, ChannelResolveResult>();
         var (page, certificates) = await ReadVerifiedPageAsync(relay, channel, query, descriptors, cancellationToken).ConfigureAwait(false);
-        var changes = new List<ChannelPostChange>();
-        ChannelInfo? channelChange = null;
-        await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
+        var boundary = query.After ?? (page.Events.IsEmpty ? -1 : page.Events[0].Sequence - 1);
+        var catchUpPages = new Dictionary<long, (ChannelReadPage Page, Dictionary<string, DeviceCertificate> Certificates)>();
+        async Task<long?> ApplyAsync()
         {
-            await using var database = new MeshlineDbContext(databaseOptions);
-            var channelRecord = await GetChannelRecordAsync(database, channel, cancellationToken).ConfigureAwait(false);
-            var operations = await database.ChannelOperations.Where(value => value.RelayId == channel.RelayId && (value.ResourceId == channel.ChannelId && value.Method == "channel.post" || value.ResourceId.StartsWith(channel.ChannelId + ":"))).ToDictionaryAsync(value => (value.ResourceId, value.Method), cancellationToken).ConfigureAwait(false);
-            var pending = operations.Values.ToArray();
-            var posts = new Dictionary<long, ChannelPostRecord>();
-            var previous = new Dictionary<long, (string? Json, DateTimeOffset? AcceptedAt, bool IsDeleted)>();
-            var catchUp = new Dictionary<long, ChannelPostRecord>();
-            var boundary = query.After ?? (page.Events.IsEmpty ? -1 : page.Events[0].Sequence - 1);
-            foreach (var group in page.Events.Where(value => GetTargetSequence(value) is not null).GroupBy(value => GetTargetSequence(value)!.Value))
+            var changes = new List<ChannelPostChange>();
+            ChannelInfo? channelChange = null;
+            await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                var record = await database.ChannelPosts.FindAsync([channel.ChannelId, group.Key], cancellationToken).ConfigureAwait(false);
-                if (record is null)
+                await using var database = new MeshlineDbContext(databaseOptions);
+                var channelRecord = await GetChannelRecordAsync(database, channel, cancellationToken).ConfigureAwait(false);
+                var operations = await database.ChannelOperations.Where(value => value.RelayId == channel.RelayId && (value.ResourceId == channel.ChannelId && value.Method == "channel.post" || value.ResourceId.StartsWith(channel.ChannelId + ":"))).ToDictionaryAsync(value => (value.ResourceId, value.Method), cancellationToken).ConfigureAwait(false);
+                var pending = operations.Values.ToArray();
+                var posts = new Dictionary<long, ChannelPostRecord>();
+                var previous = new Dictionary<long, (string? Json, DateTimeOffset? AcceptedAt, bool IsDeleted)>();
+                var catchUp = new Dictionary<long, ChannelPostRecord>();
+                foreach (var group in page.Events.Where(value => GetTargetSequence(value) is not null).GroupBy(value => GetTargetSequence(value)!.Value))
                 {
-                    record = new() { ChannelId = channel.ChannelId, Sequence = group.Key, AppliedThrough = group.Key - 1 };
-                    database.ChannelPosts.Add(record);
+                    var record = await database.ChannelPosts.FindAsync([channel.ChannelId, group.Key], cancellationToken).ConfigureAwait(false);
+                    if (record is null)
+                    {
+                        record = new() { ChannelId = channel.ChannelId, Sequence = group.Key, AppliedThrough = group.Key - 1 };
+                        database.ChannelPosts.Add(record);
+                    }
+                    previous.Add(group.Key, (record.PostJson, record.AcceptedAt, record.IsDeleted));
+                    posts.Add(group.Key, record);
+                    if (group.LastOrDefault(value => value.Payload is ChannelPostDelete) is { } deletion)
+                    {
+                        record.IsDeleted = true;
+                        record.PostJson = null;
+                        record.AppliedThrough = Math.Max(record.AppliedThrough, deletion.Sequence);
+                        continue;
+                    }
+                    if (record.IsDeleted) continue;
+                    if (record.PostJson is not null) record.AppliedThrough = Math.Max(record.AppliedThrough, channelRecord.SyncSequence);
+                    if (group.Any(value => value.Payload is PostEdit && value.Sequence > record.AppliedThrough)
+                        && !group.Any(value => value.Payload is ChannelPost) && record.AppliedThrough < boundary)
+                        catchUp.Add(group.Key, record);
                 }
-                previous.Add(group.Key, (record.PostJson, record.AcceptedAt, record.IsDeleted));
-                posts.Add(group.Key, record);
-                if (group.LastOrDefault(value => value.Payload is ChannelPostDelete) is { } deletion)
+                if (catchUp.Count > 0 && CatchUpPosts(channel, catchUp, boundary, operations, catchUpPages) is { } missingAfter)
+                    return missingAfter;
+                foreach (var entry in page.Events)
                 {
-                    record.IsDeleted = true;
-                    record.PostJson = null;
-                    record.AppliedThrough = Math.Max(record.AppliedThrough, deletion.Sequence);
-                    continue;
+                    ConfirmOperation(channel, entry, certificates[entry.SignerDeviceId], operations);
+                    if (GetTargetSequence(entry) is { } target)
+                        ApplyPostEvent(posts[target], entry, certificates[entry.SignerDeviceId]);
                 }
-                if (record.IsDeleted) continue;
-                if (record.PostJson is not null) record.AppliedThrough = Math.Max(record.AppliedThrough, channelRecord.SyncSequence);
-                if (group.Any(value => value.Payload is PostEdit && value.Sequence > record.AppliedThrough)
-                    && !group.Any(value => value.Payload is ChannelPost) && record.AppliedThrough < boundary)
-                    catchUp.Add(group.Key, record);
-            }
-            if (catchUp.Count > 0)
-                await CatchUpPostsAsync(relay, channel, catchUp, boundary, descriptors, operations, cancellationToken).ConfigureAwait(false);
-            foreach (var entry in page.Events)
-            {
-                ConfirmOperation(channel, entry, certificates[entry.SignerDeviceId], operations);
-                if (GetTargetSequence(entry) is { } target)
-                    ApplyPostEvent(posts[target], entry, certificates[entry.SignerDeviceId]);
-            }
-            foreach (var record in posts.Values)
-            {
-                if (!record.IsDeleted && record.PostJson is null) throw new InvalidDataException("The original channel post is unavailable. The history page has not been committed.");
-                record.AppliedThrough = Math.Max(record.AppliedThrough, page.Events[^1].Sequence);
-                var before = previous[record.Sequence];
-                if (before.IsDeleted) continue;
-                var reference = new ChannelPostRef { Channel = channel, Sequence = record.Sequence };
-                if (record.IsDeleted)
+                foreach (var record in posts.Values)
                 {
-                    if (before.Json is not null) changes.Add(new() { Ref = reference, ChangeKind = ChannelPostChangeKind.Deleted });
+                    if (!record.IsDeleted && record.PostJson is null) throw new InvalidDataException("The original channel post is unavailable. The history page has not been committed.");
+                    record.AppliedThrough = Math.Max(record.AppliedThrough, page.Events[^1].Sequence);
+                    var before = previous[record.Sequence];
+                    if (before.IsDeleted) continue;
+                    var reference = new ChannelPostRef { Channel = channel, Sequence = record.Sequence };
+                    if (record.IsDeleted)
+                    {
+                        if (before.Json is not null) changes.Add(new() { Ref = reference, ChangeKind = ChannelPostChangeKind.Deleted });
+                    }
+                    else if (before.Json != record.PostJson || before.AcceptedAt != record.AcceptedAt)
+                        changes.Add(new() { Ref = reference, ChangeKind = before.Json is null ? ChannelPostChangeKind.Added : ChannelPostChangeKind.Edited, Info = PostSnapshot(record, channel) });
                 }
-                else if (before.Json != record.PostJson || before.AcceptedAt != record.AcceptedAt)
-                    changes.Add(new() { Ref = reference, ChangeKind = before.Json is null ? ChannelPostChangeKind.Added : ChannelPostChangeKind.Edited, Info = PostSnapshot(record, channel) });
+                database.ChannelOperations.RemoveRange(pending.Where(value => !operations.ContainsKey((value.ResourceId, value.Method))));
+                await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+                foreach (var descriptor in descriptors.Values.OrderBy(value => value.Descriptor.Revision))
+                    if (await StoreDescriptorAsync(database, channelRecord, descriptor, cancellationToken).ConfigureAwait(false)) channelChange = ChannelSnapshot(channelRecord);
+                if (advance && !page.Events.IsEmpty) channelRecord.SyncSequence = Math.Max(channelRecord.SyncSequence, page.Events[^1].Sequence);
+                await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                if (descriptors.TryGetValue(channelRecord.Revision, out var latest)) CacheDescriptor(channel, latest);
             }
-            database.ChannelOperations.RemoveRange(pending.Where(value => !operations.ContainsKey((value.ResourceId, value.Method))));
-            await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-            foreach (var descriptor in descriptors.Values.OrderBy(value => value.Descriptor.Revision))
-                if (await StoreDescriptorAsync(database, channelRecord, descriptor, cancellationToken).ConfigureAwait(false)) channelChange = ChannelSnapshot(channelRecord);
-            if (advance && !page.Events.IsEmpty) channelRecord.SyncSequence = Math.Max(channelRecord.SyncSequence, page.Events[^1].Sequence);
-            await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            if (descriptors.TryGetValue(channelRecord.Revision, out var latest)) CacheDescriptor(channel, latest);
+            finally { _stateGate.Release(); }
+            if (channelChange is not null) ChannelChanged?.Invoke(this, channelChange);
+            if (changes.Count > 0) TimelineChanged?.Invoke(this, new(channel, changes));
+            return null;
         }
-        finally { _stateGate.Release(); }
-        if (channelChange is not null) ChannelChanged?.Invoke(this, channelChange);
-        if (changes.Count > 0) TimelineChanged?.Invoke(this, new(channel, changes));
+        // Fetch missing originals outside the state gate. Re-read local projections
+        // on every commit attempt so delayed history cannot restore a deleted post.
+        while (await ApplyAsync().ConfigureAwait(false) is { } after)
+        {
+            do
+            {
+                var verified = await ReadVerifiedPageAsync(relay, channel, new ChannelReadQuery { ChannelId = channel.ChannelId, After = after }, descriptors, cancellationToken).ConfigureAwait(false);
+                catchUpPages.Add(after, verified);
+                if (!verified.Page.HasMore || verified.Page.Events[^1].Sequence >= boundary) break;
+                after = verified.Page.Events[^1].Sequence;
+            } while (!catchUpPages.ContainsKey(after));
+        }
         return page;
     }
 
@@ -284,12 +301,14 @@ sealed partial class ChannelManager
         if (!Ed25519.Verify(signature.AsSpan(), certificate.SigningPublicKey.AsSpan(), input)) throw new CryptographicException("The channel content signature is invalid.");
     }
 
-    async Task CatchUpPostsAsync(RelayClient relay, ChannelRef channel, Dictionary<long, ChannelPostRecord> posts, long boundary, Dictionary<long, ChannelResolveResult> descriptors, Dictionary<(string ResourceId, string Method), ChannelOperationRecord> operations, CancellationToken cancellationToken)
+    long? CatchUpPosts(ChannelRef channel, Dictionary<long, ChannelPostRecord> posts, long boundary, Dictionary<(string ResourceId, string Method), ChannelOperationRecord> operations,
+        Dictionary<long, (ChannelReadPage Page, Dictionary<string, DeviceCertificate> Certificates)> pages)
     {
         var after = posts.Values.Min(value => value.AppliedThrough);
         while (after < boundary)
         {
-            var (page, certificates) = await ReadVerifiedPageAsync(relay, channel, new ChannelReadQuery { ChannelId = channel.ChannelId, After = after }, descriptors, cancellationToken).ConfigureAwait(false);
+            if (!pages.TryGetValue(after, out var verified)) return after;
+            var (page, certificates) = verified;
             foreach (var entry in page.Events)
             {
                 if (GetTargetSequence(entry) is { } target && posts.TryGetValue(target, out var record)
@@ -302,6 +321,7 @@ sealed partial class ChannelManager
             if (!page.HasMore || page.Events[^1].Sequence >= boundary) break;
             after = page.Events[^1].Sequence;
         }
+        return null;
     }
 
     static long? GetTargetSequence(ChannelEvent entry) => entry.Payload switch
@@ -319,7 +339,7 @@ sealed partial class ChannelManager
         {
             if (entry.Payload is ChannelPost post)
             {
-                var request = ProtocolModel.FromJson<ChannelPost>(publication.DocumentJson)!;
+                var request = ProtocolModel.FromJson<ChannelPost>(publication.DocumentJson!)!;
                 if (post.MessageId == request.MessageId && certificate.Account == Options.AccountId)
                 {
                     if (publication.DocumentJson != post.ToJson())

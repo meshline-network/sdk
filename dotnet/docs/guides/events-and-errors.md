@@ -49,7 +49,7 @@ Events indicate changes; local queries provide the durable current view. Use `Co
 | Emitter | Events | Application use |
 | --- | --- | --- |
 | Client | `ConversationChanged` | Re-query the affected local conversation. |
-| Account/device/profile managers | `AccountChanged`, `DeviceChanged`, `DeviceStateChanged`, `ProfileChanged` | Refresh route, authorization, or profile views. |
+| Account/device/profile managers | `AccountChanged`, `DeviceChanged`, `DeviceStateChanged`, `ProfileChanged` | Refresh route, local certificate, authorization or profile views, including changes confirmed by background recovery. |
 | Message manager | `MessageReceived`, `TimelineChanged`, `SendStatusChanged` | Display received messages and track outgoing operations. |
 | Message manager | `ContactChanged`, `ContactRequestChanged` | Refresh contacts and pending requests. |
 | Channel manager | `ChannelChanged`, `TimelineChanged`, `FollowChanged` | Refresh channel metadata, posts, or follow state. |
@@ -72,6 +72,7 @@ resource, and exception in `BackgroundErrorEventArgs`.
 | Exception | Meaning and response |
 | --- | --- |
 | `ArgumentException` / `ArgumentOutOfRangeException` | Correct invalid arguments or range bounds. |
+| `StateUpdateSupersededException` | A newer durable state update took over this still-waiting call. Nonconflicting fields remain in the successor; no rollback is implied. `Resource` identifies the operation and resource. |
 | `InvalidOperationException` / `ObjectDisposedException` | Check initialization, authorization, and component lifetime. |
 | `RelayException` | Inspect the original `Error.Code`, `Error.Message`, and `Error.Data`; distinguish business rejection from transport interruption. |
 | `TimeoutException` | An SDK-owned request deadline expired; inspect the diagnostic fields below. |
@@ -87,12 +88,22 @@ see [transport](transport-and-di.md#request-timeouts-and-cancellation).
 Caller cancellation and component/pool disposal remain cancellation. Application-owned
 HTTP clients and signers can impose independent timeouts; inspect their original
 exceptions. DNS, TLS, and other transport failures retain their original causes.
-A timeout or cancellation does not prove a remote mutation was rejected. Reconcile
-the persisted operation before retrying; [canceling a send wait](direct-messages.md#wait-for-an-acceptance-milestone)
+A timeout or cancellation does not prove a remote mutation was rejected. Messages,
+uploads and other independent commands keep their operation identities and retry
+rules; [canceling a send wait](direct-messages.md#wait-for-an-acceptance-milestone)
 does not cancel the send.
+
+Profile, route, device-state, group-property and channel-descriptor updates retain
+the latest intent per resource. New calls merge unfinished fields, with later values
+winning, and replace earlier attempts without waiting for their responses. Admission
+failures leave previous work intact. The SDK persists and retries only the latest
+intent after transient failures or restart; [start the component](lifecycle.md#session-order)
+to enable retries. Cancellation after admission stops waiting but preserves that
+intent; already completed calls keep their outcome. Permanent failures pause retries:
+correct the cause and issue another update. Saving intent does not confirm remote acceptance.
 
 For diagnosis by symptom, see [troubleshooting](troubleshooting.md).
 
 ## API reference
 
-[BackgroundErrorEventArgs](../api/Meshline.Components.BackgroundErrorEventArgs.md) · [BackgroundOperation](../api/Meshline.Components.BackgroundOperation.md) · [RelayException](../api/Meshline.Transport.RelayException.md) · [ProtocolViolation](../api/Meshline.Validation.ProtocolViolation.md)
+[BackgroundErrorEventArgs](../api/Meshline.Components.BackgroundErrorEventArgs.md) · [BackgroundOperation](../api/Meshline.Components.BackgroundOperation.md) · [StateUpdateSupersededException](../api/Meshline.Components.StateUpdateSupersededException.md) · [RelayException](../api/Meshline.Transport.RelayException.md) · [ProtocolViolation](../api/Meshline.Validation.ProtocolViolation.md)

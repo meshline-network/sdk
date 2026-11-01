@@ -7,7 +7,7 @@ public enum AccountRouteFailure
     RelayMismatch,
     /// <summary>An account signer is needed for publication or account-authenticated replay.</summary>
     SignerRequired,
-    /// <summary>The requested lifetime differs from the unfinished publication.</summary>
+    /// <summary>Retained for compatibility; not returned by <see cref="AccountManager.EnsureRouteAsync"/>.</summary>
     OperationConflict,
     /// <summary>The submitted revision conflicts or its expired outcome cannot be reconciled.</summary>
     StateConflict,

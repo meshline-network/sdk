@@ -234,18 +234,11 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             throw new InvalidOperationException("An account signer is required to renew a device.");
         DeviceCertificate certificate;
         await using var database = new MeshlineDbContext(databaseOptions);
-        await RequireCompletedDeviceMutationAsync(database, cancellationToken).ConfigureAwait(false);
+        await RequireCompletedDeviceMutationAsync(database, cancellationToken, allowPendingPublication: true).ConfigureAwait(false);
         var local = await database.LocalDevices.SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("No local device has been created.");
         var previous = ReadLocalCertificate(local);
-        byte[] signingKey;
-        await _deviceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            _signingKey ??= await ReadKeyAsync(local, previous, encryption: false, cancellationToken).ConfigureAwait(false);
-            signingKey = _signingKey.ToArray();
-        }
-        finally { _deviceGate.Release(); }
+        var signingKey = await GetKeyCopyAsync(encryption: false, cancellationToken).ConfigureAwait(false);
         try
         {
             certificate = await IssueCertificateAsync(signingKey, previous.EncryptionPublicKey, validity,
@@ -263,12 +256,10 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// Publishes a complete device state with the selected device removed after checking contact-grant continuity.
     /// </summary>
     /// <param name="deviceId">The canonical device identifier.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
-    /// <remarks>
-    /// Uses the same retained-history and confirmed-grant checks as account setup with an explicit replacement.
-    /// This operation checks existing evidence; it does not send contact-grant updates or start background synchronization.
-    /// </remarks>
+    /// <remarks>Pending removals accumulate by device ID.</remarks>
+    /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
     /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. Published device state or retained contact history is unavailable, removal would invalidate a contact grant without accepted replacement signatures, or the relay only stages the removal.</exception>
@@ -283,39 +274,8 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails.</exception>
     /// <exception cref="ArgumentException">The <paramref name="deviceId"/> argument is not a canonical device identifier.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The next device-state revision exceeds the protocol safe-integer limit.</exception>
-    public async Task RemoveDeviceAsync(string deviceId, CancellationToken cancellationToken = default)
-    {
-        EnsureInitialized();
-        using var _ = BeginOperation(ref cancellationToken);
-        using var mutation = await EnterMutationAsync(cancellationToken).ConfigureAwait(false);
-        if (Identifiers.ValidateDeviceId(deviceId) is { } violation)
-            throw new ArgumentException(violation.Message, nameof(deviceId));
-        var relayId = await GetHomeRelayIdAsync(cancellationToken).ConfigureAwait(false);
-        for (var attempt = 0; ; attempt++)
-        {
-            var state = await ReadAuthorizationStateAsync(relayId, cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException("The account has no published device state.");
-            var certificates = state.Certificates.Where(certificate => certificate.GetDeviceId(Context) != deviceId).ToArray();
-            if (certificates.Length == state.Certificates.Length) return;
-            await using var database = new MeshlineDbContext(databaseOptions);
-            var issues = await CheckRemovalContinuityAsync(database, state, deviceId, certificates, cancellationToken).ConfigureAwait(false);
-            if (issues.Count != 0)
-                throw new InvalidOperationException($"Device removal lacks contact-grant continuity evidence: {string.Join(", ", issues.Select(value => value.Code).Distinct())}.");
-            try
-            {
-                var result = await PublishDeviceStateFromSnapshotAsync(relayId, certificates, state, cancellationToken, removedDeviceId: deviceId).ConfigureAwait(false);
-                if (result.Status != DeviceStatePublishStatus.Accepted)
-                    throw new InvalidOperationException("The device removal was only staged and is not yet authoritative.");
-                return;
-            }
-            catch (DeviceAuthorizationException exception) when (exception.Failure == DeviceAuthorizationFailure.ContinuityUnverifiable)
-            {
-                throw new InvalidOperationException($"Device removal lacks contact-grant continuity evidence: {string.Join(", ", exception.ContactIssues.Select(value => value.Code).Distinct())}.", exception);
-            }
-            catch (Exception exception) when (attempt < 2 && IsDeviceStateConflict(exception)) { }
-        }
-    }
-
+    public Task RemoveDeviceAsync(string deviceId, CancellationToken cancellationToken = default) =>
+        RemoveLatestDeviceAsync(deviceId, cancellationToken);
     /// <summary>
     /// Finds a device certificate in the currently known account device state.
     /// </summary>
@@ -482,17 +442,15 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// Signs and publishes a complete device authorization state and reports acceptance or staging.
     /// </summary>
     /// <param name="relayId">The relay's canonical lowercase Neo script-hash identifier.</param>
-    /// <param name="certificates">The complete certificate list to publish, or <see langword="null"/> to preserve known devices and refresh the local certificate.</param>
+    /// <param name="certificates">The complete certificate list, replacing unfinished removals, or <see langword="null"/> to preserve known devices and refresh the local certificate.</param>
     /// <param name="options">Optional prior-state, recovery, and revision settings.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>The submitted state and the relay's authoritative-acceptance or temporary-staging result.</returns>
-    /// <remarks>
-    /// A supplied list is the complete authorized device set, not a delta. With no list, known devices are preserved and the local certificate is refreshed; unavailable prior state or missing local authorization requires explicit recovery. Staged publication is not yet authoritative.
-    /// Staged and unknown-outcome submissions remain pending. Retry with the same complete certificate list, relay, and optional revision to reuse the signed request. A call without a certificate list performs a refresh and may advance the revision.
-    /// </remarks>
+    /// <remarks>Unavailable prior state or missing local authorization requires explicit recovery.</remarks>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account signer or complete prior device state is unavailable, the local device is unauthorized outside recovery, or a pending publication conflicts with the requested update.</exception>
+    /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account signer or complete prior device state is unavailable, or the local device is unauthorized outside recovery.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
@@ -504,23 +462,19 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails.</exception>
     /// <exception cref="ArgumentException">The prior state belongs to another account or is invalid, or the complete certificate list fails protocol validation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The selected device-state revision is not a newer nonnegative safe integer. A relay-provided staging timestamp is outside the supported DateTimeOffset range.</exception>
-    public async Task<DeviceStatePublishResult> PublishDeviceStateAsync(string relayId, IReadOnlyList<DeviceCertificate>? certificates = null, DeviceStatePublishOptions? options = null, CancellationToken cancellationToken = default)
-    {
-        EnsureInitialized();
-        using var operation = BeginOperation(ref cancellationToken);
-        using var mutation = await EnterMutationAsync(cancellationToken).ConfigureAwait(false);
-        return await PublishDeviceStateCoreAsync(relayId, certificates, options, cancellationToken).ConfigureAwait(false);
-    }
+    public Task<DeviceStatePublishResult> PublishDeviceStateAsync(string relayId, IReadOnlyList<DeviceCertificate>? certificates = null, DeviceStatePublishOptions? options = null, CancellationToken cancellationToken = default) =>
+        UpdateDevicesAsync(relayId, certificates, options, cancellationToken);
 
     async Task<DeviceStatePublishResult> PublishDeviceStateCoreAsync(string relayId, IReadOnlyList<DeviceCertificate>? certificates,
-        DeviceStatePublishOptions? options, CancellationToken cancellationToken)
+        DeviceStatePublishOptions? options, CancellationToken cancellationToken, StateUpdateAttempt? attempt = null,
+        AccountDeviceState? continuityBasis = null, IReadOnlyList<string>? removals = null)
     {
         if (options?.PreviousState is { } supplied && (supplied.Account != Options.AccountId || supplied.Validate(Context) is not null))
             throw new ArgumentException("The previous device state must be valid and belong to this account.", nameof(options));
         if (accountSigner is null)
             throw new InvalidOperationException("An account signer is required to publish device state.");
         var preserveDevices = certificates is null;
-        var refreshStaging = preserveDevices && options?.IsRecovery != true && options?.Revision is null;
+        var refreshStaging = preserveDevices && options?.IsRecovery != true && options?.Revision is null && attempt?.RequestJson is null;
         await using var database = new MeshlineDbContext(databaseOptions);
         var signed = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "device.state.publish", cancellationToken).ConfigureAwait(false);
         var known = await database.DeviceStates.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == Options.AccountId, cancellationToken).ConfigureAwait(false);
@@ -529,9 +483,9 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         {
             var previous = options?.PreviousState;
             if (known is not null && (previous is null || known.Revision > previous.Revision)) previous = ProtocolModel.FromJson<AccountDeviceState>(known.DocumentJson)!;
-            if (refreshStaging && signed is { Pending: true } && signed.RelayId != relayId)
+            if (attempt is null && refreshStaging && signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && signed.RelayId != relayId)
                 throw new InvalidOperationException("Resolve the pending device state publication before transferring it to another relay.");
-            if (signed is not null && signed.RelayId == relayId && (previous is null || signed.Revision > previous.Revision))
+            if (signed is { DocumentJson: not null } && signed.RelayId == relayId && (previous is null || signed.Revision > previous.Revision))
                 previous = ProtocolModel.FromJson<AccountDeviceState>(signed.DocumentJson)!;
             if (previous is null && options?.IsRecovery != true)
                 throw new InvalidOperationException("The complete device state is unavailable. Supply the complete certificate list or recover the account explicitly.");
@@ -545,23 +499,53 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
                 certificates = registered ? certificates.Select(value => value.GetDeviceId(Context) == deviceId ? local : value).ToArray() : [.. certificates, local];
             }
         }
-        var pendingState = signed is { Pending: true } ? ProtocolModel.FromJson<AccountDeviceState>(signed.DocumentJson)! : null;
+        var pendingState = signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } ? ProtocolModel.FromJson<AccountDeviceState>(signed.DocumentJson)! : null;
         var retryPending = !refreshStaging && pendingState is not null && signed!.RelayId == relayId && (options?.Revision is null || options.Revision == signed.Revision)
             && MatchesCertificates(pendingState, certificates!);
         long revision;
         if (retryPending) revision = pendingState!.Revision;
         else
         {
-            if (pendingState is not null && !refreshStaging && options?.IsRecovery != true && options?.Revision is null)
+            if (attempt is null && pendingState is not null && !refreshStaging && options?.IsRecovery != true && options?.Revision is null)
                 throw new InvalidOperationException("Device state publication has an unknown result. Retry the original certificates or resolve the current state before publishing a change.");
             var requestedRevision = options?.Revision;
             if (requestedRevision is null && options?.IsRecovery == true)
                 requestedRevision = Math.Max(knownRevision + 1, Clock.UtcNow.ToUnixTimeMilliseconds());
             revision = AccountDeviceState.GetNextRevision(requestedRevision, knownRevision);
         }
+        async Task CheckContinuityAsync()
+        {
+            if (continuityBasis is null || removals is null) return;
+            foreach (var id in removals)
+            {
+                var issues = await CheckRemovalContinuityAsync(database, continuityBasis, id, certificates!, cancellationToken).ConfigureAwait(false);
+                if (issues.Count != 0) throw new InvalidOperationException($"Device removal lacks contact-grant continuity evidence: {string.Join(", ", issues.Select(value => value.Code).Distinct())}.");
+            }
+        }
+        await CheckContinuityAsync().ConfigureAwait(false);
         var request = await PrepareDeviceStatePublicationAsync(signed, relayId, certificates!, revision, cancellationToken).ConfigureAwait(false);
-        signed = await SaveDeviceStatePublicationAsync(database, signed, relayId, request, cancellationToken).ConfigureAwait(false);
-        return await SubmitDeviceStatePublicationAsync(database, signed, request, cancellationToken).ConfigureAwait(false);
+        async Task SaveAsync()
+        {
+            await database.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var transaction = ((SqliteConnection)database.Database.GetDbConnection()).BeginTransaction(deferred: false);
+            await using var enlisted = await database.Database.UseTransactionAsync(transaction, cancellationToken).ConfigureAwait(false);
+            if (continuityBasis is not null)
+            {
+                var current = await database.DeviceStates.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == Options.AccountId, cancellationToken).ConfigureAwait(false);
+                if (current is not null && (current.Revision > continuityBasis.Revision || current.Revision == continuityBasis.Revision && current.DocumentJson != continuityBasis.ToJson()))
+                    throw new DeviceStatePublicationException(DeviceStatePublicationFailure.StateChanged, "Device state changed while signing; rebuild the latest removal against current state.");
+            }
+            await CheckContinuityAsync().ConfigureAwait(false);
+            signed = await SaveDeviceStatePublicationAsync(database, signed, relayId, request, cancellationToken, generation: attempt?.Generation).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (attempt is null) await SaveAsync().ConfigureAwait(false);
+        else
+        {
+            await attempt.CurrentAsync(SaveAsync, cancellationToken).ConfigureAwait(false);
+            attempt.RecordRequest(request.ToJson());
+        }
+        return await SubmitDeviceStatePublicationAsync(database, signed!, request, cancellationToken, attempt: attempt).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -581,10 +565,9 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     {
         EnsureInitialized();
         using var _ = BeginOperation(ref cancellationToken);
-        await _deviceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var key = await GetKeyCopyAsync(encryption: false, cancellationToken).ConfigureAwait(false);
         try
         {
-            var key = await GetKeyAsync(encryption: false, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             var signature = new byte[Ed25519.SignatureSize];
             Ed25519.Sign(key.AsSpan(), data.Span, signature.AsSpan());
@@ -592,7 +575,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         }
         finally
         {
-            _deviceGate.Release();
+            CryptographicOperations.ZeroMemory(key);
         }
     }
 
@@ -619,10 +602,9 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         using var _ = BeginOperation(ref cancellationToken);
         if (peerPublicKey.Length != X25519.PointSize)
             throw new ArgumentException("An X25519 public key must contain 32 bytes.", nameof(peerPublicKey));
-        await _deviceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var key = await GetKeyCopyAsync(encryption: true, cancellationToken).ConfigureAwait(false);
         try
         {
-            var key = await GetKeyAsync(encryption: true, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             var sharedSecret = new byte[32];
             if (!X25519.CalculateAgreement(key.AsSpan(), peerPublicKey.Span, sharedSecret.AsSpan()))
@@ -634,7 +616,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         }
         finally
         {
-            _deviceGate.Release();
+            CryptographicOperations.ZeroMemory(key);
         }
     }
 
@@ -673,6 +655,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
                 throw new InvalidDataException("The persisted device state is invalid.");
             CacheDeviceState(cached);
         }
+        await InitializeDeviceUpdatesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -703,6 +686,8 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         accountManager.AccountChanged += OnHomeRouteChanged;
         relayClients.RelayChanged += OnHomeRelayChanged;
         _refreshRequests.Writer.TryWrite(true);
+        cancellationToken.ThrowIfCancellationRequested();
+        Updates.Start(RuntimeCancellationToken);
     }
 
     /// <inheritdoc/>
@@ -711,6 +696,8 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         accountManager.AccountChanged -= OnHomeRouteChanged;
         relayClients.RelayChanged -= OnHomeRelayChanged;
         List<Exception> failures = [];
+        try { if (_updates is { } updates) await updates.StopAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
         try { await Task.WhenAll(_homeRefresh, StopStateQueriesAsync()).ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
         _homeRefresh = Task.CompletedTask;
@@ -732,6 +719,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
     /// <exception cref="AggregateException">A cancellation callback throws while dependent component or relay lifetimes are canceled.</exception>
     protected override async ValueTask DisposeAsyncCore()
     {
+        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
         await StopStateQueriesAsync(dispose: true).ConfigureAwait(false);
         if (Local is not null)
             await relayClients.InvalidateDeviceAsync().ConfigureAwait(false);
@@ -753,10 +741,14 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         public void Dispose() => gate.Release();
     }
 
-    static async Task RequireCompletedDeviceMutationAsync(MeshlineDbContext database, CancellationToken cancellationToken)
+    async Task RequireCompletedDeviceMutationAsync(MeshlineDbContext database, CancellationToken cancellationToken, bool allowPendingPublication = false)
     {
+        // Initial authorization remains a distinct durable workflow. Only an already
+        // confirmed local identity may be renewed while a state replacement is pending.
+        allowPendingPublication &= Local is not null && DeviceState?.Certificates.Any(value => value.GetDeviceId(Context) == Local.GetDeviceId(Context)) == true;
+        if (allowPendingPublication && await database.AccountEstablishments.AnyAsync(cancellationToken).ConfigureAwait(false)) allowPendingPublication = false;
         if (await database.DevicePreparations.AnyAsync(value => value.OperationId != null, cancellationToken).ConfigureAwait(false)
-            || await database.SignedRequests.AnyAsync(value => value.Method == "device.state.publish" && value.Pending, cancellationToken).ConfigureAwait(false))
+            || !allowPendingPublication && await database.SignedRequests.AnyAsync(value => value.Method == "device.state.publish" && value.Pending, cancellationToken).ConfigureAwait(false))
             throw new InvalidOperationException("Complete the pending device preparation or publication before creating or renewing a certificate.");
     }
 
@@ -799,21 +791,46 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             throw new ArgumentOutOfRangeException(nameof(validity), "Certificate validity must be between one second and 720 days.");
     }
 
-    async Task<byte[]> GetKeyAsync(bool encryption, CancellationToken cancellationToken)
+    async Task<byte[]> GetKeyCopyAsync(bool encryption, CancellationToken cancellationToken)
     {
-        if ((encryption ? _encryptionKey : _signingKey) is { } cachedKey)
-            return cachedKey;
+        while (true)
+        {
+            LocalDeviceRecord local;
+            await _deviceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if ((encryption ? _encryptionKey : _signingKey) is { } cachedKey) return cachedKey.ToArray();
+                await using var database = new MeshlineDbContext(databaseOptions);
+                local = await database.LocalDevices.AsNoTracking().SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException("No local device has been created.");
+            }
+            finally { _deviceGate.Release(); }
 
-        await using var database = new MeshlineDbContext(databaseOptions);
-        var local = await database.LocalDevices.AsNoTracking().SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("No local device has been created.");
-        var certificate = ReadLocalCertificate(local);
-        var key = await ReadKeyAsync(local, certificate, encryption, cancellationToken).ConfigureAwait(false);
-        if (encryption)
-            _encryptionKey = key;
-        else
-            _signingKey = key;
-        return key;
+            // An external key store can ignore cancellation. Do not hold the device
+            // gate while loading; the calling operation still owns and drains it.
+            byte[]? loaded = await ReadKeyAsync(local, ReadLocalCertificate(local), encryption, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await _deviceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    if (Local?.GetDeviceId(Context) != local.DeviceId) continue;
+                    var cached = encryption ? _encryptionKey : _signingKey;
+                    if (cached is null)
+                    {
+                        cached = loaded;
+                        if (encryption) _encryptionKey = cached;
+                        else _signingKey = cached;
+                        loaded = null;
+                    }
+                    // Callers own a copy, so replacing or clearing the cache cannot
+                    // erase a key in use by a concurrent cryptographic operation.
+                    return cached.ToArray();
+                }
+                finally { _deviceGate.Release(); }
+            }
+            finally { if (loaded is not null) CryptographicOperations.ZeroMemory(loaded); }
+        }
     }
 
     async Task<byte[]> ReadKeyAsync(LocalDeviceRecord local, DeviceCertificate certificate, bool encryption, CancellationToken cancellationToken)
@@ -959,47 +976,63 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         }
     }
 
-    async Task SaveDeviceStateAsync(AccountDeviceState state, CancellationToken cancellationToken)
+    async Task SaveDeviceStateAsync(AccountDeviceState state, CancellationToken cancellationToken, StateUpdateAttempt? attempt = null, bool published = false)
     {
         var changed = false;
-        await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Task retirement = Task.CompletedTask;
+        async Task SaveAsync()
+        {
+            await _stateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var json = state.ToJson();
+                await using var database = new MeshlineDbContext(databaseOptions);
+                await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+                var record = await database.DeviceStates.SingleOrDefaultAsync(value => value.AccountId == state.Account, cancellationToken).ConfigureAwait(false);
+                if (record is not null)
+                {
+                    if (state.Revision < record.Revision || state.Revision == record.Revision && json != record.DocumentJson)
+                        throw new InvalidDataException("The device state is older than the known state or conflicts at the same revision.");
+                    record.DocumentJson = json;
+                    record.Revision = state.Revision;
+                }
+                else
+                    database.DeviceStates.Add(new DeviceStateRecord { AccountId = state.Account, DocumentJson = json, Revision = state.Revision });
+                if (state.Account == Options.AccountId)
+                {
+                    var pending = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "device.state.publish", cancellationToken).ConfigureAwait(false);
+                    if (pending is { Pending: true } && (pending.IntentJson is null || pending.RequestState.IsCurrent())
+                        && (state.Revision > pending.Revision || state.Revision == pending.Revision && json == pending.DocumentJson))
+                    {
+                        pending.Pending = false;
+                        pending.IntentJson = null;
+                    }
+                }
+                await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                CacheDeviceState(state, published ? Clock.UtcNow : null);
+                if (state.Account == Options.AccountId)
+                {
+                    changed = DeviceState?.Revision != state.Revision;
+                    DeviceState = state;
+                    if (Local is { } certificate && state.ValidateDeviceAuthorization(certificate.GetDeviceId(Context), Context) is not null)
+                        retirement = relayClients.InvalidateDeviceAsync();
+                }
+            }
+            finally
+            {
+                _stateGate.Release();
+            }
+        }
+        if (attempt is null) await SaveAsync().ConfigureAwait(false);
+        else await attempt.CurrentAsync(SaveAsync, cancellationToken).ConfigureAwait(false);
+        // Retirement detaches the old sessions during the guarded commit. Drain them
+        // outside both state gates so a successor can publish and create new sessions.
         try
         {
-            var json = state.ToJson();
-            await using var database = new MeshlineDbContext(databaseOptions);
-            await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-            var record = await database.DeviceStates.SingleOrDefaultAsync(value => value.AccountId == state.Account, cancellationToken).ConfigureAwait(false);
-            if (record is not null)
-            {
-                if (state.Revision < record.Revision || state.Revision == record.Revision && json != record.DocumentJson)
-                    throw new InvalidDataException("The device state is older than the known state or conflicts at the same revision.");
-                record.DocumentJson = json;
-                record.Revision = state.Revision;
-            }
-            else
-                database.DeviceStates.Add(new DeviceStateRecord { AccountId = state.Account, DocumentJson = json, Revision = state.Revision });
-            if (state.Account == Options.AccountId)
-            {
-                var pending = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "device.state.publish", cancellationToken).ConfigureAwait(false);
-                if (pending is { Pending: true } && (state.Revision > pending.Revision || state.Revision == pending.Revision && json == pending.DocumentJson))
-                    pending.Pending = false;
-            }
-            await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            CacheDeviceState(state);
-            if (state.Account == Options.AccountId)
-            {
-                changed = DeviceState?.Revision != state.Revision;
-                DeviceState = state;
-                if (Local is { } certificate && state.ValidateDeviceAuthorization(certificate.GetDeviceId(Context), Context) is not null)
-                    await relayClients.InvalidateDeviceAsync().ConfigureAwait(false);
-            }
-        }
-        finally
-        {
-            _stateGate.Release();
             if (changed) DeviceStateChanged?.Invoke(this, EventArgs.Empty);
         }
+        finally { await retirement.ConfigureAwait(false); }
     }
 
     async Task UseHomeRelayAsync(string relayId, CancellationToken cancellationToken)

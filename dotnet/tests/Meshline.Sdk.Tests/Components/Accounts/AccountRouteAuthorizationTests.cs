@@ -157,7 +157,9 @@ public sealed class AccountRouteAuthorizationTests
         await using (var db = fixture.Database.Open())
         {
             rejected = await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token);
-            Assert.False(rejected.Pending);
+            Assert.True(rejected.Pending);
+            Assert.NotNull(rejected.IntentJson);
+            Assert.Equal(PublicationRequestState.Rejected, rejected.RequestState);
             Assert.Equal(initialAccount ? 0 : 1, rejected.Revision);
             Assert.Equal(initialAccount ? 0 : 1, await db.AccountRoutes.CountAsync(Token));
             local = await db.LocalDevices.SingleAsync(Token);
@@ -202,7 +204,9 @@ public sealed class AccountRouteAuthorizationTests
         await using (var db = fixture.Database.Open())
         {
             rejected = await db.SignedRequests.SingleAsync(value => value.Method == "account.route.publish", Token);
-            Assert.False(rejected.Pending);
+            Assert.True(rejected.Pending);
+            Assert.NotNull(rejected.IntentJson);
+            Assert.Equal(PublicationRequestState.Rejected, rejected.RequestState);
             local = await db.LocalDevices.SingleAsync(Token);
             operationId = (await db.AccountEstablishments.SingleAsync(Token)).OperationId;
         }

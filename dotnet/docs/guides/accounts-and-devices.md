@@ -20,8 +20,8 @@ cancellationToken)`. It retains an unexpired verified route without network requ
 or account signing, reconciles an unfinished publication even when an older valid
 route exists, and renews only when necessary. It reads remote state before any
 publication. `validity` applies to a newly created route; it does not require an
-existing route to have that much time remaining. An unfinished request must use its
-original relay and lifetime. `PublishRouteAsync` remains the explicit publication
+existing route to have that much time remaining. A new validity can replace an unfinished
+request to the same relay. `PublishRouteAsync` remains the explicit publication
 API, including revision selection and recovery behavior.
 
 First route publication requires current authoritative or unexpired staged device
@@ -37,12 +37,11 @@ another explicit call to `EnsureRouteAsync`:
 | Failure | Handling |
 | --- | --- |
 | `StateUnavailable` | Restore access to complete, verified route state before retrying. A failed query does not prove account absence. |
-| `SubmissionUnknown` | Retry with the original relay and lifetime to reconcile the retained signed request; the submission may already have succeeded. |
+| `SubmissionUnknown` | The submission may already have succeeded. The latest intent remains durable; the next call can reconcile or replace it. |
 | `StateConflict` | Obtain newer authoritative state or correct relay prerequisites when the relay rejects a revision and discovery cannot resolve the conflict. |
 | `SignerRequired` | Supply an account signer before retrying. |
 | `SignatureDeclined` | Let the caller obtain renewed user consent before retrying account signing. |
 | `RelayMismatch` | Use the retained or unfinished publication's relay; resolve intentional migration through the migration API. |
-| `OperationConflict` | Resume the unfinished publication with its original lifetime. |
 
 A later explicit call may retry a definitively rejected unexpired route request
 after fresh discovery. Superseding an expired request requires retained verified
@@ -97,11 +96,9 @@ public static async Task RenewDeviceAsync(
 
 Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). Inspect `DeviceStatePublishResult.Status`: a relay can temporarily stage a state instead of accepting it as authoritative. `StagedUntil` describes that temporary state when available. Do not present a staged publication as completed authorization.
 
-Staged submissions and submissions with an unknown outcome remain pending across
-restart. For an exact retry, pass the same complete certificate list, relay and
-revision (if one was supplied); the SDK reuses the signed request. A call without a
-certificate list performs a refresh and may advance the revision. Authoritative
-state reads reconcile pending requests; a temporary staging response does not.
+`PublishDeviceStateAsync` replaces the complete certificate list; omit it to preserve
+known devices and refresh the local certificate. Overlapping publications follow the
+shared [completion and retry rules](events-and-errors.md#cancellation-and-error-types).
 
 `GetAuthorizationState(deviceId)` distinguishes authorization conditions for a known device. `GetCertificate(deviceId)` retrieves a known certificate. `DeviceChanged` and `DeviceStateChanged` notify applications about changes; query current state again when updating UI.
 
@@ -201,7 +198,7 @@ the new certificate.
 Its return alone does not confirm relay acceptance. `EstablishAccountAsync` publishes
 and verifies effective authorization; if it fails or is interrupted, resume that
 workflow after restart instead of reissuing the certificate. An unresolved device
-publication or preparation blocks another standalone update. Applications managing
+publication or preparation blocks another standalone certificate renewal. Applications managing
 publication themselves may use `PublishDeviceStateAsync` as described above and
 must distinguish `accepted` from `staged` or unknown outcomes.
 
@@ -217,7 +214,7 @@ phone can receive a push notification.
 
 ## Removing devices and preserving access
 
-`RemoveDeviceAsync` independently reads the latest device state before publishing updated authorization; it requires the account signer. Do not treat deletion of a local database as remote device revocation. Removing a device's authorization affects future authorized operations, while local copies of already retrieved data remain under the application's storage policy.
+`RemoveDeviceAsync` requires the account signer and reads current device state before publishing removal. Pending removals accumulate by device ID; a later complete certificate list replaces them. Do not treat deletion of a local database as remote device revocation. Removing a device's authorization affects future authorized operations, while local copies of already retrieved data remain under the application's storage policy.
 
 Standalone removal and `EstablishAccountAsync` with `ReplaceDeviceId` use the same
 contact-continuity checks. A valid selected device requires retained contact-history

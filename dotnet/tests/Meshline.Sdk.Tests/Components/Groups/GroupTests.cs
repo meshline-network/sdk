@@ -88,7 +88,7 @@ public sealed class GroupTests
         {
             var operation = await database.GroupOperations.SingleAsync(Token);
             Assert.Equal(Assert.Single(requests), operation.RequestJson);
-            var envelope = ProtocolModel.FromJson<GroupMessageEnvelope>(operation.RequestJson)!;
+            var envelope = ProtocolModel.FromJson<GroupMessageEnvelope>(operation.RequestJson!)!;
             Assert.True(envelope.Notify);
             Assert.True(Ed25519.Verify(envelope.DeviceSignature.AsSpan(), fixture.Client.Device!.SigningPublicKey.AsSpan(), envelope.GetSigningInput(TestNetwork.Context)));
         }
@@ -209,7 +209,7 @@ public sealed class GroupTests
             });
             Assert.NotEqual(epochs[0].Commitment, epochs[1].Commitment);
             Assert.Equal(epochs[1].Commitment, epochs[2].Commitment);
-            Assert.Empty(await db.GroupOperations.ToListAsync(Token));
+            Assert.Empty(await db.GroupOperations.Where(value => value.Pending).ToListAsync(Token));
             Assert.Empty(await db.GroupRotations.ToListAsync(Token));
         }
 
@@ -350,7 +350,7 @@ public sealed class GroupTests
     }
 
     [Fact]
-    public async Task Rejected_write_leaves_no_pending_work()
+    public async Task Rejected_state_update_pauses_its_retained_intent()
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
@@ -365,7 +365,10 @@ public sealed class GroupTests
 
         await using var verify = fixture.Database.Open();
 
-        Assert.Empty(await verify.GroupOperations.ToListAsync(Token));
+        var publication = await verify.GroupOperations.SingleAsync(Token);
+        Assert.True(publication.Pending);
+        Assert.Null(publication.NextAttemptAt);
+        Assert.NotNull(publication.IntentJson);
         Assert.Equal("offline", (await verify.Groups.SingleAsync(Token)).Name);
     }
 

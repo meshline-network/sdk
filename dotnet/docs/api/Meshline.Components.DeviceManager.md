@@ -719,7 +719,7 @@ The relay's canonical lowercase Neo script\-hash identifier\.
 
 `certificates` [System\.Collections\.Generic\.IReadOnlyList&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')[DeviceCertificate](Meshline.Models.Protocol.DeviceCertificate.md 'Meshline\.Models\.Protocol\.DeviceCertificate')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')
 
-The complete certificate list to publish, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') to preserve known devices and refresh the local certificate\.
+The complete certificate list, replacing unfinished removals, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') to preserve known devices and refresh the local certificate\.
 
 <a name='Meshline.Components.DeviceManager.PublishDeviceStateAsync(string,System.Collections.Generic.IReadOnlyList_Meshline.Models.Protocol.DeviceCertificate_,Meshline.Models.Client.DeviceStatePublishOptions,System.Threading.CancellationToken).options'></a>
 
@@ -731,7 +731,7 @@ Optional prior\-state, recovery, and revision settings\.
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that can cancel the operation\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[DeviceStatePublishResult](Meshline.Models.Client.DeviceStatePublishResult.md 'Meshline\.Models\.Client\.DeviceStatePublishResult')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
@@ -745,8 +745,11 @@ The caller cancels the operation or a component or relay lifetime ends\.
 [System\.TimeoutException](https://learn.microsoft.com/en-us/dotnet/api/system.timeoutexception 'System\.TimeoutException')<br>
 An SDK request deadline expires\. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause\.
 
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
+
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
-This component or a required component has not completed initialization\. The account signer or complete prior device state is unavailable, the local device is unauthorized outside recovery, or a pending publication conflicts with the requested update\.
+This component or a required component has not completed initialization\. The account signer or complete prior device state is unavailable, or the local device is unauthorized outside recovery\.
 
 [System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
 This component, a required component, or the shared relay pool has been disposed\.
@@ -782,8 +785,7 @@ The prior state belongs to another account or is invalid, or the complete certif
 The selected device\-state revision is not a newer nonnegative safe integer\. A relay\-provided staging timestamp is outside the supported DateTimeOffset range\.
 
 ### Remarks
-A supplied list is the complete authorized device set, not a delta\. With no list, known devices are preserved and the local certificate is refreshed; unavailable prior state or missing local authorization requires explicit recovery\. Staged publication is not yet authoritative\.<br>
-Staged and unknown\-outcome submissions remain pending\. Retry with the same complete certificate list, relay, and optional revision to reuse the signed request\. A call without a certificate list performs a refresh and may advance the revision\.
+Unavailable prior state or missing local authorization requires explicit recovery\.
 
 <a name='Meshline.Components.DeviceManager.RefreshDeviceStateAsync(Meshline.Models.Protocol.ContactGrant,System.Threading.CancellationToken)'></a>
 
@@ -1019,13 +1021,16 @@ The canonical device identifier\.
 
 `cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
 
-A token that can cancel the operation\.
+Cancels the call without discarding saved changes\.
 
 #### Returns
 [System\.Threading\.Tasks\.Task](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task 'System\.Threading\.Tasks\.Task')<br>
 A task that completes when the operation finishes\.
 
 #### Exceptions
+
+[StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException')<br>
+A newer update superseded this call\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The caller cancels the operation or a component or relay lifetime ends\.
@@ -1070,8 +1075,7 @@ The [deviceId](Meshline.Components.DeviceManager.md#Meshline.Components.DeviceMa
 The next device\-state revision exceeds the protocol safe\-integer limit\.
 
 ### Remarks
-Uses the same retained\-history and confirmed\-grant checks as account setup with an explicit replacement\.<br>
-This operation checks existing evidence; it does not send contact\-grant updates or start background synchronization\.
+Pending removals accumulate by device ID\.
 
 <a name='Meshline.Components.DeviceManager.RenewDeviceAsync(Meshline.Models.Client.DeviceRenewalOptions,System.Threading.CancellationToken)'></a>
 

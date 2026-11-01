@@ -115,15 +115,7 @@ public sealed class DatabaseTests
             await previous.GetService<IMigrator>().MigrateAsync("20261022102400_ResumableAccountEstablishment", token);
             await previous.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO AccountEstablishment (Id, RelayId, OperationId, Step, CertificateValiditySeconds, RouteValiditySeconds, IsInitialState, DeviceAuthorizationConfirmed) VALUES ({1}, {"relay"}, {operationId}, {0}, {86400}, {172800}, {true}, {false})", token);
             previous.DevicePreparations.Add(draft);
-            previous.SignedRequests.Add(new SignedRequestRecord
-            {
-                Method = "device.state.publish",
-                RelayId = "relay",
-                DocumentJson = "exact-signed-publication",
-                Revision = 7,
-                Pending = true,
-                OperationKey = operationId.ToString("N")
-            });
+            await previous.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO SignedRequests (Method, RelayId, DocumentJson, Revision, Pending, OperationKey) VALUES ({"device.state.publish"}, {"relay"}, {"exact-signed-publication"}, {7}, {true}, {operationId.ToString("N")})", token);
             await previous.SaveChangesAsync(token);
         }
 

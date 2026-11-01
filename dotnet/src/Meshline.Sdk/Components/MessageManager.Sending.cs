@@ -43,7 +43,8 @@ sealed partial class MessageManager
             await database.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
             await using var transaction = ((SqliteConnection)database.Database.GetDbConnection()).BeginTransaction(deferred: false);
             await using var enlisted = await database.Database.UseTransactionAsync(transaction, cancellationToken).ConfigureAwait(false);
-            if (contactAuthorization && await database.SignedRequests.AnyAsync(value => value.Method == "device.state.publish" && value.Pending, cancellationToken).ConfigureAwait(false))
+            if (contactAuthorization && await database.SignedRequests.AnyAsync(value => value.Method == "device.state.publish" && value.Pending
+                && value.DocumentJson != null && (value.RequestState == PublicationRequestState.Prepared || value.RequestState == PublicationRequestState.Superseded), cancellationToken).ConfigureAwait(false))
                 throw new InvalidOperationException("Reconcile the pending device publication before changing contact authorizations.");
             await action(database, notifications, cancellationToken).ConfigureAwait(false);
             if (contactAuthorization) await ValidateContactAuthorizationsAsync(database, cancellationToken).ConfigureAwait(false);

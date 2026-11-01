@@ -55,6 +55,7 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
         await using var database = new MeshlineDbContext(databaseOptions);
         await EnsureDatabaseBindingAsync(database, cancellationToken).ConfigureAwait(false);
         await LoadProfileCacheAsync(database, cancellationToken).ConfigureAwait(false);
+        await InitializeProfileUpdatesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -90,12 +91,13 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
     /// <summary>
     /// Applies profile field updates, signs the result with the local device, and publishes it.
     /// </summary>
-    /// <param name="update">The field assignments and deletions to apply; unspecified fields remain unchanged.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <param name="update">Field assignments and deletions. Omitted fields retain existing values and unfinished edits; later changes to the same field win.</param>
+    /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>The signed profile published after applying the updates.</returns>
+    /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account has no resolvable home route or a usable device-authenticated session cannot be established. A pending profile publication conflicts with the requested content.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account has no resolvable home route or a usable device-authenticated session cannot be established.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
@@ -105,19 +107,20 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
     /// <exception cref="DbUpdateException">Persisting local changes fails, including database constraint or optimistic-concurrency failures.</exception>
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails.</exception>
-    /// <exception cref="ArgumentException">The profile belongs to another account, a required public-discovery field is deleted, or the resulting profile fails validation.</exception>
+    /// <exception cref="ArgumentException">The required public-discovery field is deleted or a supplied profile field fails validation.</exception>
     public Task<AccountProfile> UpdateProfileAsync(ProfileUpdate update, CancellationToken cancellationToken = default) =>
-        PublishProfileCoreAsync(update, null, cancellationToken);
+        UpdateLatestProfileAsync(update, cancellationToken);
 
     /// <summary>
-    /// Republishes the newest available profile for this account, including an optional supplied snapshot.
+    /// Republishes the newest available profile for this account, retaining unfinished field changes.
     /// </summary>
     /// <param name="profile">An optional profile snapshot for this account to consider alongside cached state.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
+    /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>The republished profile, or <see langword="null"/> if no profile was available to publish.</returns>
+    /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
     /// <exception cref="OperationCanceledException">The caller cancels the operation or a component or relay lifetime ends.</exception>
     /// <exception cref="TimeoutException">An SDK request deadline expires. Data contains operation and timeoutSeconds; InnerException preserves the cancellation cause.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account has no resolvable home route or a usable device-authenticated session cannot be established. A pending profile publication conflicts with the requested content.</exception>
+    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization. The account has no resolvable home route or a usable device-authenticated session cannot be established.</exception>
     /// <exception cref="ObjectDisposedException">This component, a required component, or the shared relay pool has been disposed.</exception>
     /// <exception cref="HttpRequestException">Relay discovery, authentication, or the HTTP request fails at the transport layer.</exception>
     /// <exception cref="RelayException">The relay rejects the operation with a structured protocol error that is not handled by this method.</exception>
@@ -127,15 +130,19 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
     /// <exception cref="DbUpdateException">Persisting local changes fails, including database constraint or optimistic-concurrency failures.</exception>
     /// <exception cref="CryptographicException">The local device key cannot be validated against its certificate, or cryptographic signing or verification fails.</exception>
-    /// <exception cref="ArgumentException">The profile belongs to another account, a required public-discovery field is deleted, or the resulting profile fails validation.</exception>
+    /// <exception cref="ArgumentException">The supplied profile belongs to another account or fails protocol validation.</exception>
     public async Task<AccountProfile?> PublishProfileAsync(AccountProfile? profile = null, CancellationToken cancellationToken = default)
     {
         EnsureInitialized();
         using var operation = BeginOperation(ref cancellationToken);
         if (profile is not null && profile.Account != AccountId)
             throw new ArgumentException("The profile must belong to the current account.", nameof(profile));
+        if (profile?.Validate() is { } invalid) throw new ArgumentException(invalid.Message, nameof(profile));
         profile = await ReadLatestProfileAsync(profile, cancellationToken).ConfigureAwait(false);
-        return profile is null ? null : await PublishProfileCoreAsync(new(), profile, cancellationToken).ConfigureAwait(false);
+        await using var database = new MeshlineDbContext(databaseOptions);
+        if (profile is null && !await database.SignedRequests.AnyAsync(value => value.Method == "profile.publish" && value.Pending, cancellationToken).ConfigureAwait(false)) return null;
+        return await Updates.SubmitAsync<AccountProfile>(AccountId,
+            profile is null ? new() : new() { ["snapshot"] = (profile with { DeviceSignature = [] }).ToJson() }, cancellationToken).ConfigureAwait(false);
     }
 
     async Task<AccountProfile?> ReadLatestProfileAsync(AccountProfile? fallback, CancellationToken cancellationToken)
@@ -205,7 +212,7 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
                 }
                 if (await database.AccountProfiles.AnyAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false))
                     throw new InvalidDataException("A previously known profile is unavailable; initial values cannot replace it.");
-                if (signed is not null && signed.RelayId == relayId)
+                if (signed is { DocumentJson: not null } && signed.RelayId == relayId)
                 {
                     var original = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
                     // A definitive rejection allows re-signing after discovery.
@@ -217,9 +224,9 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
                         update = new();
                     }
                 }
-                if (signed is { Pending: true }) update = new();
+                if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded }) update = new();
             }
-            if (signed is { Pending: true } && (restored is null || signed.RelayId == relayId))
+            if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && (restored is null || signed.RelayId == relayId))
             {
                 request = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
                 if (signed.RelayId != relayId || Apply(update.Nickname, request.Nickname) != request.Nickname || Apply(update.Bio, request.Bio) != request.Bio
@@ -239,7 +246,7 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
                 {
                     var local = await database.AccountProfiles.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false);
                     if (local is not null && local.UpdatedAt > restored.UpdatedAt) restored = ProtocolModel.FromJson<AccountProfile>(local.DocumentJson)!;
-                    if (signed is { Pending: true } && signed.Revision >= restored.UpdatedAt) restored = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
+                    if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && signed.Revision >= restored.UpdatedAt) restored = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
                     if (basis is null || restored.UpdatedAt > basis.UpdatedAt) basis = restored;
                 }
                 basis ??= new AccountProfile { Account = AccountId, PublicDiscovery = false, UpdatedAt = 0, DeviceSignature = [] };
@@ -266,6 +273,7 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
                     signed.DocumentJson = request.ToJson();
                     signed.Revision = request.UpdatedAt;
                     signed.Pending = true;
+                    signed.RequestState = PublicationRequestState.Prepared;
                 }
                 await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -342,8 +350,12 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
         if (profile.Account == AccountId)
         {
             var pending = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "profile.publish", cancellationToken).ConfigureAwait(false);
-            if (pending is { Pending: true } && (profile.UpdatedAt > pending.Revision || profile.UpdatedAt == pending.Revision && json == pending.DocumentJson))
+            if (pending is { Pending: true } && (pending.IntentJson is null || pending.RequestState.IsCurrent())
+                && (profile.UpdatedAt > pending.Revision || profile.UpdatedAt == pending.Revision && json == pending.DocumentJson))
+            {
                 pending.Pending = false;
+                pending.IntentJson = null;
+            }
         }
         await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
