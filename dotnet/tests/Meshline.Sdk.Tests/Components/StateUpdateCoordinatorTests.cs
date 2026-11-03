@@ -15,6 +15,74 @@ public sealed class StateUpdateCoordinatorTests
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task Resume_joins_active_intent_without_overwriting_or_canceling_its_owner()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var database = new TestDatabase();
+        await database.MigrateAsync();
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        var calls = 0;
+        var coordinator = new TestStateUpdateCoordinator(database.Options, "group.update", async (attempt, token) =>
+        {
+            Interlocked.Increment(ref calls);
+            entered.TrySetResult();
+            await release.Task.WaitAsync(token);
+            return attempt.Intent["name"]!.GetValue<string>();
+        }, (_, error) => Assert.Fail(error.ToString()));
+        var original = coordinator.SubmitAsync<string>("resource", new() { ["name"] = "user edit" }, Token);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            var joined = coordinator.ResumeAsync<string>("resource", new() { ["name"] = "default" }, cancellation.Token);
+            await cancellation.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => joined);
+            Assert.False(original.IsCompleted);
+            Assert.Equal(1, Volatile.Read(ref calls));
+        }
+        finally { release.TrySetResult(); }
+        Assert.Equal("user edit", await original);
+        await coordinator.DrainAsync();
+    }
+
+    [Fact]
+    public async Task Superseded_initialization_cannot_replace_a_newer_in_memory_retry_after_storage_failure()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var database = new TestDatabase();
+        await database.MigrateAsync();
+        await using (var write = database.Open())
+            await write.Database.ExecuteSqlRawAsync("CREATE TRIGGER reject_schedule BEFORE UPDATE OF NextAttemptAt ON GroupOperations WHEN NEW.Generation = 2 AND OLD.Generation = 2 BEGIN SELECT RAISE(ABORT, 'schedule write failed'); END", Token);
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        var coordinator = new TestStateUpdateCoordinator(database.Options, "group.update", async (attempt, _) =>
+        {
+            if (attempt.Intent["name"]!.GetValue<string>() == "initial")
+            {
+                entered.TrySetResult(); await release.Task;
+                throw new InvalidOperationException("late rejection");
+            }
+            throw new HttpRequestException("latest network failure");
+        }, (_, error) => Assert.Fail(error.ToString()));
+        var initial = coordinator.ResumeAsync<string>("resource", new() { ["name"] = "initial" }, Token);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            await Assert.ThrowsAsync<AggregateException>(() => coordinator.SubmitAsync<string>("resource", new() { ["name"] = "new" }, Token));
+            await Assert.ThrowsAsync<StateUpdateSupersededException>(() => initial);
+            Assert.Equal(Clock.UtcNow.AddSeconds(1), await coordinator.ReadNextAttemptAsync("resource", Token));
+            release.TrySetResult(); await coordinator.DrainAsync();
+            Assert.Equal(Clock.UtcNow.AddSeconds(1), await coordinator.ReadNextAttemptAsync("resource", Token));
+            await using var read = database.Open();
+            var row = await read.GroupOperations.SingleAsync(Token);
+            Assert.Equal(2, row.Generation);
+            Assert.True(row.Pending);
+        }
+        finally { release.TrySetResult(); await coordinator.DrainAsync(); }
+    }
+
+    [Fact]
     public async Task Failed_pause_write_keeps_the_live_generation_paused_until_a_new_call()
     {
         var clock = new ManualClock();

@@ -72,6 +72,53 @@ test('a failed admission leaves the active call and its durable intent intact', 
     } finally { release.resolve(); }
 });
 
+test('initialization joins active intent and canceling the join preserves its owner', async () => {
+    const f = await fixture(); const entered = deferred(); const release = deferred(); const caller = new AbortController();
+    f.updates.afterSend = async () => { entered.resolve(); await release.promise; };
+    const original = f.updates.send({ name: 'user' });
+    try {
+        await entered.promise;
+        const joined = f.updates.resume('one', { name: 'default' }, caller.signal);
+        await f.updates.read('one', () => undefined, f.updates.controller.signal);
+        caller.abort(); await expect(joined).rejects.toMatchObject({ name: 'AbortError' });
+        expect(f.updates.sent).toHaveLength(1);
+    } finally { release.resolve(); }
+    expect(await original).toEqual({ name: 'user' });
+});
+
+test('an initialization-owned attempt drains uncancellable work before caller cancellation completes', async () => {
+    const f = await fixture(); const entered = deferred(); const release = deferred(); const caller = new AbortController();
+    f.updates.afterSend = async attempt => { if (attempt.intent.name === 'initial') { entered.resolve(); await release.promise; } };
+    let completed = false;
+    const work = f.updates.resume('one', { name: 'initial' }, caller.signal).finally(() => { completed = true; });
+    const canceled = expect(work).rejects.toMatchObject({ name: 'AbortError' });
+    try {
+        await entered.promise;
+        caller.abort();
+        await Promise.resolve(); expect(completed).toBe(false);
+    }
+    finally { release.resolve(); }
+    await canceled;
+    expect(await f.row()).toMatchObject({ pending: true, intent: { name: 'initial' } });
+});
+
+test('supersession completes initialization promptly while draining still waits for its old work', async () => {
+    const f = await fixture(); const entered = deferred(); const release = deferred();
+    f.updates.afterSend = async attempt => { if (attempt.intent.name === 'initial') { entered.resolve(); await release.promise; } };
+    const work = f.updates.resume('one', { name: 'initial' }, f.updates.controller.signal);
+    const superseded = expect(work).rejects.toBeInstanceOf(StateUpdateSupersededError);
+    let drained = false;
+    try {
+        await entered.promise;
+        expect(await f.updates.send({ name: 'user' })).toEqual({ name: 'user' });
+        await superseded;
+        const drain = f.updates.drain().then(() => { drained = true; });
+        await Promise.resolve(); expect(drained).toBe(false);
+        release.resolve(); await drain;
+        expect(await f.row()).toMatchObject({ pending: false, document: { name: 'user' } });
+    } finally { release.resolve(); await f.updates.drain(); }
+});
+
 test('cancellation preserves merged intent for restart and a late completion cannot clear it', async () => {
     const f = await fixture(); const entered = deferred(); const release = deferred(); const caller = new AbortController();
     f.updates.afterSend = async () => { entered.resolve(); await release.promise; };
@@ -87,6 +134,32 @@ test('cancellation preserves merged intent for restart and a late completion can
         await vi.waitFor(async () => expect((await resumed.row())!.pending).toBe(false));
         expect(resumed.updates.sent).toEqual([{ resource: 'one', intent: { name: 'latest', bio: 'retained' } }]);
     } finally { release.resolve(); }
+});
+
+test('a superseded initialization cannot replace a newer in-memory retry after a storage failure', async () => {
+    const f = await fixture(); const entered = deferred(); const release = deferred();
+    f.updates.afterSend = async attempt => {
+        if (attempt.intent.name === 'initial') { entered.resolve(); await release.promise; throw new Error('late rejection'); }
+        throw new TypeError('latest network failure');
+    };
+    const work = f.updates.resume('one', { name: 'initial' }, f.updates.controller.signal);
+    const superseded = expect(work).rejects.toBeInstanceOf(StateUpdateSupersededError);
+    try {
+        await entered.promise;
+        const commit = f.store.commit.bind(f.store);
+        const failing = vi.spyOn(f.store, 'commit').mockImplementation((version, mutations, signal) => {
+            if (mutations.some(value => value.kind === 'put' && value.value.generation === 2 && value.value.nextAttemptAt === f.clock.wall + 1))
+                throw new Error('schedule write failed');
+            return commit(version, mutations, signal);
+        });
+        await expect(f.updates.send({ name: 'new' })).rejects.toBeInstanceOf(AggregateError);
+        await superseded; failing.mockRestore();
+        const next = () => f.updates.read('one', (_row, _publishing, at) => at, f.updates.controller.signal);
+        expect(await next()).toBe(f.clock.wall + 1);
+        release.resolve(); await f.updates.drain();
+        expect(await next()).toBe(f.clock.wall + 1);
+        expect(await f.row()).toMatchObject({ generation: 2, pending: true, intent: { name: 'new' } });
+    } finally { release.resolve(); await f.updates.drain(); }
 });
 
 test('retry deadlines survive restart and long relay delays use bounded timers', async () => {

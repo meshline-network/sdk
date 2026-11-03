@@ -12,18 +12,31 @@ test('latest merged profile intent survives IndexedDB reopen after two timeouts'
                 try { await first.client.profileManager.updateProfile(patch); throw new Error('Expected timeout'); }
                 catch (error) { if (!(error instanceof TypeError)) throw error; }
             }
+            const failed = await first.client.profileManager.getUpdateState();
             await first.dispose(); network.failBefore = undefined;
-            const resumed = await network.open(91, first.path); network.clock.tick(); await resumed.client.profileManager.start();
+            const resumed = await network.open(91, first.path);
+            const restored = await resumed.client.profileManager.getUpdateState();
+            const states: string[] = [];
+            let finish!: () => void;
+            const synchronized = new Promise<void>(resolve => { finish = resolve; });
+            resumed.client.profileManager.on('updateStateChanged', async () => {
+                const state = await resumed.client.profileManager.getUpdateState(); states.push(state.status);
+                if (state.status === 'synchronized') finish();
+            });
+            network.clock.tick(); await resumed.client.profileManager.start();
             for (let count = 0; count < 100; count++) {
-                if ((await resumed.store.read([{ collection: 'signed_requests', key: 'profile.publish' }])).sets[0]![0]!.value.pending === false) break;
+                if ((await resumed.client.profileManager.getUpdateState()).status === 'synchronized') break;
                 network.clock.tick(); await new Promise(resolve => setTimeout(resolve, 10));
             }
-            await resumed.client.profileManager.stop();
-            return { nickname: resumed.client.profile!.nickname, bio: resumed.client.profile!.bio,
+            await synchronized; await resumed.client.profileManager.stop();
+            return { nickname: resumed.client.profile!.nickname, bio: resumed.client.profile!.bio, failed, restored, states,
                 requests: network.requests.filter(request => request.method === 'profile.publish').map(request => request.body.nickname) };
         } finally { await network.dispose(); }
     });
     expect(result.nickname).toBe('latest'); expect(result.bio).toBe('retained');
+    expect(result.failed).toMatchObject({ status: 'waitingToRetry', pendingUpdate: { nickname: 'latest', bio: 'retained' } });
+    expect(result.restored).toEqual(result.failed);
+    expect(result.states).toContain('publishing'); expect(result.states).toContain('synchronized');
     expect(result.requests.slice(-3)).toEqual(['old', 'latest', 'latest']);
 });
 

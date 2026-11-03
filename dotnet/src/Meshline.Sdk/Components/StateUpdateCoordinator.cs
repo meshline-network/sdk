@@ -17,8 +17,8 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
     readonly Channel<bool> wake = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
     readonly ConcurrentDictionary<Task, byte> workers = new();
     // Backoff counts restart with this coordinator. Keep the computed schedule in
-    // memory too, so a failed deadline write cannot cause immediate repeated sends.
-    readonly ConcurrentDictionary<string, (long Generation, int Failures, DateTimeOffset? NextAttemptAt)> retryStates = new(StringComparer.Ordinal);
+    // memory too, so a failed outcome read or write cannot cause repeated sends.
+    readonly ConcurrentDictionary<string, (long Generation, int Failures, DateTimeOffset? NextAttemptAt, StateUpdateFailure Failure)> retryStates = new(StringComparer.Ordinal);
     Task? runtime;
 
     protected abstract string Operation { get; }
@@ -29,6 +29,8 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
     protected abstract void Report(string resource, Exception error);
     protected virtual void BeforeMerge(JsonObject previous, JsonObject patch) { }
     protected virtual DateTimeOffset? GetFollowUpAt(object? result) => null;
+    protected virtual void SetError(IStatePublication publication, StateUpdateFailure? failure) { }
+    protected virtual void OnChanged(string resource) { }
 
     protected StatePublication Publication(string resource, IStatePublication state) => new(resource, Operation + ":" + resource, state);
 
@@ -50,16 +52,64 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
 
     SemaphoreSlim Gate(string key) => gates.GetOrAdd(key, static _ => new(1, 1));
 
+    // Authoritative discovery can finish intent outside an active attempt. Share
+    // admission's gate so its generation change cannot race a guarded write.
+    protected async Task WithPublicationLockAsync(string resource, Func<Task> action, CancellationToken token)
+    {
+        var gate = Gate(Operation + ":" + resource);
+        await gate.WaitAsync(token).ConfigureAwait(false);
+        try { await action().ConfigureAwait(false); }
+        finally { gate.Release(); }
+    }
+
     DateTimeOffset? ScheduledAt(string key, IStatePublication publication) =>
         retryStates.TryGetValue(key, out var retry) && retry.Generation == publication.Generation
             ? retry.NextAttemptAt : publication.NextAttemptAt;
 
-    public async Task<T> SubmitAsync<T>(string resource, JsonObject patch, CancellationToken token)
+    void ApplyFailure(IStatePublication row, StateUpdateFailure failure)
+    {
+        if (failure.RejectedRequestJson is { } rejected && row.RequestJson == rejected && row.RequestState.IsCurrent())
+            row.RequestState = PublicationRequestState.Rejected;
+        SetError(row, failure);
+    }
+
+    void RestoreFailure(string key, IStatePublication? row)
+    {
+        if (row is { Pending: true } && retryStates.TryGetValue(key, out var retry) && retry.Generation == row.Generation)
+            ApplyFailure(row, retry.Failure);
+    }
+
+    protected async Task<T> ReadAsync<T>(string resource, Func<IStatePublication?, bool, DateTimeOffset?, T> read, CancellationToken token)
+    {
+        var key = Operation + ":" + resource;
+        var gate = Gate(key);
+        await gate.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await using var database = new MeshlineDbContext(options);
+            var row = await FindAsync(database, resource, token).ConfigureAwait(false);
+            var publishing = row is { Pending: true } && active.TryGetValue(key, out var run)
+                && run.Record.State.Generation == row.Generation && !run.Completion.Task.IsCompleted;
+            RestoreFailure(key, row);
+            return read(row, publishing, row is null ? null : ScheduledAt(key, row));
+        }
+        finally { gate.Release(); }
+    }
+
+    public Task<T> SubmitAsync<T>(string resource, JsonObject patch, CancellationToken token) => SubmitCoreAsync<T>(resource, patch, token, resume: false);
+
+    // Initialization may adopt existing intent, but must never replace newer edits.
+    // The owner waits for its publication to drain on cancellation, as setup does
+    // for its other protocol steps. Joining somebody else's attempt only waits.
+    public Task<T> ResumeAsync<T>(string resource, JsonObject initial, CancellationToken token) => SubmitCoreAsync<T>(resource, initial, token, resume: true);
+
+    async Task<T> SubmitCoreAsync<T>(string resource, JsonObject patch, CancellationToken token, bool resume)
     {
         var key = Operation + ":" + resource;
         var gate = Gate(key);
         await gate.WaitAsync(token).ConfigureAwait(false);
         AttemptRun run;
+        var ownsRun = true;
         try
         {
             await using var database = new MeshlineDbContext(options);
@@ -67,26 +117,48 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
             await using var transaction = ((SqliteConnection)database.Database.GetDbConnection()).BeginTransaction(deferred: false);
             await using var enlisted = await database.Database.UseTransactionAsync(transaction, token).ConfigureAwait(false);
             var record = await FindAsync(database, resource, token).ConfigureAwait(false);
-            var intent = record is { Pending: true, IntentJson: not null } ? JsonNode.Parse(record.IntentJson)!.AsObject() : new JsonObject();
-            BeforeMerge(intent, patch);
-            foreach (var pair in patch) intent[pair.Key] = pair.Value?.DeepClone();
-            record ??= Create(database, resource, intent);
-            record.RequestState = record.Pending ? record.RequestState.Supersede() : PublicationRequestState.None;
-            record.IntentJson = intent.ToJsonString();
-            record.Generation = checked(record.Generation + 1);
-            record.Pending = true;
-            record.NextAttemptAt = Clock.UtcNow;
-            await database.SaveChangesAsync(token).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            retryStates.TryRemove(key, out _);
-            if (active.TryRemove(key, out var previous)) previous.Supersede(key);
-            run = new(new(resource, key, record), token);
-            active[key] = run;
+            RestoreFailure(key, record);
+            if (resume && record is { Pending: true, IntentJson: not null } && active.TryGetValue(key, out var existing)
+                && existing.Record.State.Generation == record.Generation && !existing.Completion.Task.IsCompleted)
+            {
+                await transaction.CommitAsync(token).ConfigureAwait(false);
+                run = existing;
+                ownsRun = false;
+            }
+            else
+            {
+                var retain = resume && record is { Pending: true, IntentJson: not null };
+                if (!retain)
+                {
+                    var intent = record is { Pending: true, IntentJson: not null } ? JsonNode.Parse(record.IntentJson)!.AsObject() : new JsonObject();
+                    BeforeMerge(intent, patch);
+                    foreach (var pair in patch) intent[pair.Key] = pair.Value?.DeepClone();
+                    record ??= Create(database, resource, intent);
+                    record.RequestState = record.Pending ? record.RequestState.Supersede() : PublicationRequestState.None;
+                    record.IntentJson = intent.ToJsonString();
+                    record.Generation = checked(record.Generation + 1);
+                    SetError(record, null);
+                }
+                record!.Pending = true;
+                record.NextAttemptAt = Clock.UtcNow;
+                await database.SaveChangesAsync(token).ConfigureAwait(false);
+                await transaction.CommitAsync(token).ConfigureAwait(false);
+                run = new(new(resource, key, record), token, waitForPublication: resume);
+            }
+            if (ownsRun)
+            {
+                if (!resume) retryStates.TryRemove(key, out _);
+                if (active.TryRemove(key, out var previous)) previous.Supersede(key);
+                active[key] = run;
+            }
         }
         finally { gate.Release(); }
-        _ = ObserveWorkAsync(run.Completion.Task);
-        Track(ExecuteAsync(run));
-        return (T)(await run.Completion.Task.WaitAsync(token).ConfigureAwait(false))!;
+        if (ownsRun)
+        {
+            _ = ObserveWorkAsync(run.Completion.Task);
+            Track(ExecuteAsync(run));
+        }
+        return (T)(await (ownsRun && resume ? run.Completion.Task : run.Completion.Task.WaitAsync(token)).ConfigureAwait(false))!;
     }
 
     // Adopt pending publications prepared outside this coordinator in place.
@@ -144,6 +216,7 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
                             var latest = await FindAsync(current, row.Resource, token).ConfigureAwait(false);
                             if (latest is not { Pending: true, NextAttemptAt: not null, IntentJson: not null }
                                 || ScheduledAt(row.Key, latest) is not { } due || due > Clock.UtcNow) continue;
+                            RestoreFailure(row.Key, latest);
                             run = new AttemptRun(new(row.Resource, row.Key, latest), token);
                             active[row.Key] = run;
                         }
@@ -195,10 +268,11 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
         var attempt = new StateUpdateAttempt(this, run.Record, background);
         try
         {
-            // WaitAsync ends the old call even when a transport or signer ignores cancellation.
+            OnChanged(run.Record.Resource);
+            // Ordinary updates stop waiting even when signing or transport ignores cancellation.
             var work = PublishAsync(attempt, run.Cancellation.Token);
             Track(work);
-            var result = await work.WaitAsync(run.Cancellation.Token).ConfigureAwait(false);
+            var result = await (run.WaitForPublication ? work : work.WaitAsync(run.Cancellation.Token)).ConfigureAwait(false);
             await CurrentAsync(run.Record, async () =>
             {
                 await using var database = new MeshlineDbContext(options);
@@ -209,6 +283,7 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
                 row.Pending = pending;
                 if (!pending) row.IntentJson = null;
                 row.NextAttemptAt = pending ? next : null;
+                SetError(row, null);
                 await database.SaveChangesAsync().ConfigureAwait(false);
                 retryStates.TryRemove(run.Record.Key, out _);
                 run.Completion.TrySetResult(result);
@@ -216,21 +291,10 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
         }
         catch (Exception error)
         {
+            var failure = new StateUpdateFailure(error, Clock.UtcNow, attempt.RejectedRequestJson);
             try
             {
-                await CurrentAsync(run.Record, async () =>
-                {
-                    await using var database = new MeshlineDbContext(options);
-                    var row = (await FindAsync(database, run.Record.Resource, CancellationToken.None).ConfigureAwait(false))!;
-                    if (!row.Pending) return;
-                    var previous = retryStates.GetValueOrDefault(run.Record.Key);
-                    var failures = previous.Generation == run.Record.State.Generation ? Math.Min(previous.Failures + 1, 30) : 1;
-                    // Pending + no deadline means retained intent with automatic retry paused.
-                    row.NextAttemptAt = GetNextAttemptAt(row, error, failures);
-                    retryStates[run.Record.Key] = (run.Record.State.Generation, failures, row.NextAttemptAt);
-                    await database.SaveChangesAsync().ConfigureAwait(false);
-                    if (row.NextAttemptAt is null) retryStates.TryRemove(run.Record.Key, out _);
-                }, CancellationToken.None).ConfigureAwait(false);
+                await SaveFailureAsync(run, failure).ConfigureAwait(false);
             }
             catch (StateUpdateSupersededException) { error = new StateUpdateSupersededException(run.Record.Key); }
             catch (Exception storageError) { error = new AggregateException(error, storageError); }
@@ -238,10 +302,46 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
         }
         finally
         {
-            active.TryRemove(new KeyValuePair<string, AttemptRun>(run.Record.Key, run));
+            if (active.TryRemove(new KeyValuePair<string, AttemptRun>(run.Record.Key, run))) OnChanged(run.Record.Resource);
             await run.DisposeAsync().ConfigureAwait(false);
             wake.Writer.TryWrite(true);
         }
+    }
+
+    async Task SaveFailureAsync(AttemptRun run, StateUpdateFailure failure)
+    {
+        var record = run.Record;
+        var gate = Gate(record.Key);
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (!active.TryGetValue(record.Key, out var current) || current != run)
+                throw new StateUpdateSupersededException(record.Key);
+            var previous = retryStates.GetValueOrDefault(record.Key);
+            var failures = previous.Generation == record.State.Generation ? Math.Min(previous.Failures + 1, 30) : 1;
+            DateTimeOffset? Remember(IStatePublication state)
+            {
+                var next = GetNextAttemptAt(state, failure.Error, failures);
+                retryStates[record.Key] = (record.State.Generation, failures, next, failure);
+                return next;
+            }
+            // Keep a generation-scoped fallback before any storage access. Discovery
+            // may have retired it; the durable generation and Pending still govern reads.
+            Remember(record.State);
+            await using var database = new MeshlineDbContext(options);
+            var row = await FindAsync(database, record.Resource, CancellationToken.None).ConfigureAwait(false);
+            if (row is null || row.Generation != record.State.Generation)
+            {
+                retryStates.TryRemove(record.Key, out _);
+                throw new StateUpdateSupersededException(record.Key);
+            }
+            if (!row.Pending) { retryStates.TryRemove(record.Key, out _); return; }
+            row.NextAttemptAt = Remember(row);
+            ApplyFailure(row, failure);
+            await database.SaveChangesAsync().ConfigureAwait(false);
+            if (row.NextAttemptAt is null) retryStates.TryRemove(record.Key, out _);
+        }
+        finally { gate.Release(); }
     }
 
     void Track(Task work)
@@ -303,11 +403,12 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
         if (expected.State.RequestJson == json) expected.State.RequestState = PublicationRequestState.Rejected;
     }, CancellationToken.None);
 
-    sealed class AttemptRun(StatePublication record, CancellationToken token) : IAsyncDisposable
+    sealed class AttemptRun(StatePublication record, CancellationToken token, bool waitForPublication = false) : IAsyncDisposable
     {
         readonly Lock completionGate = new();
         Task cancellation = Task.CompletedTask;
         public StatePublication Record { get; } = record;
+        public bool WaitForPublication { get; } = waitForPublication;
         public CancellationToken OwnerToken { get; } = token;
         public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(token);
         public TaskCompletionSource<object?> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -335,19 +436,30 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
 // An attempt's in-memory snapshot of an existing publication row. It has no table.
 sealed record StatePublication(string Resource, string Key, IStatePublication State);
 
+// Retained with the retry schedule even if persisting the latest outcome fails.
+sealed record StateUpdateFailure(Exception Error, DateTimeOffset OccurredAt, string? RejectedRequestJson = null);
+
 sealed class StateUpdateAttempt(StateUpdateCoordinator owner, StatePublication record, bool background)
 {
     public bool IsBackground { get; } = background;
     public JsonObject Intent { get; } = JsonNode.Parse(record.State.IntentJson!)!.AsObject();
     public long Generation => record.State.Generation;
     public string? RequestJson => record.State.RequestState == PublicationRequestState.Prepared ? record.State.RequestJson : null;
-    public Task SaveRequestAsync(string json, CancellationToken token) => owner.SaveRequestAsync(record, json, token);
-    // Device publication saves its request and revision floor in the guarded
-    // transaction. Keep that request available to this attempt's conflict retries.
+    public string? RejectedRequestJson { get; private set; } = record.State.RequestState is PublicationRequestState.Rejected or PublicationRequestState.SupersededRejected ? record.State.RequestJson : null;
+    public async Task SaveRequestAsync(string json, CancellationToken token)
+    {
+        await owner.SaveRequestAsync(record, json, token).ConfigureAwait(false);
+        RejectedRequestJson = null;
+    }
+    // Save the known rejection together with diagnostics and its retry deadline.
+    public void RecordRejection(string json) => RejectedRequestJson = json;
+    // Keep requests saved by manager-owned transactions available for retries
+    // and failure diagnostics even when subsequent storage access fails.
     public void RecordRequest(string json)
     {
         record.State.RequestJson = json;
         record.State.RequestState = PublicationRequestState.Prepared;
+        RejectedRequestJson = null;
     }
     public Task InvalidateRequestAsync(string json) => owner.InvalidateRequestAsync(record, json);
     public Task CurrentAsync(Func<Task> action, CancellationToken token) => owner.CurrentAsync(record, action, token);

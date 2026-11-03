@@ -48,6 +48,11 @@ Reauthorizing a device does **not** restore lost chat history or group secrets.
 | `replaceDeviceId` | Explicit device to remove in the same publication that authorizes the local device, subject to contact continuity. |
 | `initialProfile` | Creation-only `nickname`, `bio`, `avatar` and `publicDiscovery`. Existing remote or retained profiles take precedence. |
 
+Profile initialization preserves pending user edits. Finding an existing profile
+completes initialization without applying defaults. `publishProfile()` and empty
+updates retain this creation-only behavior; explicit field assignments or deletions
+supersede it with ordinary user edits.
+
 Options, including nested initial profile data, are copied before asynchronous work.
 Omitted options resume saved values; changed lifetime options do not replace the
 saved lifetimes. A conflicting explicit relay, initial profile or non-undefined
@@ -119,6 +124,11 @@ reconciled before renewing the same keys.
 Success requires accepted publication and effective authorization, not a saved
 checkpoint or staged response. Profile initialization and completion recheck
 validity; an expiry keeps the operation available for explicit retry.
+
+Observe initial publication through
+[`getUpdateState()` and `updateStateChanged`](profiles-and-contacts.md#display-pending-edits-and-synchronization-status).
+If background retry confirms the profile after setup failed, call `establishAccount()`
+again to complete the retained authorization checks and setup.
 
 Discovery returns `not_found` for expired routes as well as absent accounts. A
 retained verified route can be renewed. After complete local erasure, an expired

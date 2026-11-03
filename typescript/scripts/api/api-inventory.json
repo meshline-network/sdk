@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "f2efcd943bbc25eb77f58a01987e2c0b1e8e5deb8646b7059f3c855aacb231e5",
+  "sourceSha256": "3de3c1b4621fdfbda3cdee744ec5f5f422a285e9348410d4831825cc50be6cff",
   "sdkBaseline": "f024be46d6ff288739d1555ef9e6607b914d571d",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -149,7 +149,14 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.ProfileChanged",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
+    },
+    {
+      "symbol": "E:Meshline.Components.ProfileManager.UpdateStateChanged",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.UpdateStateChanged",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "E:Meshline.MeshlineClient.ConversationChanged",
@@ -801,6 +808,41 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/messages/outbox.ts",
       "notes": "Durable delivery-state projection, uncertainty and accepted-relay binding."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.ProfileUpdateStatus.Failed",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateStatus.md#Meshline.Models.Client.ProfileUpdateStatus.Failed",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "String union: synchronized, pending, publishing, waitingToRetry and failed. Synchronized does not imply that a confirmed profile exists."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.ProfileUpdateStatus.Pending",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateStatus.md#Meshline.Models.Client.ProfileUpdateStatus.Pending",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "String union: synchronized, pending, publishing, waitingToRetry and failed. Synchronized does not imply that a confirmed profile exists."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.ProfileUpdateStatus.Publishing",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateStatus.md#Meshline.Models.Client.ProfileUpdateStatus.Publishing",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "String union: synchronized, pending, publishing, waitingToRetry and failed. Synchronized does not imply that a confirmed profile exists."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.ProfileUpdateStatus.Synchronized",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateStatus.md#Meshline.Models.Client.ProfileUpdateStatus.Synchronized",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "String union: synchronized, pending, publishing, waitingToRetry and failed. Synchronized does not imply that a confirmed profile exists."
+    },
+    {
+      "symbol": "F:Meshline.Models.Client.ProfileUpdateStatus.WaitingToRetry",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateStatus.md#Meshline.Models.Client.ProfileUpdateStatus.WaitingToRetry",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "String union: synchronized, pending, publishing, waitingToRetry and failed. Synchronized does not imply that a confirmed profile exists."
     },
     {
       "symbol": "F:Meshline.Models.Client.ResourceSyncBlockReason.Authentication",
@@ -1969,35 +2011,42 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.ProfileManager(Meshline.Models.Client.ClientOptions,Meshline.Storage.DatabaseOptions,Meshline.Transport.RelayClientPool,Meshline.Components.AccountManager,Meshline.Interactions.IDeviceSigner)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "M:Meshline.Components.ProfileManager.GetProfileAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.GetProfileAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
+    },
+    {
+      "symbol": "M:Meshline.Components.ProfileManager.GetUpdateStateAsync(System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.GetUpdateStateAsync(System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "M:Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "M:Meshline.Components.ProfileManager.RefreshProfileAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.RefreshProfileAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "M:Meshline.Components.ProfileManager.UpdateProfileAsync(Meshline.Models.Client.ProfileUpdate,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.UpdateProfileAsync(Meshline.Models.Client.ProfileUpdate,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "M:Meshline.Components.StateUpdateSupersededException.#ctor(System.String)",
@@ -3585,6 +3634,21 @@
       "status": "unmapped"
     },
     {
+      "symbol": "M:Meshline.Storage.Migrations.ProfileUpdateDiagnostics.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ProfileUpdateDiagnostics.md#Meshline.Storage.Migrations.ProfileUpdateDiagnostics.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.ProfileUpdateDiagnostics.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ProfileUpdateDiagnostics.md#Meshline.Storage.Migrations.ProfileUpdateDiagnostics.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.ProfileUpdateDiagnostics.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ProfileUpdateDiagnostics.md#Meshline.Storage.Migrations.ProfileUpdateDiagnostics.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
       "symbol": "M:Meshline.Storage.Migrations.ResumableAccountEstablishment.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ResumableAccountEstablishment.md#Meshline.Storage.Migrations.ResumableAccountEstablishment.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "status": "mapped-requires-behavior-review",
@@ -3995,14 +4059,14 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.AccountId",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "P:Meshline.Components.ProfileManager.Profile",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.Profile",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "P:Meshline.Components.StateUpdateSupersededException.Resource",
@@ -5319,6 +5383,55 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
       "notes": "ProfileUpdate uses optional fields; null clears nickname/avatar/bio, while publicDiscovery accepts a boolean. Omission leaves a value unchanged."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ProfileUpdateError.Code",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateError.md#Meshline.Models.Client.ProfileUpdateError.Code",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Message, optional relay code and original failure time in UTC Unix seconds; retained during retries and cleared by new intent or confirmation."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ProfileUpdateError.Message",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateError.md#Meshline.Models.Client.ProfileUpdateError.Message",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Message, optional relay code and original failure time in UTC Unix seconds; retained during retries and cleared by new intent or confirmation."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ProfileUpdateError.OccurredAt",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateError.md#Meshline.Models.Client.ProfileUpdateError.OccurredAt",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Message, optional relay code and original failure time in UTC Unix seconds; retained during retries and cleared by new intent or confirmation."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ProfileUpdateState.LastError",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateState.md#Meshline.Models.Client.ProfileUpdateState.LastError",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Detached local state uses optional pendingUpdate, lastError and nextAttemptAt; timestamps are UTC Unix seconds. Pure republication has an empty pendingUpdate."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ProfileUpdateState.NextAttemptAt",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateState.md#Meshline.Models.Client.ProfileUpdateState.NextAttemptAt",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Detached local state uses optional pendingUpdate, lastError and nextAttemptAt; timestamps are UTC Unix seconds. Pure republication has an empty pendingUpdate."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ProfileUpdateState.PendingUpdate",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateState.md#Meshline.Models.Client.ProfileUpdateState.PendingUpdate",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Detached local state uses optional pendingUpdate, lastError and nextAttemptAt; timestamps are UTC Unix seconds. Pure republication has an empty pendingUpdate."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.ProfileUpdateState.Status",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateState.md#Meshline.Models.Client.ProfileUpdateState.Status",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Detached local state uses optional pendingUpdate, lastError and nextAttemptAt; timestamps are UTC Unix seconds. Pure republication has an empty pendingUpdate."
     },
     {
       "symbol": "P:Meshline.Models.Client.ResourceSyncStatus.BlockReason",
@@ -8258,7 +8371,7 @@
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ProfileManager.md",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
-      "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+      "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
     },
     {
       "symbol": "T:Meshline.Components.StateUpdateSupersededException",
@@ -8707,6 +8820,27 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/profile.ts",
       "notes": "ProfileUpdate uses optional fields; null clears nickname/avatar/bio, while publicDiscovery accepts a boolean. Omission leaves a value unchanged."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.ProfileUpdateError",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateError.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Message, optional relay code and original failure time in UTC Unix seconds; retained during retries and cleared by new intent or confirmation."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.ProfileUpdateState",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateState.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "Detached local state uses optional pendingUpdate, lastError and nextAttemptAt; timestamps are UTC Unix seconds. Pure republication has an empty pendingUpdate."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.ProfileUpdateStatus",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ProfileUpdateStatus.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/profile.ts",
+      "notes": "String union: synchronized, pending, publishing, waitingToRetry and failed. Synchronized does not imply that a confirmed profile exists."
     },
     {
       "symbol": "T:Meshline.Models.Client.ResourceSyncBlockReason",
@@ -9659,6 +9793,11 @@
     {
       "symbol": "T:Meshline.Storage.Migrations.LatestStatePublications",
       "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.LatestStatePublications.md",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "T:Meshline.Storage.Migrations.ProfileUpdateDiagnostics",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ProfileUpdateDiagnostics.md",
       "status": "unmapped"
     },
     {

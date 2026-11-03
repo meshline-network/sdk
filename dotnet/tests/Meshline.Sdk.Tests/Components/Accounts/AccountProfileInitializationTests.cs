@@ -106,7 +106,11 @@ public sealed class AccountProfileInitializationTests
         Assert.IsType<RelayException>(error.InnerException);
         await using var verify = fixture.Database.Open();
         Assert.Single(await verify.AccountEstablishments.ToListAsync(Token));
-        Assert.Equal(unknown, (await verify.SignedRequests.SingleAsync(value => value.Method == "profile.publish", Token)).Pending);
+        var pending = await verify.SignedRequests.SingleAsync(value => value.Method == "profile.publish", Token);
+        Assert.True(pending.Pending);
+        Assert.NotNull(pending.IntentJson);
+        Assert.Equal(unknown, pending.NextAttemptAt is not null);
+        Assert.Equal(unknown ? PublicationRequestState.Prepared : PublicationRequestState.Rejected, pending.RequestState);
     }
 
     [Theory]

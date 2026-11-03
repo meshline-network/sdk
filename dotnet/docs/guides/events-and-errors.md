@@ -50,6 +50,7 @@ Events indicate changes; local queries provide the durable current view. Use `Co
 | --- | --- | --- |
 | Client | `ConversationChanged` | Re-query the affected local conversation. |
 | Account/device/profile managers | `AccountChanged`, `DeviceChanged`, `DeviceStateChanged`, `ProfileChanged` | Refresh route, local certificate, authorization or profile views, including changes confirmed by background recovery. |
+| Profile manager | `UpdateStateChanged` | Read `GetUpdateStateAsync` for [pending edits and publication status](profiles-and-contacts.md#display-pending-edits-and-synchronization-status). |
 | Message manager | `MessageReceived`, `TimelineChanged`, `SendStatusChanged` | Display received messages and track outgoing operations. |
 | Message manager | `ContactChanged`, `ContactRequestChanged` | Refresh contacts and pending requests. |
 | Channel manager | `ChannelChanged`, `TimelineChanged`, `FollowChanged` | Refresh channel metadata, posts, or follow state. |
@@ -96,8 +97,9 @@ does not cancel the send.
 Profile, route, device-state, group-property and channel-descriptor updates retain
 the latest intent per resource. New calls merge unfinished fields, with later values
 winning, and replace earlier attempts without waiting for their responses. Admission
-failures leave previous work intact. The SDK persists and retries only the latest
-intent after transient failures or restart; [start the component](lifecycle.md#session-order)
+failures leave previous work intact. Late results from superseded attempts cannot
+replace newer local state. The SDK persists and retries only the latest intent
+after transient failures or restart; [start the component](lifecycle.md#session-order)
 to enable retries. Cancellation after admission stops waiting but preserves that
 intent; already completed calls keep their outcome. Permanent failures pause retries:
 correct the cause and issue another update. Saving intent does not confirm remote acceptance.

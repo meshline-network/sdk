@@ -3,8 +3,6 @@ using Meshline.Storage;
 using Meshline.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 
 namespace Meshline.Tests.Components.Accounts;
 
@@ -193,34 +191,5 @@ public sealed class AccountEstablishmentCompletionTests
         Assert.DoesNotContain(fixture.Relay.Requests, request => request.Method is "device.state.publish" or "account.route.publish" or "profile.publish");
         await using var verify = fixture.Database.Open();
         Assert.Empty(await verify.AccountEstablishments.ToListAsync(Token));
-    }
-
-    sealed class Observer<T>(Action<T> onNext) : IObserver<T>
-    {
-        public void OnNext(T value) => onNext(value);
-        public void OnError(Exception error) { }
-        public void OnCompleted() { }
-    }
-
-    sealed class DatabaseObserver : IDisposable
-    {
-        readonly ConcurrentBag<IDisposable> subscriptions = [];
-        readonly IDisposable all;
-        public DatabaseObserver(Action<string, object?> callback)
-        {
-            all = DiagnosticListener.AllListeners.Subscribe(new Observer<DiagnosticListener>(listener =>
-            {
-                if (listener.Name == "Microsoft.EntityFrameworkCore")
-                    subscriptions.Add(listener.Subscribe(new Observer<KeyValuePair<string, object?>>(pair =>
-                    {
-                        callback(pair.Key, pair.Value);
-                    })));
-            }));
-        }
-        public void Dispose()
-        {
-            all.Dispose();
-            foreach (var subscription in subscriptions) subscription.Dispose();
-        }
     }
 }

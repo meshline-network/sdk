@@ -1,6 +1,5 @@
 using Meshline.Identity;
 using Meshline.Interactions;
-using Meshline.Models;
 using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Storage;
@@ -12,6 +11,7 @@ using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Meshline.Components;
 
@@ -33,14 +33,12 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
     /// </summary>
     public event EventHandler? ProfileChanged;
 
-    private readonly SemaphoreSlim _profileGate = new(1, 1);
-
     /// <summary>
     /// The account's CAIP-10 identifier.
     /// </summary>
     public string AccountId => Options.AccountId;
     /// <summary>
-    /// The current account's profile, or <see langword="null"/> when it is unavailable.
+    /// The current account's confirmed profile, or <see langword="null"/> when it is unavailable. Pending local edits are exposed by GetUpdateStateAsync.
     /// </summary>
     public AccountProfile? Profile { get; private set; }
 
@@ -114,7 +112,7 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
     /// <summary>
     /// Republishes the newest available profile for this account, retaining unfinished field changes.
     /// </summary>
-    /// <param name="profile">An optional profile snapshot for this account to consider alongside cached state.</param>
+    /// <param name="profile">An optional profile snapshot for this account to consider alongside cached state. Among pending and supplied snapshots, the higher UpdatedAt wins; equal timestamps retain the pending snapshot.</param>
     /// <param name="cancellationToken">Cancels the call without discarding saved changes.</param>
     /// <returns>The republished profile, or <see langword="null"/> if no profile was available to publish.</returns>
     /// <exception cref="StateUpdateSupersededException">A newer update superseded this call.</exception>
@@ -138,26 +136,25 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
         if (profile is not null && profile.Account != AccountId)
             throw new ArgumentException("The profile must belong to the current account.", nameof(profile));
         if (profile?.Validate() is { } invalid) throw new ArgumentException(invalid.Message, nameof(profile));
-        profile = await ReadLatestProfileAsync(profile, cancellationToken).ConfigureAwait(false);
-        await using var database = new MeshlineDbContext(databaseOptions);
-        if (profile is null && !await database.SignedRequests.AnyAsync(value => value.Method == "profile.publish" && value.Pending, cancellationToken).ConfigureAwait(false)) return null;
-        return await Updates.SubmitAsync<AccountProfile>(AccountId,
-            profile is null ? new() : new() { ["snapshot"] = (profile with { DeviceSignature = [] }).ToJson() }, cancellationToken).ConfigureAwait(false);
-    }
-
-    async Task<AccountProfile?> ReadLatestProfileAsync(AccountProfile? fallback, CancellationToken cancellationToken)
-    {
-        await _profileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
+        if (profile is null)
         {
             await using var database = new MeshlineDbContext(databaseOptions);
-            var local = await database.AccountProfiles.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false);
-            var pending = await database.SignedRequests.AsNoTracking().SingleOrDefaultAsync(value => value.Method == "profile.publish" && value.Pending, cancellationToken).ConfigureAwait(false);
-            var json = pending is not null && (local is null || pending.Revision >= local.UpdatedAt) ? pending.DocumentJson : local?.DocumentJson;
-            var profile = json is null ? null : ProtocolModel.FromJson<AccountProfile>(json);
-            return profile is not null && (fallback is null || profile.UpdatedAt >= fallback.UpdatedAt) ? profile : fallback;
+            if (!await database.AccountProfiles.AnyAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false)
+                && !await database.SignedRequests.AnyAsync(value => value.Method == "profile.publish" && value.Pending, cancellationToken).ConfigureAwait(false))
+                return null;
         }
-        finally { _profileGate.Release(); }
+        try
+        {
+            // Only caller-supplied snapshots become intent. The owning attempt reads
+            // current cache and pending work, so retired requests cannot be reintroduced.
+            return await Updates.SubmitAsync<AccountProfile>(AccountId,
+                profile is null ? new() : new() { ["snapshot"] = (profile with { DeviceSignature = [] }).ToJson() }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is ProfilePublicationException or AggregateException)
+        {
+            ExceptionDispatchInfo.Throw(ProfilePublicationException.Unwrap(error));
+            throw;
+        }
     }
 
     internal async Task InitializeAccountProfileAsync(AccountInitialProfile initial, bool createIfMissing, CancellationToken cancellationToken)
@@ -165,143 +162,34 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
         EnsureInitialized();
         var callerToken = cancellationToken;
         using var operation = BeginOperation(ref cancellationToken);
-        if (!createIfMissing)
+        var publication = Interlocked.Read(ref _profilePublication);
+        var existing = await ResolveProfileAsync(AccountId, cancellationToken).ConfigureAwait(false);
+        if (existing is not null)
         {
-            var publication = Interlocked.Read(ref _profilePublication);
-            var existing = await ResolveProfileAsync(AccountId, cancellationToken).ConfigureAwait(false);
-            if (existing is not null) await SaveProfileAsync(existing, cancellationToken, publication).ConfigureAwait(false);
+            await SaveProfileAsync(existing, cancellationToken, publication).ConfigureAwait(false);
             return;
         }
-        var update = new ProfileUpdate { PublicDiscovery = initial.PublicDiscovery };
-        if (initial.Nickname is not null) update.Nickname = initial.Nickname;
-        if (initial.Bio is not null) update.Bio = initial.Bio;
-        if (initial.Avatar is not null) update.Avatar = initial.Avatar;
+        if (!createIfMissing) return;
+        await using var database = new MeshlineDbContext(databaseOptions);
+        if (await database.AccountProfiles.AnyAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false))
+            throw new InvalidDataException("A previously known profile is unavailable; initial values cannot replace it.");
+        var intent = new JsonObject { ["initialize_only"] = true, ["public_discovery"] = initial.PublicDiscovery };
+        if (initial.Nickname is not null) intent["nickname"] = initial.Nickname;
+        if (initial.Bio is not null) intent["bio"] = initial.Bio;
+        if (initial.Avatar is not null) intent["avatar"] = JsonNode.Parse(initial.Avatar.ToJson());
         try
         {
-            await PublishProfileCoreAsync(update, null, cancellationToken, initializeOnly: true).ConfigureAwait(false);
+            await Updates.ResumeAsync<AccountProfile>(AccountId, intent, cancellationToken).ConfigureAwait(false);
         }
         catch (ProfilePublicationException exception) when (callerToken.IsCancellationRequested && exception.InnerException is OperationCanceledException)
         {
             ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
         }
-    }
-
-    async Task<AccountProfile> PublishProfileCoreAsync(ProfileUpdate update, AccountProfile? restored, CancellationToken cancellationToken, bool initializeOnly = false)
-    {
-        EnsureInitialized();
-        using var _ = BeginOperation(ref cancellationToken);
-        if (update.PublicDiscovery.IsDeleted)
-            throw new ArgumentException("PublicDiscovery cannot be deleted.", nameof(update));
-        await _profileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        AccountProfile request;
-        try
+        catch (AggregateException exception) when (exception.Flatten().InnerExceptions.Any(value => value is ProfilePublicationException))
         {
-            var certificate = deviceSigner.Certificate;
-            var route = await accountManager.GetRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException("The account route could not be found. Establish or recover the account explicitly.");
-            var relayId = route.RelayId;
-            await using var database = new MeshlineDbContext(databaseOptions);
-            var signed = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "profile.publish", cancellationToken).ConfigureAwait(false);
-            if (initializeOnly)
-            {
-                var existing = await ResolveProfileAsync(AccountId, cancellationToken, relayId).ConfigureAwait(false);
-                if (existing is not null)
-                {
-                    await SaveProfileAsync(existing, cancellationToken).ConfigureAwait(false);
-                    return existing.Profile;
-                }
-                if (await database.AccountProfiles.AnyAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false))
-                    throw new InvalidDataException("A previously known profile is unavailable; initial values cannot replace it.");
-                if (signed is { DocumentJson: not null } && signed.RelayId == relayId)
-                {
-                    var original = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
-                    // A definitive rejection allows re-signing after discovery.
-                    // Keep the original content in SignedRequests so interruption
-                    // after rejection does not lose it or require workflow metadata.
-                    if (!signed.Pending)
-                    {
-                        restored = original;
-                        update = new();
-                    }
-                }
-                if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded }) update = new();
-            }
-            if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && (restored is null || signed.RelayId == relayId))
-            {
-                request = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
-                if (signed.RelayId != relayId || Apply(update.Nickname, request.Nickname) != request.Nickname || Apply(update.Bio, request.Bio) != request.Bio
-                    || Apply(update.Avatar, request.Avatar)?.ToJson() != request.Avatar?.ToJson() || update.PublicDiscovery.IsSpecified && update.PublicDiscovery.Value != request.PublicDiscovery)
-                    throw new InvalidOperationException("A profile publication has an unknown result. Retry the original update or resolve the profile first.");
-            }
-            else
-            {
-                var current = await ResolveProfileAsync(AccountId, cancellationToken, relayId).ConfigureAwait(false);
-                if (initializeOnly && current is not null)
-                {
-                    await SaveProfileAsync(current, cancellationToken).ConfigureAwait(false);
-                    return current.Profile;
-                }
-                var basis = current?.Profile;
-                if (restored is not null)
-                {
-                    var local = await database.AccountProfiles.AsNoTracking().SingleOrDefaultAsync(value => value.AccountId == AccountId, cancellationToken).ConfigureAwait(false);
-                    if (local is not null && local.UpdatedAt > restored.UpdatedAt) restored = ProtocolModel.FromJson<AccountProfile>(local.DocumentJson)!;
-                    if (signed is { Pending: true, DocumentJson: not null, RequestState: PublicationRequestState.Prepared or PublicationRequestState.Superseded } && signed.Revision >= restored.UpdatedAt) restored = ProtocolModel.FromJson<AccountProfile>(signed.DocumentJson)!;
-                    if (basis is null || restored.UpdatedAt > basis.UpdatedAt) basis = restored;
-                }
-                basis ??= new AccountProfile { Account = AccountId, PublicDiscovery = false, UpdatedAt = 0, DeviceSignature = [] };
-                request = basis with
-                {
-                    Nickname = Apply(update.Nickname, basis.Nickname),
-                    Avatar = Apply(update.Avatar, basis.Avatar),
-                    Bio = Apply(update.Bio, basis.Bio),
-                    PublicDiscovery = update.PublicDiscovery.IsSpecified ? update.PublicDiscovery.Value : basis.PublicDiscovery,
-                    UpdatedAt = Math.Max(Clock.UtcNow.ToUnixTimeSeconds(), basis.UpdatedAt),
-                    DeviceSignature = []
-                };
-                request = request with { DeviceSignature = [.. await deviceSigner.SignAsync(request.GetSigningInput(Context), cancellationToken).ConfigureAwait(false)] };
-                if (request.Validate() is { } violation)
-                    throw new ArgumentException(violation.Message, nameof(update));
-                if (signed is null)
-                {
-                    signed = new SignedRequestRecord { Method = "profile.publish", RelayId = relayId, DocumentJson = request.ToJson(), Revision = request.UpdatedAt, Pending = true };
-                    database.SignedRequests.Add(signed);
-                }
-                else
-                {
-                    signed.RelayId = relayId;
-                    signed.DocumentJson = request.ToJson();
-                    signed.Revision = request.UpdatedAt;
-                    signed.Pending = true;
-                    signed.RequestState = PublicationRequestState.Prepared;
-                }
-                await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-            var relayClient = await relayClients.GetAsync(relayId, deviceSigner, cancellationToken).ConfigureAwait(false);
-            try
-            {
-                await relayClient.SendHttpAsync(HttpMethod.Put, "profile.publish", request, cancellationToken: cancellationToken).ConfigureAwait(false);
-            }
-            catch (RelayException exception) when (exception.Error.IsDefinitiveRejection())
-            {
-                signed.Pending = false;
-                await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
-                throw;
-            }
-            catch (Exception exception) when (initializeOnly && exception is HttpRequestException or TimeoutException or RelayException or InvalidDataException or CryptographicException or OperationCanceledException)
-            {
-                throw new ProfilePublicationException(exception);
-            }
-            await SaveProfileAsync(new ProfileResolveResult { Profile = request, SignerCertificate = certificate }, cancellationToken, published: true).ConfigureAwait(false);
-            return request;
-        }
-        finally
-        {
-            _profileGate.Release();
+            throw new ProfilePublicationException(ProfilePublicationException.Unwrap(exception));
         }
     }
-
-    static T? Apply<T>(FieldUpdate<T> update, T? current) where T : class => update.IsDeleted ? null : update.IsSpecified ? update.Value : current;
 
     async Task<ProfileResolveResult?> ResolveProfileAsync(string accountId, CancellationToken cancellationToken, string? relayId = null)
     {
@@ -330,8 +218,9 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
         return result;
     }
 
-    async Task StoreProfileAsync(ProfileResolveResult result, CancellationToken cancellationToken)
+    async Task<bool> StoreProfileAsync(ProfileResolveResult result, bool published, CancellationToken cancellationToken)
     {
+        var confirmed = false;
         var profile = result.Profile;
         var json = profile.ToJson();
         await using var database = new MeshlineDbContext(databaseOptions);
@@ -350,14 +239,29 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
         if (profile.Account == AccountId)
         {
             var pending = await database.SignedRequests.SingleOrDefaultAsync(value => value.Method == "profile.publish", cancellationToken).ConfigureAwait(false);
-            if (pending is { Pending: true } && (pending.IntentJson is null || pending.RequestState.IsCurrent())
-                && (profile.UpdatedAt > pending.Revision || profile.UpdatedAt == pending.Revision && json == pending.DocumentJson))
+            var initializeOnly = pending is { Pending: true, IntentJson: not null }
+                && JsonNode.Parse(pending.IntentJson)!["initialize_only"]?.GetValue<bool>() == true;
+            if (pending is { Pending: true } && (initializeOnly
+                || (pending.IntentJson is null || pending.RequestState.IsCurrent())
+                    && (profile.UpdatedAt > pending.Revision || profile.UpdatedAt == pending.Revision && json == pending.DocumentJson)))
             {
+                // Discovery ends creation-only intent even before a request was prepared.
+                // Fence in-flight work in the same transaction; its late result must not
+                // restore defaults. An owning publication completes its own generation.
+                if (initializeOnly && !published)
+                {
+                    pending.Generation = checked(pending.Generation + 1);
+                    pending.RequestState = pending.RequestState.Supersede();
+                }
                 pending.Pending = false;
                 pending.IntentJson = null;
+                pending.NextAttemptAt = null;
+                pending.LastErrorJson = null;
+                confirmed = true;
             }
         }
         await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return confirmed;
     }
 }

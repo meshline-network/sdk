@@ -102,6 +102,12 @@ publications. Preserve generation checks when changing publication writes; the r
 contract is defined by [IStatePublication](dotnet/src/Meshline.Sdk/Storage/IStatePublication.cs)
 and [PublicationRequestState](dotnet/src/Meshline.Sdk/Storage/PublicationRequestState.cs).
 
+`ProfileUpdateDiagnostics` adds nullable `LastErrorJson` to `SignedRequests`, reusing
+the existing intent and retry state. Verify upgrades preserve exact requests,
+pending intent and retry deadlines.
+TypeScript stores optional `lastError` diagnostics in its existing `signed_requests`
+JSON records; missing diagnostics are valid and require no adapter schema migration.
+
 ## Account establishment
 
 The [account establishment guide](dotnet/docs/guides/account-establishment.md)
@@ -175,7 +181,7 @@ proposal from an older publication when checkpointing failed. Signing refusal
 before persistence does not freeze a new proposal. Evidence reads for this failure
 path do not add reads to successful or unchanged authorization.
 
-### Device and route publication
+### Publication and recovery
 
 Persist the exact certificate draft and both protected keys before account signing.
 Commit activation, binding changes and draft consumption together. Clear consumed
@@ -220,9 +226,24 @@ but not repeatedly within one call. Never guess a higher bootstrap revision.
 Each publication owner classifies unknown outcomes around the actual submission.
 Query, signing and session-acquisition failures before submission are unavailable,
 not unknown outcomes. Standalone publication APIs preserve their exception types.
-Profile initialization resolves first and replays unknown requests exactly; existing
-values win over initial settings. Its publication counter prevents delayed reads
-from overwriting newer local edits, including edits within the same second.
+
+Profile initialization shares the profile coordinator and adopts pending edits
+without merging initial defaults. Its caller drains an owned publication on
+cancellation; ordinary updates retain prompt cancellation and supersession.
+Legacy recovery must distinguish initial values from user edits using the retained
+workflow, matching publication and absence of a confirmed profile.
+
+Keep profile snapshots separate from explicit field edits. Merge caller-supplied
+snapshots with current intent under the admission gate; read cached and prepared
+documents in the owning attempt so admission cannot restore work retired by
+discovery. Preserve candidate snapshots through rejected attempts.
+
+Profile discovery and publication acquire the admission gate before the cache gate.
+Retire initialization intent and advance its generation atomically, preserving newer
+user edits. Keep the publication counter to fence delayed reads with equal timestamps.
+Generation checks also protect retry diagnostics, including in-memory errors and
+their original failure times when persistence fails. Notify observers after releasing
+publication locks.
 
 ### Local coordination and contact continuity
 

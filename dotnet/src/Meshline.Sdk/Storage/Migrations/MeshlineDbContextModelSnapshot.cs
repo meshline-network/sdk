@@ -789,6 +789,9 @@ namespace Meshline.Storage.Migrations
                     b.Property<string>("IntentJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("LastErrorJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<long?>("NextAttemptAt")
                         .HasColumnType("INTEGER");
 

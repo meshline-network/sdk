@@ -41,6 +41,10 @@ public sealed class LatestStateUpdateTests
         };
         var deviceId = fixture.Client.Device!.GetDeviceId(TestNetwork.Context);
         var method = removeDevice ? "device.state.publish" : "profile.publish";
+        long initialGeneration;
+        await using (var database = fixture.Database.Open())
+            initialGeneration = await database.SignedRequests.Where(value => value.Method == method)
+                .Select(value => (long?)value.Generation).SingleOrDefaultAsync(Token) ?? 0;
         Task first = removeDevice
             ? fixture.Client.DeviceManager.RemoveDeviceAsync(deviceId, Token)
             : fixture.Client.ProfileManager.UpdateProfileAsync(new() { Nickname = "old", Bio = "retained" }, Token);
@@ -68,7 +72,7 @@ public sealed class LatestStateUpdateTests
             await using (var admission = fixture.Database.Open())
             {
                 var admitted = await admission.SignedRequests.SingleAsync(value => value.Method == method, Token);
-                Assert.Equal(3, admitted.Generation);
+                Assert.Equal(initialGeneration + 3, admitted.Generation);
                 Assert.True(admitted.Pending);
                 Assert.Equal(PublicationRequestState.None, admitted.RequestState);
                 var intent = JsonNode.Parse(admitted.IntentJson!)!;

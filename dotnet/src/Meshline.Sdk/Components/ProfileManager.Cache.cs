@@ -55,16 +55,25 @@ sealed partial class ProfileManager
     async Task SaveProfileAsync(ProfileResolveResult result, CancellationToken cancellationToken, long? publication = null, bool published = false, bool notify = true)
     {
         var changed = false;
-        await _profileSaveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
+        var confirmed = false;
+        async Task SaveAsync()
         {
-            if (publication is not null && publication != _profilePublication && result.Profile.Account == AccountId && result.Profile.UpdatedAt <= Profile?.UpdatedAt) return;
-            await StoreProfileAsync(result, cancellationToken).ConfigureAwait(false);
-            if (published) Interlocked.Increment(ref _profilePublication);
-            ProfileCache(result.Profile.Account).Publish(result, published ? Clock.UtcNow : null);
-            if (result.Profile.Account == AccountId) { changed = Profile?.ToJson() != result.Profile.ToJson(); Profile = result.Profile; }
+            await _profileSaveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (publication is not null && publication != _profilePublication && result.Profile.Account == AccountId && result.Profile.UpdatedAt <= Profile?.UpdatedAt) return;
+                confirmed = await StoreProfileAsync(result, published, cancellationToken).ConfigureAwait(false);
+                if (published) Interlocked.Increment(ref _profilePublication);
+                ProfileCache(result.Profile.Account).Publish(result, published ? Clock.UtcNow : null);
+                if (result.Profile.Account == AccountId) { changed = Profile?.ToJson() != result.Profile.ToJson(); Profile = result.Profile; }
+            }
+            finally { _profileSaveGate.Release(); }
         }
-        finally { _profileSaveGate.Release(); }
+        // Publications already own the coordinator gate. Discovery must take it
+        // before the cache gate as well; notifications run after releasing both.
+        if (published || result.Profile.Account != AccountId) await SaveAsync().ConfigureAwait(false);
+        else await Updates.SaveDiscoveredAsync(SaveAsync, cancellationToken).ConfigureAwait(false);
+        if (confirmed && notify) NotifyUpdateStateChanged();
         if (changed && notify) ProfileChanged?.Invoke(this, EventArgs.Empty);
     }
 

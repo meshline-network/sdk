@@ -42,5 +42,6 @@ sealed class SignedRequestRecord : IStatePublication
     public long Generation { get; set; }
     public PublicationRequestState RequestState { get; set; } = PublicationRequestState.Prepared;
     public DateTimeOffset? NextAttemptAt { get; set; }
+    public string? LastErrorJson { get; set; }
     string? IStatePublication.RequestJson { get => DocumentJson; set => DocumentJson = value; }
 }

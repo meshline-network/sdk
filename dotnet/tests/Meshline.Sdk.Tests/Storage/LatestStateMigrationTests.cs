@@ -2,13 +2,48 @@ using Meshline.Models.Client;
 using Meshline.Models.Protocol;
 using Meshline.Storage;
 using Meshline.Tests.Support;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Meshline.Tests.Storage;
 
 public sealed class LatestStateMigrationTests
 {
     static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task Profile_diagnostics_upgrade_preserves_pending_intent_request_generation_and_schedule()
+    {
+        await using var storage = new TestDatabase();
+        var deadline = new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero);
+        var intent = "{\"nickname\":\"pending\",\"bio\":null}";
+        Directory.CreateDirectory(Path.GetDirectoryName(storage.Options.Path)!);
+        await using (var previous = new MeshlineDbContext(storage.Options, SqliteOpenMode.ReadWriteCreate))
+        {
+            await previous.GetService<IMigrator>().MigrateAsync("20261030132411_LatestStatePublications", Token);
+            await previous.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO SignedRequests (Method, RelayId, DocumentJson, Revision, Pending, IntentJson, Generation, RequestState, NextAttemptAt)
+                VALUES ('profile.publish', 'relay', 'exact-signed-request', 42, 1, {intent}, 7, 1, {deadline.UtcTicks})
+                """, Token);
+        }
+        await storage.MigrateAsync();
+        await using var upgraded = storage.Open();
+        var row = await upgraded.SignedRequests.SingleAsync(Token);
+        Assert.Equal("exact-signed-request", row.DocumentJson);
+        Assert.Equal("{\"nickname\":\"pending\",\"bio\":null}", row.IntentJson);
+        Assert.Equal(7, row.Generation);
+        Assert.Equal(42, row.Revision);
+        Assert.True(row.Pending);
+        Assert.Equal(PublicationRequestState.Prepared, row.RequestState);
+        Assert.Equal(deadline, row.NextAttemptAt);
+        Assert.Null(row.LastErrorJson);
+        row.LastErrorJson = "persisted diagnostic";
+        await upgraded.SaveChangesAsync(Token);
+        await using var reopened = storage.Open();
+        Assert.Equal("persisted diagnostic", (await reopened.SignedRequests.SingleAsync(Token)).LastErrorJson);
+    }
 
     [Fact]
     public async Task Fresh_schema_uses_existing_publication_tables()
@@ -29,6 +64,8 @@ public sealed class LatestStateMigrationTests
             Assert.Contains("NextAttemptAt", columns);
         }
         Assert.Equal(upgraded.Database.GetMigrations(), await upgraded.Database.GetAppliedMigrationsAsync(Token));
+        var signedColumns = await upgraded.Database.SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('SignedRequests')").ToListAsync(Token);
+        Assert.Contains("LastErrorJson", signedColumns);
     }
 
     [Theory]

@@ -6,8 +6,10 @@
 <summary>Members on this page</summary>
 
 - [`ProfileChanged`](#Meshline.Components.ProfileManager.ProfileChanged)
+- [`UpdateStateChanged`](#Meshline.Components.ProfileManager.UpdateStateChanged)
 - [`ProfileManager(ClientOptions, DatabaseOptions, RelayClientPool, AccountManager, IDeviceSigner)`](#Meshline.Components.ProfileManager.ProfileManager%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Components.AccountManager%2CMeshline.Interactions.IDeviceSigner%29)
 - [`GetProfileAsync(string, CancellationToken)`](#Meshline.Components.ProfileManager.GetProfileAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`GetUpdateStateAsync(CancellationToken)`](#Meshline.Components.ProfileManager.GetUpdateStateAsync%28System.Threading.CancellationToken%29)
 - [`PublishProfileAsync(AccountProfile, CancellationToken)`](#Meshline.Components.ProfileManager.PublishProfileAsync%28Meshline.Models.Protocol.AccountProfile%2CSystem.Threading.CancellationToken%29)
 - [`RefreshProfileAsync(string, CancellationToken)`](#Meshline.Components.ProfileManager.RefreshProfileAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`UpdateProfileAsync(ProfileUpdate, CancellationToken)`](#Meshline.Components.ProfileManager.UpdateProfileAsync%28Meshline.Models.Client.ProfileUpdate%2CSystem.Threading.CancellationToken%29)
@@ -111,7 +113,7 @@ public string AccountId { get; }
 
 ## ProfileManager\.Profile Property
 
-The current account's profile, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when it is unavailable\.
+The current account's confirmed profile, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when it is unavailable\. Pending local edits are exposed by GetUpdateStateAsync\.
 
 ```csharp
 public Meshline.Models.Protocol.AccountProfile? Profile { get; }
@@ -192,6 +194,47 @@ The requested account identifier is invalid\.
 [System\.NotSupportedException](https://learn.microsoft.com/en-us/dotnet/api/system.notsupportedexception 'System\.NotSupportedException')<br>
 The requested account uses an unsupported namespace\.
 
+<a name='Meshline.Components.ProfileManager.GetUpdateStateAsync(System.Threading.CancellationToken)'></a>
+
+## ProfileManager\.GetUpdateStateAsync\(CancellationToken\) Method
+
+Reads the current account's pending profile changes and publication status without network access\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.ProfileUpdateState> GetUpdateStateAsync(System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ProfileManager.GetUpdateStateAsync(System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+A token that can cancel the local read\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[ProfileUpdateState](Meshline.Models.Client.ProfileUpdateState.md 'Meshline\.Models\.Client\.ProfileUpdateState')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+A detached snapshot of pending field changes, the latest error, and the retry schedule\.
+
+#### Exceptions
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+The component has not completed initialization\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The read is canceled\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+The local database cannot be read\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+Stored publication data is invalid\.
+
+### Remarks
+Available after initialization, including before StartAsync\. Pending fields distinguish omission, assignment and deletion\.
+
 <a name='Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken)'></a>
 
 ## ProfileManager\.PublishProfileAsync\(AccountProfile, CancellationToken\) Method
@@ -207,7 +250,7 @@ public System.Threading.Tasks.Task<Meshline.Models.Protocol.AccountProfile?> Pub
 
 `profile` [AccountProfile](Meshline.Models.Protocol.AccountProfile.md 'Meshline\.Models\.Protocol\.AccountProfile')
 
-An optional profile snapshot for this account to consider alongside cached state\.
+An optional profile snapshot for this account to consider alongside cached state\. Among pending and supplied snapshots, the higher UpdatedAt wins; equal timestamps retain the pending snapshot\.
 
 <a name='Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken).cancellationToken'></a>
 
@@ -418,3 +461,19 @@ public event EventHandler? ProfileChanged;
 
 #### Event Type
 [System\.EventHandler](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler 'System\.EventHandler')
+
+<a name='Meshline.Components.ProfileManager.UpdateStateChanged'></a>
+
+## ProfileManager\.UpdateStateChanged Event
+
+Occurs when the pending profile update or its publication state changes\.
+
+```csharp
+public event EventHandler? UpdateStateChanged;
+```
+
+#### Event Type
+[System\.EventHandler](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler 'System\.EventHandler')
+
+### Remarks
+Read GetUpdateStateAsync for the latest snapshot\. Handlers run synchronously on the thread performing the change; marshal UI work to the application's dispatcher\. Subscriber exceptions are reported through BackgroundError and do not change publication results\.

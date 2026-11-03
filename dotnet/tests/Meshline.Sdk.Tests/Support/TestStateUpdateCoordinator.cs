@@ -12,6 +12,9 @@ sealed class TestStateUpdateCoordinator(DatabaseOptions options, string method,
 {
     protected override string Operation => method;
 
+    public Task<DateTimeOffset?> ReadNextAttemptAsync(string resource, CancellationToken token) =>
+        ReadAsync(resource, (_, _, next) => next, token);
+
     protected override Task<object?> PublishAsync(StateUpdateAttempt attempt, CancellationToken token) => publish(attempt, token);
 
     protected override void Report(string resource, Exception error) => report(resource, error);

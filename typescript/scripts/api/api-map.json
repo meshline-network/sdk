@@ -182,7 +182,7 @@
   {
     "type": "Meshline.Components.ProfileManager",
     "path": "packages/sdk/src/components/profile.ts",
-    "notes": "getProfile/updateProfile/publishProfile implemented. Undefined retains fields; null deletes optional update fields. Historical certificate evidence is verified independently."
+    "notes": "Confirmed profiles remain separate from pending fields. getUpdateState and updateStateChanged expose local publication progress, diagnostics and recovery; undefined retains fields and null deletes optional fields."
   },
   {
     "type": "Meshline.Transport.RelayClientPool",
@@ -1008,6 +1008,21 @@
     "type": "Meshline.Models.Client.ProfileUpdate",
     "path": "packages/sdk/src/components/profile.ts",
     "notes": "ProfileUpdate uses optional fields; null clears nickname/avatar/bio, while publicDiscovery accepts a boolean. Omission leaves a value unchanged."
+  },
+  {
+    "type": "Meshline.Models.Client.ProfileUpdateState",
+    "path": "packages/sdk/src/components/profile.ts",
+    "notes": "Detached local state uses optional pendingUpdate, lastError and nextAttemptAt; timestamps are UTC Unix seconds. Pure republication has an empty pendingUpdate."
+  },
+  {
+    "type": "Meshline.Models.Client.ProfileUpdateStatus",
+    "path": "packages/sdk/src/components/profile.ts",
+    "notes": "String union: synchronized, pending, publishing, waitingToRetry and failed. Synchronized does not imply that a confirmed profile exists."
+  },
+  {
+    "type": "Meshline.Models.Client.ProfileUpdateError",
+    "path": "packages/sdk/src/components/profile.ts",
+    "notes": "Message, optional relay code and original failure time in UTC Unix seconds; retained during retries and cleared by new intent or confirmation."
   },
   {
     "type": "Meshline.Models.FieldUpdate`1",

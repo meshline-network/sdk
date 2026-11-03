@@ -27,6 +27,7 @@ track any work that must finish separately.
 | Account manager | `accountChanged` | Current account state and route snapshot |
 | Device manager | `deviceChanged`, `deviceStateChanged` | Device ID or accepted device-state snapshot |
 | Profile manager | `profileChanged` | Profile snapshot or `undefined` |
+| Profile manager | `updateStateChanged` | No payload; read [`getUpdateState()`](profiles-and-contacts.md#display-pending-edits-and-synchronization-status) for pending edits and publication status. |
 | Message manager | `messageReceived`, `sendStatusChanged`, `timelineChanged` | Message array, send status, or no payload |
 | Message manager | `contactChanged`, `contactRequestChanged` | Identity, committed optional snapshot, and change classification |
 | Channel manager | `channelChanged`, `timelineChanged`, `followChanged` | Channel snapshot, channel/post changes, or follow status |

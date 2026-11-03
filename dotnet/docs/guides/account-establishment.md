@@ -56,6 +56,11 @@ automatic wallet signing. Observe `BackgroundError` and `StateChanged`; the
 | `InitialProfile` | Creation-only `Nickname`, `Bio`, `Avatar` and `PublicDiscovery` (default false). Existing values are preserved. |
 | `ReplaceDeviceId` | Exact caller-selected device to remove while authorizing the local device in one complete state publication. Omit it to resume a saved choice, or preserve all other devices when no choice is saved. |
 
+Profile initialization preserves existing profiles and pending user edits. Finding
+an existing profile completes initialization without applying the initial values.
+`PublishProfileAsync` and empty profile updates retain this creation-only behavior;
+explicit field assignments or deletions supersede it with ordinary user edits.
+
 Options and initial profile fields are copied when setup is called. An unfinished
 operation retains its saved lifetimes, initial push gateway and profile. Omitted
 options resume those settings; changing lifetimes does not restart it. A conflicting
@@ -166,6 +171,11 @@ final cleanup. Expiry returns `AuthorizationNotYetEffective` with the original
 workflow retained. Retry renews only the expired prerequisite using the same keys
 and saved lifetimes, and preserves an accepted profile. Very short lifetimes can
 expire again before retry completes.
+
+Observe the initial profile publication through
+[`ProfileManager.GetUpdateStateAsync` and `UpdateStateChanged`](profiles-and-contacts.md#display-pending-edits-and-synchronization-status).
+If a background retry confirms the profile after establishment failed, call
+`EstablishAccountAsync` again to complete the retained authorization checks and setup.
 
 A healthy account with no setup record can return despite an unrelated unfinished
 route publication. Setup does not replay that request; discovery may confirm it,

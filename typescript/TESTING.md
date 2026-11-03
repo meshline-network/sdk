@@ -55,6 +55,7 @@ Use the fixture clock for SDK timers and an explicit handshake for concurrent wo
 | `components/account.test.ts` | Route reconciliation, exact replay, original-relay preservation, expired publication evidence and cache/publication concurrency. |
 | `components/device.test.ts` | Device-state acceptance, complete-state publication and atomic publication/grant guards. |
 | `components/state-update-coordinator.test.ts` | Durable replacement, field merging, admission rollback, cancellation, retry deadlines and restart recovery. |
+| `components/profile.test.ts`, `components/profile-update-state.test.ts` | Confirmed profiles, pending field edits, status notifications, diagnostics, initialization, snapshot ordering and restart recovery. |
 | `components/latest-state.test.ts` | Group/channel update concurrency, restart recovery and observer lifecycle. |
 | `components/push-gateway.test.ts` | Suites for creation/renewal, account establishment/recovery, input validation and call isolation. |
 | `protocol/push-certificate.test.ts`, `protocol/push-interop.test.ts` | Fixed push certificate/URL vectors, signature coverage, UTF-8 limits and actual C# certificate interoperability. |

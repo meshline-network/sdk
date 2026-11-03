@@ -14,7 +14,7 @@ Paths in the table and code references below are relative to `tests/Meshline.Sdk
 | `Storage/` | Database setup, binding, constraints, transactions and timestamp persistence; `QueryReaderTests` owns pagination, snapshots, concurrent reads, cancellation and reader disposal. |
 | `Components/Accounts/` | Establishment, routes, account recovery, home-relay migration and account synchronization. |
 | `Components/Devices/` | Device keys, authorization, renewal and fixed key-agreement vectors through the device API. |
-| `Components/Profiles/` | Profile publication, resolution, caching and restart recovery. |
+| `Components/Profiles/` | Profile edits, initialization, publication status and notifications, resolution, caching and restart recovery. |
 | `Components/Contacts/` | Contact requests, grants, aliases, invitations and expiry. |
 | `Components/Messages/` | Sending, outbox retention, send-status waiting, message reception/synchronization and fixed decryption vectors. |
 | `Components/History/` | Local message/group/channel query contracts, ordering, exclusive bounds, snapshots, restart continuation and API compatibility. |
@@ -54,6 +54,7 @@ Choose the layer by the behavior under test, not by whether its input happens to
 `OfflineRelay` and `MemorySocket` exercise actual transport code without network I/O. `GroupRelay` and `ChannelRelay` provide domain scripts. Their state is per test; avoid shared mutable fixtures or a universal scenario framework.
 
 `TestStateUpdateCoordinator` scripts shared admission and retry behavior against SQLite; protocol behavior belongs in manager tests.
+`DatabaseObserver` observes EF database boundaries for deterministic interruption and concurrency tests; callbacks must filter by their fixture's database path.
 
 ## Regression ownership
 
@@ -68,7 +69,7 @@ resumability. Domain-specific cases remain with their owning component.
 | Contract | Test owners |
 | --- | --- |
 | Shared state admission, replacement and retry recovery | `Components/StateUpdateCoordinatorTests`, `Components/LatestStateUpdateTests` |
-| Profile merging, publication ordering and confirmed cache state | `Components/Profiles/LatestProfileTests` |
+| Profile intent, confirmed state and publication recovery across initialization, retries and discovery | `Components/Profiles/` |
 | Group property updates against concurrent management history | `Components/Groups/LatestGroupTests` |
 | Channel descriptor updates and concurrent history/cache refreshes | `Components/Channels/LatestChannelTests` |
 | Public setup scenarios, options, retained/new installation, selection and failure details | `Components/Accounts/AccountEstablishmentTests` |

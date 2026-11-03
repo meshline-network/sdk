@@ -21,6 +21,42 @@ depends on its discovery and contact authorization.
 
 Further edits merge with unfinished changes even while an earlier call is waiting;
 see [completion and retry behavior](events-and-errors.md#cancellation-and-error-types).
+`profileManager.profile` and `client.profile` contain confirmed values; changes are
+reported by `profileChanged`. `publishProfile()` republishes the newest available
+profile with unfinished edits. Supplied snapshots use `updatedAt` to select the
+newer pending snapshot; equal timestamps retain the existing snapshot.
+
+### Display pending edits and synchronization status
+
+After `initialize()`, call `profileManager.getUpdateState()` to read local state
+without network access, including before `start()`. Subscribe with
+`on('updateStateChanged', listener)`, then read once and again after notifications.
+Notifications have no payload. Serialize asynchronous reads so an older result
+cannot replace a newer view; observer failures follow the usual
+[event rules](events-and-errors.md#event-behavior).
+
+`pendingUpdate` contains merged field edits: omission means unchanged, a value
+means assignment, and `null` clears an optional field. Overlay these edits on the
+confirmed profile for an editor. Cached or supplied publication snapshots do not
+create field edits; pure republication has an empty `pendingUpdate`. Results are
+detached, so changing them does not submit an update. Applications need no separate
+pending-data store or access to internal records.
+
+| `status` | Meaning |
+| --- | --- |
+| `synchronized` | No publication is pending. `pendingUpdate`, `lastError` and `nextAttemptAt` are absent; a confirmed profile may still be unavailable. |
+| `pending` | Saved intent is waiting for an attempt, including after restart. |
+| `publishing` | The latest update is being resolved, signed or sent. |
+| `waitingToRetry` | An attempt failed; `nextAttemptAt` gives the scheduled UTC Unix time in seconds. |
+| `failed` | Intent is retained with automatic retry paused. Correct the cause and submit an update or call `publishProfile()`. |
+
+Intent, the latest error (`message`, optional relay `code` and `occurredAt` in UTC
+Unix seconds), and the retry deadline survive restart. New intent clears the error;
+retries retain it until confirmation or another failure. If saving an outcome fails,
+its diagnostics and retry policy remain available in the current process, but only
+saved state survives restart. Automatic retries require a running component.
+The same query covers initial publication during
+[account establishment](account-establishment.md#confirmation-and-protocol-limits).
 
 ## Establish a contact
 

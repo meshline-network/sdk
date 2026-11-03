@@ -54,6 +54,8 @@ Application\-facing options, drafts, queries, result models, and pagination type
 | [Page&lt;T&gt;](Meshline.Models.Client.Page_T_.md 'Meshline\.Models\.Client\.Page\<T\>') | Contains one page of results and an optional cursor for the next page\. |
 | [PageRequest](Meshline.Models.Client.PageRequest.md 'Meshline\.Models\.Client\.PageRequest') | Specifies an optional page size and continuation cursor for a relay\-backed query\. |
 | [ProfileUpdate](Meshline.Models.Client.ProfileUpdate.md 'Meshline\.Models\.Client\.ProfileUpdate') | Describes field assignments and deletions to apply to the current account's profile\. |
+| [ProfileUpdateError](Meshline.Models.Client.ProfileUpdateError.md 'Meshline\.Models\.Client\.ProfileUpdateError') | Diagnostics from the most recent failed attempt of the latest profile update\. |
+| [ProfileUpdateState](Meshline.Models.Client.ProfileUpdateState.md 'Meshline\.Models\.Client\.ProfileUpdateState') | A detached local snapshot of the latest profile publication and its pending field changes\. |
 | [ResourceSyncStatus](Meshline.Models.Client.ResourceSyncStatus.md 'Meshline\.Models\.Client\.ResourceSyncStatus') | Reports synchronization progress, blocking information, and retention gaps for a resource\. |
 
 | Enums | |
@@ -64,5 +66,6 @@ Application\-facing options, drafts, queries, result models, and pagination type
 | [ConversationKind](Meshline.Models.Client.ConversationKind.md 'Meshline\.Models\.Client\.ConversationKind') | Selects the kinds of local conversations to include; values may be combined\. |
 | [GroupMembershipState](Meshline.Models.Client.GroupMembershipState.md 'Meshline\.Models\.Client\.GroupMembershipState') | Describes the local account's membership or admission state in a group\. |
 | [MessageSendState](Meshline.Models.Client.MessageSendState.md 'Meshline\.Models\.Client\.MessageSendState') | Describes a direct\-message outbox state or a combination of states for filtering\. |
+| [ProfileUpdateStatus](Meshline.Models.Client.ProfileUpdateStatus.md 'Meshline\.Models\.Client\.ProfileUpdateStatus') | The publication status of the current account's latest local profile intent\. |
 | [ResourceSyncBlockReason](Meshline.Models.Client.ResourceSyncBlockReason.md 'Meshline\.Models\.Client\.ResourceSyncBlockReason') | Identifies why synchronization cannot currently advance\. |
 | [ResourceSyncState](Meshline.Models.Client.ResourceSyncState.md 'Meshline\.Models\.Client\.ResourceSyncState') | Describes the progress of resource synchronization\. |
