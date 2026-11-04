@@ -28,7 +28,7 @@ Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system
 Implements [System\.IEquatable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.iequatable-1 'System\.IEquatable\`1')[ProfileUpdateState](Meshline.Models.Client.ProfileUpdateState.md 'Meshline\.Models\.Client\.ProfileUpdateState')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.iequatable-1 'System\.IEquatable\`1')
 
 ### Remarks
-Read again after a change notification\. Editing PendingUpdate does not change SDK state; submit it through UpdateProfileAsync instead\.
+Editing [PendingUpdate](Meshline.Models.Client.ProfileUpdateState.md#Meshline.Models.Client.ProfileUpdateState.PendingUpdate 'Meshline\.Models\.Client\.ProfileUpdateState\.PendingUpdate') does not change SDK state; submit it through [UpdateProfileAsync\(ProfileUpdate, CancellationToken\)](Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.UpdateProfileAsync(Meshline.Models.Client.ProfileUpdate,System.Threading.CancellationToken) 'Meshline\.Components\.ProfileManager\.UpdateProfileAsync\(Meshline\.Models\.Client\.ProfileUpdate, System\.Threading\.CancellationToken\)')\.
 ### Properties
 
 <a name='Meshline.Models.Client.ProfileUpdateState.LastError'></a>
@@ -48,7 +48,7 @@ public Meshline.Models.Client.ProfileUpdateError? LastError { get; init; }
 
 ## ProfileUpdateState\.NextAttemptAt Property
 
-The next automatic attempt's scheduled UTC time, or null while publishing, synchronized, or paused\.
+The next automatic attempt's scheduled UTC time, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') while publishing, synchronized, or paused\.
 
 ```csharp
 public System.Nullable<System.DateTimeOffset> NextAttemptAt { get; init; }
@@ -64,7 +64,7 @@ Automatic retry requires a running component\.
 
 ## ProfileUpdateState\.PendingUpdate Property
 
-The merged requested field changes, or null when synchronized\.
+The merged requested field changes, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when synchronized\.
 
 ```csharp
 public Meshline.Models.Client.ProfileUpdate? PendingUpdate { get; init; }

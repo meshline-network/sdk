@@ -11,13 +11,13 @@ namespace Meshline.Components;
 sealed partial class ProfileManager
 {
     /// <summary>Occurs when the pending profile update or its publication state changes.</summary>
-    /// <remarks>Read GetUpdateStateAsync for the latest snapshot. Handlers run synchronously on the thread performing the change; marshal UI work to the application's dispatcher. Subscriber exceptions are reported through BackgroundError and do not change publication results.</remarks>
+    /// <remarks>Read <see cref="GetUpdateStateAsync"/> for the latest snapshot. Handlers run synchronously on the thread performing the change; marshal UI work to the application's dispatcher. Subscriber exceptions are reported through <see cref="ClientComponent.BackgroundError"/> and do not change publication results.</remarks>
     public event EventHandler? UpdateStateChanged;
 
     /// <summary>Reads the current account's pending profile changes and publication status without network access.</summary>
     /// <param name="cancellationToken">A token that can cancel the local read.</param>
     /// <returns>A detached snapshot of pending field changes, the latest error, and the retry schedule.</returns>
-    /// <remarks>Available after initialization, including before StartAsync. Pending fields distinguish omission, assignment and deletion.</remarks>
+    /// <remarks>Available after initialization, including before <see cref="ClientComponent.StartAsync"/>. Subscribe to <see cref="UpdateStateChanged"/> before the initial read, and serialize subsequent reads so an older result cannot replace a newer view. Pending fields distinguish omission, assignment and deletion.</remarks>
     /// <exception cref="InvalidOperationException">The component has not completed initialization.</exception>
     /// <exception cref="ObjectDisposedException">The component has been disposed.</exception>
     /// <exception cref="OperationCanceledException">The read is canceled.</exception>

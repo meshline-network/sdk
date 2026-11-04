@@ -5,7 +5,7 @@ public enum ProfileUpdateStatus
 {
     /// <summary>No local profile publication is pending; this does not imply that a profile exists.</summary>
     Synchronized,
-    /// <summary>Saved intent is waiting for an attempt. Start the component to resume background work.</summary>
+    /// <summary>Saved intent is waiting for an attempt.</summary>
     Pending,
     /// <summary>The latest intent is being resolved, signed, or published.</summary>
     Publishing,

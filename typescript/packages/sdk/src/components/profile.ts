@@ -27,6 +27,7 @@ export type ProfileUpdateStatus = 'synchronized' | 'pending' | 'publishing' | 'w
 /** Diagnostics from the most recent failed attempt. */
 export interface ProfileUpdateError {
     readonly message: string;
+    /** Relay error code; absent for local or transport failures. */
     readonly code?: string;
     /** UTC Unix time in seconds. */
     readonly occurredAt: number;
@@ -38,7 +39,7 @@ export interface ProfileUpdateState {
     readonly pendingUpdate?: ProfileUpdate;
     /** Retained during retries; cleared by new intent or confirmation. */
     readonly lastError?: ProfileUpdateError;
-    /** Scheduled UTC Unix time in seconds; absent while publishing, synchronized or paused. Requires a running component. */
+    /** Scheduled UTC Unix time in seconds; absent while publishing, synchronized or paused. Automatic attempts require a running component. */
     readonly nextAttemptAt?: number;
 }
 export interface ProfileEvents {

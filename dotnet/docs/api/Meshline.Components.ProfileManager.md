@@ -113,7 +113,7 @@ public string AccountId { get; }
 
 ## ProfileManager\.Profile Property
 
-The current account's confirmed profile, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when it is unavailable\. Pending local edits are exposed by GetUpdateStateAsync\.
+The current account's confirmed profile, or [null](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/null 'https://docs\.microsoft\.com/en\-us/dotnet/csharp/language\-reference/keywords/null') when it is unavailable\. Read pending edits through [GetUpdateStateAsync\(CancellationToken\)](Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.GetUpdateStateAsync(System.Threading.CancellationToken) 'Meshline\.Components\.ProfileManager\.GetUpdateStateAsync\(System\.Threading\.CancellationToken\)')\.
 
 ```csharp
 public Meshline.Models.Protocol.AccountProfile? Profile { get; }
@@ -233,7 +233,7 @@ The local database cannot be read\.
 Stored publication data is invalid\.
 
 ### Remarks
-Available after initialization, including before StartAsync\. Pending fields distinguish omission, assignment and deletion\.
+Available after initialization, including before [StartAsync\(CancellationToken\)](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.StartAsync(System.Threading.CancellationToken) 'Meshline\.Components\.ClientComponent\.StartAsync\(System\.Threading\.CancellationToken\)')\. Subscribe to [UpdateStateChanged](Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.UpdateStateChanged 'Meshline\.Components\.ProfileManager\.UpdateStateChanged') before the initial read, and serialize subsequent reads so an older result cannot replace a newer view\. Pending fields distinguish omission, assignment and deletion\.
 
 <a name='Meshline.Components.ProfileManager.PublishProfileAsync(Meshline.Models.Protocol.AccountProfile,System.Threading.CancellationToken)'></a>
 
@@ -453,7 +453,7 @@ The required public\-discovery field is deleted or a supplied profile field fail
 
 ## ProfileManager\.ProfileChanged Event
 
-Occurs when the current account's locally known profile changes\.
+Occurs when the current account's confirmed profile changes\.
 
 ```csharp
 public event EventHandler? ProfileChanged;
@@ -476,4 +476,4 @@ public event EventHandler? UpdateStateChanged;
 [System\.EventHandler](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler 'System\.EventHandler')
 
 ### Remarks
-Read GetUpdateStateAsync for the latest snapshot\. Handlers run synchronously on the thread performing the change; marshal UI work to the application's dispatcher\. Subscriber exceptions are reported through BackgroundError and do not change publication results\.
+Read [GetUpdateStateAsync\(CancellationToken\)](Meshline.Components.ProfileManager.md#Meshline.Components.ProfileManager.GetUpdateStateAsync(System.Threading.CancellationToken) 'Meshline\.Components\.ProfileManager\.GetUpdateStateAsync\(System\.Threading\.CancellationToken\)') for the latest snapshot\. Handlers run synchronously on the thread performing the change; marshal UI work to the application's dispatcher\. Subscriber exceptions are reported through [BackgroundError](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.BackgroundError 'Meshline\.Components\.ClientComponent\.BackgroundError') and do not change publication results\.

@@ -29,7 +29,7 @@ namespace Meshline.Components;
 public sealed partial class ProfileManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, AccountManager accountManager, IDeviceSigner deviceSigner) : ClientComponent(options)
 {
     /// <summary>
-    /// Occurs when the current account's locally known profile changes.
+    /// Occurs when the current account's confirmed profile changes.
     /// </summary>
     public event EventHandler? ProfileChanged;
 
@@ -38,7 +38,7 @@ public sealed partial class ProfileManager(ClientOptions options, DatabaseOption
     /// </summary>
     public string AccountId => Options.AccountId;
     /// <summary>
-    /// The current account's confirmed profile, or <see langword="null"/> when it is unavailable. Pending local edits are exposed by GetUpdateStateAsync.
+    /// The current account's confirmed profile, or <see langword="null"/> when it is unavailable. Read pending edits through <see cref="GetUpdateStateAsync"/>.
     /// </summary>
     public AccountProfile? Profile { get; private set; }
 

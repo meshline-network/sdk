@@ -35,7 +35,7 @@ No local profile publication is pending; this does not imply that a profile exis
 
 `Pending` 1
 
-Saved intent is waiting for an attempt\. Start the component to resume background work\.
+Saved intent is waiting for an attempt\.
 
 <a name='Meshline.Models.Client.ProfileUpdateStatus.Publishing'></a>
 
