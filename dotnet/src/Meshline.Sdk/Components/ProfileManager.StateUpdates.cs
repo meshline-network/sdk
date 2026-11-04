@@ -144,7 +144,7 @@ sealed partial class ProfileManager
     {
         var before = Profile?.ToJson();
         await attempt.CurrentAsync(() => SaveProfileAsync(result, token, published: true, notify: false), token).ConfigureAwait(false);
-        if (before != Profile?.ToJson()) ProfileChanged?.Invoke(this, EventArgs.Empty);
+        if (before != Profile?.ToJson()) BackgroundFailure.Notify(() => ProfileChanged?.Invoke(this, EventArgs.Empty));
     }
 
     sealed class ProfileStateUpdates(ProfileManager owner, DatabaseOptions options) : StateUpdateCoordinator(options)

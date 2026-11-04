@@ -21,6 +21,7 @@ sealed partial class RelayClient
         SocketSession? connection = null;
         string? appliedJson = null;
         var emptyJson = empty.ToJson();
+        List<Exception> failures = [];
         SocketConnected += OnConnected;
         var updates = ReadUpdatesAsync();
         try
@@ -49,7 +50,7 @@ sealed partial class RelayClient
                     catch (OperationCanceledException exception) when (pending.IsCancellationRequested)
                     {
                         // A cleanup timeout remains visible after component events detach.
-                        reportError(exception);
+                        BackgroundFailure.Notify(() => reportError(exception));
                         throw;
                     }
                     token.ThrowIfCancellationRequested();
@@ -59,7 +60,8 @@ sealed partial class RelayClient
                 catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
                 catch (Exception exception)
                 {
-                    reportError(exception);
+                    if (BackgroundFailure.IsRequired(exception)) throw;
+                    BackgroundFailure.Notify(() => reportError(exception));
                     if (exception is HttpRequestException or WebSocketException or IOException or OperationCanceledException or TimeoutException
                         || exception is RelayException { Error.Code: "unauthorized" or "temporarily_unavailable" or "bad_gateway" or "rate_limited" })
                     {
@@ -76,26 +78,28 @@ sealed partial class RelayClient
                 }
             }
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (token.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
+        catch (Exception error) { failures.Add(error); }
         finally
         {
             SocketConnected -= OnConnected;
             try { await updates.ConfigureAwait(false); }
-            finally
+            catch (Exception error) { failures.Add(error); }
+            if (connection is { Failure: null })
             {
-                if (connection is { Failure: null })
+                try { await SendSubscriptionAsync(connection, method, empty, pending.Token).ConfigureAwait(false); }
+                catch (Exception exception)
                 {
-                    try { await SendSubscriptionAsync(connection, method, empty, pending.Token).ConfigureAwait(false); }
-                    catch (Exception exception)
-                    {
-                        // Even a rejected clear leaves the set active. Retire
-                        // this exact connection, never a subsequent replacement.
-                        connection.Stop(new IOException("The relay subscriptions could not be cleared; reconnect to discard the old subscription set.", exception));
-                        reportError(exception);
-                    }
+                    // Even a rejected clear leaves the set active. Retire
+                    // this exact connection, never a subsequent replacement.
+                    try { connection.Stop(new IOException("The relay subscriptions could not be cleared; reconnect to discard the old subscription set.", exception)); }
+                    catch (Exception error) { failures.Add(error); }
+                    try { BackgroundFailure.Notify(() => reportError(exception)); }
+                    catch (Exception error) { failures.Add(error); }
                 }
             }
         }
+        BackgroundFailure.ThrowIfAny(failures);
 
         void OnConnected(object? sender, EventArgs args) => wake.Writer.TryWrite(true);
 

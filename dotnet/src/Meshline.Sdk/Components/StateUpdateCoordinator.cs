@@ -16,6 +16,8 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
     readonly ConcurrentDictionary<string, AttemptRun> active = new(StringComparer.Ordinal);
     readonly Channel<bool> wake = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
     readonly ConcurrentDictionary<Task, byte> workers = new();
+    readonly ConcurrentDictionary<SharedOperation<object?>, byte> outcomes = new();
+    readonly ConcurrentQueue<Exception> cleanupFailures = new();
     // Backoff counts restart with this coordinator. Keep the computed schedule in
     // memory too, so a failed outcome read or write cannot cause repeated sends.
     readonly ConcurrentDictionary<string, (long Generation, int Failures, DateTimeOffset? NextAttemptAt, StateUpdateFailure Failure)> retryStates = new(StringComparer.Ordinal);
@@ -149,16 +151,14 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
             {
                 if (!resume) retryStates.TryRemove(key, out _);
                 if (active.TryRemove(key, out var previous)) previous.Supersede(key);
+                Remember(run.Outcome);
                 active[key] = run;
             }
         }
         finally { gate.Release(); }
-        if (ownsRun)
-        {
-            _ = ObserveWorkAsync(run.Completion.Task);
-            Track(ExecuteAsync(run));
-        }
-        return (T)(await (ownsRun && resume ? run.Completion.Task : run.Completion.Task.WaitAsync(token)).ConfigureAwait(false))!;
+        var waiting = run.Outcome.WaitAsync(ownsRun && resume ? CancellationToken.None : token);
+        if (ownsRun) Track(ExecuteAsync(run));
+        return (T)(await waiting.ConfigureAwait(false))!;
     }
 
     // Adopt pending publications prepared outside this coordinator in place.
@@ -183,21 +183,56 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
     public void Start(CancellationToken token) => runtime = RecoverAsync(token);
     public async Task StopAsync()
     {
-        if (runtime is not null) await runtime.ConfigureAwait(false);
-        runtime = null;
+        var stopping = runtime;
+        List<Exception> failures = [];
+        try { if (stopping is not null) await stopping.ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        finally { _ = Interlocked.CompareExchange(ref runtime, null, stopping); }
+        await DrainOutcomesAsync(failures, completedOnly: true).ConfigureAwait(false);
+        ThrowCleanupFailures(failures);
     }
 
     public async Task DrainAsync()
     {
         while (!workers.IsEmpty) await Task.WhenAll(workers.Keys.Select(ObserveWorkAsync)).ConfigureAwait(false);
+        List<Exception> failures = [];
+        await DrainOutcomesAsync(failures).ConfigureAwait(false);
+        ThrowCleanupFailures(failures);
+    }
+
+    void Remember(SharedOperation<object?> outcome)
+    {
+        foreach (var previous in outcomes.Keys)
+            if (previous.CanForget) outcomes.TryRemove(previous, out _);
+        outcomes.TryAdd(outcome, 0);
+    }
+
+    async Task DrainOutcomesAsync(List<Exception> failures, bool completedOnly = false)
+    {
+        foreach (var outcome in outcomes.Keys)
+        {
+            if (completedOnly && !outcome.IsCompleted) continue;
+            try { await outcome.DrainAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            finally { if (outcome.CanForget) outcomes.TryRemove(outcome, out _); }
+        }
+    }
+
+    void ThrowCleanupFailures(List<Exception> failures)
+    {
+        while (cleanupFailures.TryDequeue(out var error)) failures.Add(error);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     async Task RecoverAsync(CancellationToken token)
     {
+        HashSet<Task> observers = [];
+        ConcurrentQueue<Exception> failures = new();
         try
         {
-            while (true)
+            while (failures.IsEmpty)
             {
+                observers.RemoveWhere(static observer => observer.IsCompleted);
                 try
                 {
                     await using var database = new MeshlineDbContext(options);
@@ -218,11 +253,12 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
                                 || ScheduledAt(row.Key, latest) is not { } due || due > Clock.UtcNow) continue;
                             RestoreFailure(row.Key, latest);
                             run = new AttemptRun(new(row.Resource, row.Key, latest), token);
+                            Remember(run.Outcome);
                             active[row.Key] = run;
                         }
                         finally { gate.Release(); }
+                        observers.Add(ObserveAsync(run, token, failures));
                         Track(ExecuteAsync(run, background: true));
-                        _ = ObserveAsync(run, token);
                     }
                     await using var schedule = new MeshlineDbContext(options);
                     var waiting = await ReadPendingAsync(schedule, token).ConfigureAwait(false);
@@ -236,31 +272,50 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
                         if (delay > TimeSpan.FromDays(1)) delay = TimeSpan.FromDays(1);
                         using var wait = CancellationTokenSource.CreateLinkedTokenSource(token);
                         await Task.WhenAny(wake.Reader.ReadAsync(wait.Token).AsTask(), Task.Delay(delay, Clock.Provider, wait.Token)).ConfigureAwait(false);
-                        await wait.CancelAsync().ConfigureAwait(false);
+                        await BackgroundFailure.CompleteAsync(wait.CancelAsync()).ConfigureAwait(false);
                         token.ThrowIfCancellationRequested();
                     }
                 }
-                catch (Exception error) when (!token.IsCancellationRequested)
+                catch (Exception error)
                 {
+                    BackgroundFailure.ThrowIfCanceled(error, token);
                     Report(Operation, error);
                     await Task.Delay(TimeSpan.FromSeconds(1), Clock.Provider, token).ConfigureAwait(false);
                 }
             }
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (token.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
+        catch (Exception error) { failures.Enqueue(error); }
         finally
         {
             var pending = active.Values.Where(value => value.OwnerToken == token).Select(value => value.Completion.Task).ToArray();
             try { await Task.WhenAll(pending).ConfigureAwait(false); } catch { /* Each failure is observed separately. */ }
+            // A completed attempt can still be delivering its error notification.
+            await Task.WhenAll(observers).ConfigureAwait(false);
         }
+        BackgroundFailure.ThrowIfAny(failures.ToArray());
     }
 
-    async Task ObserveAsync(AttemptRun run, CancellationToken token)
+    async Task ObserveAsync(AttemptRun run, CancellationToken token, ConcurrentQueue<Exception> failures)
     {
-        try { await run.Completion.Task.ConfigureAwait(false); }
+        try { await run.Outcome.WaitAsync(CancellationToken.None).ConfigureAwait(false); }
         catch (StateUpdateSupersededException) { }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (Exception error) { Report(run.Record.Key, error); }
+        catch (OperationCanceledException error) when (token.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
+        catch (Exception error)
+        {
+            if (BackgroundFailure.IsRequired(error))
+            {
+                failures.Enqueue(error);
+                wake.Writer.TryWrite(true);
+            }
+            try { Report(run.Record.Key, error); }
+            catch (Exception observer)
+            {
+                failures.Enqueue(observer);
+                wake.Writer.TryWrite(true);
+            }
+        }
+        finally { await run.Drained.Task.ConfigureAwait(false); }
     }
 
     async Task ExecuteAsync(AttemptRun run, bool background = false)
@@ -271,8 +326,10 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
             OnChanged(run.Record.Resource);
             // Ordinary updates stop waiting even when signing or transport ignores cancellation.
             var work = PublishAsync(attempt, run.Cancellation.Token);
+            var publication = new SharedOperation<object?>(work);
+            Remember(publication);
             Track(work);
-            var result = await (run.WaitForPublication ? work : work.WaitAsync(run.Cancellation.Token)).ConfigureAwait(false);
+            var result = await publication.WaitAsync(run.WaitForPublication ? CancellationToken.None : run.Cancellation.Token).ConfigureAwait(false);
             await CurrentAsync(run.Record, async () =>
             {
                 await using var database = new MeshlineDbContext(options);
@@ -296,14 +353,18 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
             {
                 await SaveFailureAsync(run, failure).ConfigureAwait(false);
             }
-            catch (StateUpdateSupersededException) { error = new StateUpdateSupersededException(run.Record.Key); }
+            catch (StateUpdateSupersededException) when (!BackgroundFailure.IsRequired(error)) { error = new StateUpdateSupersededException(run.Record.Key); }
+            catch (StateUpdateSupersededException) { }
             catch (Exception storageError) { error = new AggregateException(error, storageError); }
-            run.Completion.TrySetException(error);
+            if (!run.Completion.TrySetException(error) && BackgroundFailure.IsRequired(error)) cleanupFailures.Enqueue(error);
         }
         finally
         {
-            if (active.TryRemove(new KeyValuePair<string, AttemptRun>(run.Record.Key, run))) OnChanged(run.Record.Resource);
-            await run.DisposeAsync().ConfigureAwait(false);
+            try { if (active.TryRemove(new KeyValuePair<string, AttemptRun>(run.Record.Key, run))) OnChanged(run.Record.Resource); }
+            catch (Exception error) { cleanupFailures.Enqueue(error); }
+            try { await run.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { cleanupFailures.Enqueue(error); }
+            run.Drained.TrySetResult();
             wake.Writer.TryWrite(true);
         }
     }
@@ -359,7 +420,7 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
     static async Task ObserveWorkAsync(Task work)
     {
         try { await work.ConfigureAwait(false); }
-        catch { /* The foreground or recovery waiter owns the outcome, even after cancellation. */ }
+        catch { /* Shared outcomes retain failures not delivered to a waiter. */ }
     }
 
     internal async Task CurrentAsync(StatePublication expected, Func<Task> action, CancellationToken token)
@@ -403,15 +464,25 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
         if (expected.State.RequestJson == json) expected.State.RequestState = PublicationRequestState.Rejected;
     }, CancellationToken.None);
 
-    sealed class AttemptRun(StatePublication record, CancellationToken token, bool waitForPublication = false) : IAsyncDisposable
+    sealed class AttemptRun : IAsyncDisposable
     {
         readonly Lock completionGate = new();
         Task cancellation = Task.CompletedTask;
-        public StatePublication Record { get; } = record;
-        public bool WaitForPublication { get; } = waitForPublication;
-        public CancellationToken OwnerToken { get; } = token;
-        public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(token);
+        public StatePublication Record { get; }
+        public bool WaitForPublication { get; }
+        public CancellationToken OwnerToken { get; }
+        public CancellationTokenSource Cancellation { get; }
         public TaskCompletionSource<object?> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public SharedOperation<object?> Outcome { get; }
+        public TaskCompletionSource Drained { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public AttemptRun(StatePublication record, CancellationToken token, bool waitForPublication = false)
+        {
+            Record = record;
+            WaitForPublication = waitForPublication;
+            OwnerToken = token;
+            Cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+            Outcome = new(Completion.Task);
+        }
         public void Supersede(string key)
         {
             lock (completionGate)
@@ -427,8 +498,8 @@ abstract class StateUpdateCoordinator(DatabaseOptions options)
             // Supersession completes the caller before starting cancellation. Do not
             // dispose its source or finish draining while those callbacks still run.
             lock (completionGate) pending = cancellation;
-            await ObserveWorkAsync(pending).ConfigureAwait(false);
-            Cancellation.Dispose();
+            try { await pending.ConfigureAwait(false); }
+            finally { Cancellation.Dispose(); }
         }
     }
 }

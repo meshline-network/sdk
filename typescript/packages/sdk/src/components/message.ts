@@ -116,10 +116,21 @@ export class MessageManager extends ClientComponent {
     }
     #observeRoute(relayId: string): void {
         this.#pendingRoutes.add(relayId);
-        this.#routeRecording = this.#routeRecording.then(async () => {
-            for (const relay of [...this.#pendingRoutes]) { try { await this.#repository.observeRelay(relay); this.#pendingRoutes.delete(relay); }
-                catch (error) { this.notifyBackgroundError({ operation: 'record_route', resource: relay, error }); } }
-            this.#sendPulse?.pulse(); this.#syncPulse?.pulse();
+        void this.#recordRoutes();
+    }
+    #recordRoutes(): Promise<void> {
+        return this.#routeRecording = this.#routeRecording.then(async () => {
+            let recorded = false;
+            for (const relay of [...this.#pendingRoutes]) {
+                try {
+                    await this.#repository.observeRelay(relay);
+                    this.#pendingRoutes.delete(relay);
+                    recorded = true;
+                } catch (error) {
+                    this.notifyBackgroundError({ operation: 'record_route', resource: relay, error });
+                }
+            }
+            if (recorded) { this.#sendPulse?.pulse(); this.#syncPulse?.pulse(); }
         });
     }
     async #getState(target: string | ContactAuthorization, signal?: AbortSignal, refresh = false) {
@@ -288,7 +299,7 @@ export class MessageManager extends ClientComponent {
             await this.#syncPulse!.wait(signal);
             try {
                 try { await this.#account.getRoute(undefined, signal); } catch (error) { throwIfAborted(signal); this.notifyBackgroundError({ operation: 'resolve_route', error }); }
-                await this.#routeRecording;
+                await this.#recordRoutes();
                 const rows = await this.#store.read([{ collection: 'message_timelines' }], signal);
                 for (const row of rows.sets[0]!) {
                     if (row.value.hasRetentionGap === true) this.#syncStatus.observeGap(row.key);
@@ -322,11 +333,29 @@ export class MessageManager extends ClientComponent {
         this.#sendPulse?.pulse();
     }
     protected override async onStop(): Promise<void> {
-        try { const results = await Promise.allSettled(this.#runtimeJobs); const failures = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected'); if (failures.length) throw new AggregateError(failures.map(value => value.reason), 'Message runtime failed.'); }
-        finally { for (const observed of this.#observed.values()) for (const remove of observed.detach) remove(); this.#observed.clear();
-            for (const remove of this.#deviceListeners) remove(); this.#deviceListeners = []; this.#runtimeJobs = []; this.#sendPulse = this.#syncPulse = this.#maintenancePulse = undefined;
-            this.#maintenanceRetry = false; this.#syncStatus.stop(); }
+        try {
+            const results = await Promise.allSettled(this.#runtimeJobs);
+            results.push(...await Promise.allSettled([this.#routeRecording]));
+            const failures = results.filter((value): value is PromiseRejectedResult => value.status === 'rejected');
+            if (failures.length) throw new AggregateError(failures.map(value => value.reason), 'Message runtime failed.');
+        } finally {
+            for (const observed of this.#observed.values()) for (const remove of observed.detach) remove();
+            this.#observed.clear();
+            for (const remove of this.#deviceListeners) remove();
+            this.#deviceListeners = [];
+            this.#runtimeJobs = [];
+            this.#sendPulse = this.#syncPulse = this.#maintenancePulse = undefined;
+            this.#maintenanceRetry = false;
+            this.#syncStatus.stop();
+        }
     }
-    protected override async onDispose(): Promise<void> { this.#removeRouteListener?.(); this.#removeRouteListener = undefined; await this.#routeRecording; if (this.#pendingRoutes.size) throw new Error('Some observed message timelines could not be persisted.'); this.#syncStatus.stop(true); this.#events.clear(); }
+    protected override async onDispose(): Promise<void> {
+        this.#removeRouteListener?.();
+        this.#removeRouteListener = undefined;
+        await this.#recordRoutes();
+        if (this.#pendingRoutes.size) throw new Error('Some observed message timelines could not be persisted.');
+        this.#syncStatus.stop(true);
+        this.#events.clear();
+    }
 }
 function ordinal(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }

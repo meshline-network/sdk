@@ -94,7 +94,7 @@ A value task that completes after the wrapper's pending refreshes have ended\.
 #### Exceptions
 
 [System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
-A cancellation callback throws while refreshes are canceled\.
+A cancellation callback throws, or multiple refresh cleanup failures occur\.
 
 <a name='Meshline.Interactions.CachedRelayRegistry.GetRelayAsync(string,System.Threading.CancellationToken)'></a>
 

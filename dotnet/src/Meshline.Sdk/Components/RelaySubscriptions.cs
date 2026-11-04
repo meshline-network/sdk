@@ -37,7 +37,7 @@ sealed class RelaySubscriptions(
     public async ValueTask DisposeAsync()
     {
         foreach (var subscription in _subscriptions.Values) subscription.Requests.Writer.TryComplete();
-        await Task.WhenAll(_subscriptions.Values.Select(value => value.Worker)).ConfigureAwait(false);
-        _subscriptions.Clear();
+        try { await BackgroundFailure.DrainAsync(_subscriptions.Values.Select(value => value.Worker).ToArray()).ConfigureAwait(false); }
+        finally { _subscriptions.Clear(); }
     }
 }

@@ -66,7 +66,7 @@ sealed partial class ChannelManager
     async Task StopDescriptorsAsync(bool dispose = false)
     {
         Task pending;
-        lock (_descriptorCacheGate) { _descriptorsStopping = true; pending = Task.WhenAll(_descriptors.Values.Select(cache => cache.StopAsync(dispose))); }
+        lock (_descriptorCacheGate) { _descriptorsStopping = true; pending = BackgroundFailure.DrainAsync(_descriptors.Values.Select(cache => cache.StopAsync(dispose)).ToArray()); }
         try { await pending.ConfigureAwait(false); }
         finally { lock (_descriptorCacheGate) _descriptorsStopping = dispose; }
     }

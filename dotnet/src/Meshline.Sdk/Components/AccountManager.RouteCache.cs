@@ -11,6 +11,7 @@ sealed partial class AccountManager
     static readonly TimeSpan RefreshFailureDelay = TimeSpan.FromMinutes(1);
     readonly Lock _routeCacheGate = new();
     readonly Dictionary<string, RouteEntry> _routeCache = new(StringComparer.Ordinal);
+    readonly List<Exception> _routeRefreshFailures = [];
     CancellationTokenSource _routeRefreshLifetime = new();
     Task? _stoppingRefreshes;
     bool _routeCacheDisposed;
@@ -120,7 +121,7 @@ sealed partial class AccountManager
                 }
                 finally { _routeSaveGate.Release(); }
                 if (changed)
-                    AccountChanged?.Invoke(this, EventArgs.Empty);
+                    BackgroundFailure.Notify(() => AccountChanged?.Invoke(this, EventArgs.Empty));
                 return new(route);
             }
             catch (Exception exception)
@@ -132,8 +133,11 @@ sealed partial class AccountManager
                         if (entry.Publication == publication)
                             entry.RefreshAfter = entry.RetryAfter = Clock.UtcNow + RefreshFailureDelay;
                     }
-                    ReportBackgroundError(BackgroundOperation.Connect, accountId, exception);
+                    try { ReportBackgroundError(BackgroundOperation.Connect, accountId, exception); }
+                    catch (Exception observer) { exception = new AggregateException(exception, observer); }
                 }
+                if (BackgroundFailure.IsRequired(exception))
+                    lock (_routeCacheGate) _routeRefreshFailures.Add(exception);
                 return new(null, ExceptionDispatchInfo.Capture(exception));
             }
         }
@@ -153,7 +157,7 @@ sealed partial class AccountManager
     }
 
     /// <inheritdoc/>
-    protected override Task OnStopAsync() => Task.WhenAll(_updates?.StopAsync() ?? Task.CompletedTask, StopRouteRefreshesAsync());
+    protected override Task OnStopAsync() => BackgroundFailure.DrainAsync(_updates?.StopAsync() ?? Task.CompletedTask, StopRouteRefreshesAsync());
 
     Task StopRouteRefreshesAsync()
     {
@@ -167,10 +171,14 @@ sealed partial class AccountManager
         Task<RouteRefreshResult>[] pending;
         lock (_routeCacheGate)
             pending = [.. _routeCache.Values.Select(entry => entry.Refresh).OfType<Task<RouteRefreshResult>>()];
+        List<Exception> failures = [];
         try
         {
             // A throwing cancellation callback must not skip draining the requests it canceled.
-            await Task.WhenAll(_routeRefreshLifetime.CancelAsync(), Task.WhenAll(pending)).ConfigureAwait(false);
+            try { await BackgroundFailure.DrainAsync([_routeRefreshLifetime.CancelAsync(), .. pending]).ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            lock (_routeCacheGate) { failures.AddRange(_routeRefreshFailures); _routeRefreshFailures.Clear(); }
+            BackgroundFailure.ThrowIfAny(failures);
         }
         finally
         {
@@ -184,23 +192,27 @@ sealed partial class AccountManager
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask DisposeAsyncCore()
-    {
-        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
-        Task stopping;
-        lock (_routeCacheGate)
+    protected override ValueTask DisposeAsyncCore() => BackgroundFailure.CleanupAsync(
+        () => new(_updates?.DrainAsync() ?? Task.CompletedTask),
+        () =>
         {
-            stopping = StopRouteRefreshesAsync();
-            _routeCacheDisposed = true;
-        }
-        await stopping.ConfigureAwait(false);
-        lock (_routeCacheGate)
+            lock (_routeCacheGate)
+            {
+                var stopping = StopRouteRefreshesAsync();
+                _routeCacheDisposed = true;
+                return new(stopping);
+            }
+        },
+        () =>
         {
-            _routeCache.Clear();
-            _routeRefreshLifetime.Dispose();
-        }
-        _publicationGate.Dispose();
-        _routeSaveGate.Dispose();
-        await base.DisposeAsyncCore().ConfigureAwait(false);
-    }
+            lock (_routeCacheGate)
+            {
+                _routeCache.Clear();
+                _routeRefreshLifetime.Dispose();
+            }
+            _publicationGate.Dispose();
+            _routeSaveGate.Dispose();
+            return ValueTask.CompletedTask;
+        },
+        base.DisposeAsyncCore);
 }

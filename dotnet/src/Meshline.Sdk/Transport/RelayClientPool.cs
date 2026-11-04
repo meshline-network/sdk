@@ -200,7 +200,7 @@ public sealed class RelayClientPool : IAsyncDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
         Entry entry;
-        Task authentication;
+        SharedOperation<bool>? authentication;
         var added = false;
         lock (_gate)
         {
@@ -226,26 +226,37 @@ public sealed class RelayClientPool : IAsyncDisposable
             if (mode is not null && entry.Mode is null)
             {
                 entry.Mode = mode;
-                entry.Authentication = AuthenticateAsync(entry, authenticate!);
-                _ = entry.Authentication.ContinueWith(static task => _ = task.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                entry.Authentications.RemoveWhere(static operation => operation.CanForget);
+                entry.Authentication = new(AuthenticateAsync(entry, authenticate!));
+                entry.Authentications.Add(entry.Authentication);
             }
-            authentication = mode is null ? Task.CompletedTask : entry.Authentication;
+            authentication = mode is null ? null : entry.Authentication;
         }
         if (added)
-            PoolChanged?.Invoke(this, EventArgs.Empty);
-        await authentication.WaitAsync(cancellationToken).ConfigureAwait(false);
+            BackgroundFailure.Notify(() => PoolChanged?.Invoke(this, EventArgs.Empty));
+        if (authentication is not null)
+        {
+            Task waiting;
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(entry.Retired, this);
+                waiting = authentication.WaitAsync(cancellationToken);
+            }
+            await waiting.ConfigureAwait(false);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
             ObjectDisposedException.ThrowIf(entry.Retired, this);
         return entry;
     }
 
-    async Task AuthenticateAsync(Entry entry, Func<RelayClient, CancellationToken, Task> authenticate)
+    async Task<bool> AuthenticateAsync(Entry entry, Func<RelayClient, CancellationToken, Task> authenticate)
     {
         await Task.Yield();
         try
         {
             await authenticate(entry.Client, entry.Lifetime.Token).ConfigureAwait(false);
+            return true;
         }
         catch
         {
@@ -274,29 +285,30 @@ public sealed class RelayClientPool : IAsyncDisposable
     async Task DisposeEntryAsync(Entry entry)
     {
         await Task.Yield();
+        List<Exception> failures = [];
         try
         {
-            await entry.Lifetime.CancelAsync().ConfigureAwait(false);
-            try
-            {
-                await entry.Client.DisposeAsync().ConfigureAwait(false);
-            }
-            finally
-            {
-                try { await entry.Authentication.ConfigureAwait(false); }
-                catch (Exception) { /* Authentication failures are reported to callers. */ }
-            }
+            try { await entry.Lifetime.CancelAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            try { await entry.Client.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            // Retirement removes the entry from acquisition before this drain.
+            try { await BackgroundFailure.DrainAsync(entry.Authentications.Select(static operation => operation.DrainAsync()).ToArray()).ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            entry.Authentications.Clear();
         }
         finally
         {
             entry.Client.StateChanged -= OnRelayStateChanged;
             entry.Client.Faulted -= OnClientFaulted;
             entry.Lifetime.Dispose();
-            PoolChanged?.Invoke(this, EventArgs.Empty);
+            try { BackgroundFailure.Notify(() => PoolChanged?.Invoke(this, EventArgs.Empty)); }
+            catch (Exception error) { failures.Add(error); }
         }
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
-    void OnRelayStateChanged(object? sender, EventArgs args) => RelayChanged?.Invoke(this, (RelayClient)sender!);
+    void OnRelayStateChanged(object? sender, EventArgs args) => BackgroundFailure.Notify(() => RelayChanged?.Invoke(this, (RelayClient)sender!));
 
     void OnClientFaulted(object? sender, EventArgs args)
     {
@@ -358,14 +370,14 @@ public sealed class RelayClientPool : IAsyncDisposable
             Retire(entry);
             tasks.Add(entry.Disposal!);
         }
-        return Task.WhenAll(tasks);
+        return BackgroundFailure.DrainAsync(tasks.ToArray());
     }
 
     /// <summary>
     /// Cancels pending authentication and relay work, disposes pooled clients, and releases any pool-owned HTTP client.
     /// </summary>
     /// <returns>A value task that completes when owned resources and active work have been released.</returns>
-    /// <exception cref="AggregateException">A registered cancellation callback throws while pool or session lifetimes are canceled.</exception>
+    /// <exception cref="AggregateException">A cancellation callback throws, or multiple failures occur while background work and pooled resources are released.</exception>
     public async ValueTask DisposeAsync()
     {
         Task disposal;
@@ -387,8 +399,7 @@ public sealed class RelayClientPool : IAsyncDisposable
         }
         try
         {
-            try { await _lifetime.CancelAsync().ConfigureAwait(false); }
-            finally { await Task.WhenAll(tasks).ConfigureAwait(false); }
+            await BackgroundFailure.DrainAsync([_lifetime.CancelAsync(), .. tasks]).ConfigureAwait(false);
         }
         finally
         {
@@ -404,7 +415,8 @@ public sealed class RelayClientPool : IAsyncDisposable
         public RelayClient Client { get; } = client;
         public SessionMode? Mode { get; set; }
         public CancellationTokenSource Lifetime { get; } = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        public Task Authentication { get; set; } = Task.CompletedTask;
+        public SharedOperation<bool>? Authentication { get; set; }
+        public HashSet<SharedOperation<bool>> Authentications { get; } = [];
         public Task? Disposal { get; set; }
         public bool Retired { get; set; }
     }

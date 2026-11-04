@@ -4,7 +4,6 @@ using Meshline.Storage;
 using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -145,8 +144,10 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <param name="operation">The background activity that failed.</param>
     /// <param name="resource">The associated resource identifier, or <see langword="null"/> when none applies.</param>
     /// <param name="error">The failure to report.</param>
-    protected void ReportBackgroundError(BackgroundOperation operation, string? resource, Exception error) =>
-        BackgroundError?.Invoke(this, new(operation, resource, error));
+    protected void ReportBackgroundError(BackgroundOperation operation, string? resource, Exception error)
+    {
+        BackgroundFailure.Notify(() => BackgroundError?.Invoke(this, new(operation, resource, error)));
+    }
 
     internal void EnsureInitialized()
     {
@@ -218,8 +219,8 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <param name="cancellationToken">A token that can cancel waiting to begin stopping; active shutdown is drained without cancellation.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
     /// <remarks>
-    /// The cancellation token controls waiting to enter the lifecycle operation. Once stopping begins, background work is drained without that token, including demand-triggered refreshes created before start or after a previous stop. The application-owned relay pool remains available to other components.
-    /// A completed running-to-stopped transition raises StateChanged even when cleanup reports an error. Cleanup errors remain observable to the caller.
+    /// Once stopping begins, background work and its pending local writes are drained without the caller's token, including refreshes triggered before start or after a previous stop. The application-owned relay pool remains available to other components.
+    /// A completed running-to-stopped transition raises <see cref="StateChanged"/> before cleanup errors are reported to the caller.
     /// </remarks>
     /// <exception cref="OperationCanceledException">The <paramref name="cancellationToken"/> is canceled while waiting to enter the lifecycle transition.</exception>
     /// <exception cref="ObjectDisposedException">This component, or a dependency stopped by its shutdown hook, has been disposed.</exception>
@@ -259,7 +260,7 @@ public abstract class ClientComponent : IAsyncDisposable
         }
         try { StateChanged?.Invoke(this, change); }
         catch (Exception error) { failures.Add(error); }
-        ThrowCleanupFailures(failures);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     /// <summary>
@@ -295,7 +296,7 @@ public abstract class ClientComponent : IAsyncDisposable
             _runtime.Dispose();
             _runtime = null;
         }
-        ThrowCleanupFailures(failures);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     /// <summary>
@@ -324,6 +325,7 @@ public abstract class ClientComponent : IAsyncDisposable
     /// <summary>
     /// Cancels and drains active operations, stops background work, and releases component-owned resources.
     /// </summary>
+    /// <remarks>A completed transition to <see cref="ComponentState.Disposed"/> raises <see cref="StateChanged"/> before cleanup errors are reported. If resource cleanup fails before that transition, correct the cause and retry disposal; new operations remain blocked.</remarks>
     /// <returns>A value task that completes when owned resources and active work have been released.</returns>
     /// <exception cref="SqliteException">A component cleanup hook fails to access SQLite while persisting pending local observations.</exception>
     /// <exception cref="DbUpdateException">A component cleanup hook cannot save its pending local observations.</exception>
@@ -340,13 +342,13 @@ public abstract class ClientComponent : IAsyncDisposable
             _lifetimeCancellation ??= _lifetime.CancelAsync();
         }
         ComponentStateChangedEventArgs change;
+        List<Exception> failures = [];
         await _lifecycleGate.WaitAsync().ConfigureAwait(false);
         try
         {
             if (LifecycleState == ComponentState.Disposed)
                 return;
 
-            List<Exception> failures = [];
             try { await _lifetimeCancellation.ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
             // Report cancellation errors once, even when resource cleanup is retried.
@@ -359,28 +361,21 @@ public abstract class ClientComponent : IAsyncDisposable
             {
                 failures.Add(error);
                 // Keep disposal retryable when the resource cleanup hook itself fails.
-                ThrowCleanupFailures(failures);
+                BackgroundFailure.ThrowIfAny(failures);
             }
             _lifetime.Dispose();
             GC.SuppressFinalize(this);
             change = new(LifecycleState, ComponentState.Disposed);
             LifecycleState = ComponentState.Disposed;
-            ThrowCleanupFailures(failures);
         }
         finally
         {
             _lifecycleGate.Release();
         }
 
-        StateChanged?.Invoke(this, change);
-    }
-
-    static void ThrowCleanupFailures(List<Exception> failures)
-    {
-        if (failures.Count == 1)
-            ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        if (failures.Count > 1)
-            throw new AggregateException(failures);
+        try { StateChanged?.Invoke(this, change); }
+        catch (Exception error) { failures.Add(error); }
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     /// <summary>

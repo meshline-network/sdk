@@ -173,6 +173,7 @@ public sealed partial class AccountManager(ClientOptions options, DatabaseOption
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested && (exception is HttpRequestException or InvalidDataException or JsonException or CryptographicException or OperationCanceledException or TimeoutException
                 || exception is RelayException { Error.Code: "temporarily_unavailable" or "bad_gateway" or "rate_limited" }))
             {
+                if (BackgroundFailure.IsRequired(exception)) throw;
                 failures.Add(exception);
                 ReportBackgroundError(BackgroundOperation.Connect, entry.RelayId, exception);
                 continue;

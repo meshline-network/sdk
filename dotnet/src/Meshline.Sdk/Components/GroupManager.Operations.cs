@@ -68,10 +68,10 @@ sealed partial class GroupManager
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         if (!confirmed) return;
         Wake();
-        if (change is not null) GroupChanged?.Invoke(this, change);
+        if (change is not null) BackgroundFailure.Notify(() => GroupChanged?.Invoke(this, change));
         var group = new GroupRef { RelayId = record.RelayId, GroupId = record.GroupId };
-        if (operation.Method.StartsWith("group.application.", StringComparison.Ordinal)) ApplicationsChanged?.Invoke(this, new(group));
-        if (operation.Method.StartsWith("group.member.recovery.", StringComparison.Ordinal)) KeyRecoveryChanged?.Invoke(this, new(group));
+        if (operation.Method.StartsWith("group.application.", StringComparison.Ordinal)) BackgroundFailure.Notify(() => ApplicationsChanged?.Invoke(this, new(group)));
+        if (operation.Method.StartsWith("group.member.recovery.", StringComparison.Ordinal)) BackgroundFailure.Notify(() => KeyRecoveryChanged?.Invoke(this, new(group)));
     }
 
     static ProtocolModel ReadOperationRequest(GroupOperationRecord operation) => operation.Method switch
@@ -115,7 +115,7 @@ sealed partial class GroupManager
             var accepted = await database.GroupEvents.AsNoTracking().SingleOrDefaultAsync(value => value.GroupId == operation.GroupId && value.PayloadJson == json && value.Rejection == null, cancellationToken).ConfigureAwait(false);
             if (accepted is not null)
             {
-                await CompleteOperationAsync(operation, true, CancellationToken.None).ConfigureAwait(false);
+                await BackgroundFailure.CompleteAsync(CompleteOperationAsync(operation, true, CancellationToken.None)).ConfigureAwait(false);
                 return request is GroupMessageEnvelope ? new SequenceResult { Sequence = accepted.Sequence } : null;
             }
         }
@@ -126,7 +126,7 @@ sealed partial class GroupManager
             {
                 var existing = await ReadInviteAsync(new(new() { RelayId = relayId, GroupId = operation.GroupId }, invite.InviteId), cancellationToken).ConfigureAwait(false);
                 if (existing.Invite.Document.ToJson() != operation.RequestJson) throw new InvalidDataException("The invitation ID is occupied by a different invitation.");
-                await CompleteOperationAsync(operation, true, CancellationToken.None).ConfigureAwait(false);
+                await BackgroundFailure.CompleteAsync(CompleteOperationAsync(operation, true, CancellationToken.None)).ConfigureAwait(false);
                 return null;
             }
             catch (RelayException exception) when (exception.Error.Code == "not_found") { }
@@ -150,10 +150,10 @@ sealed partial class GroupManager
         }
         catch (RelayException exception) when (!recovering && exception.Error.IsDefinitiveRejection())
         {
-            await CompleteOperationAsync(operation, false, CancellationToken.None).ConfigureAwait(false);
+            await BackgroundFailure.CompleteAsync(CompleteOperationAsync(operation, false, CancellationToken.None), exception).ConfigureAwait(false);
             throw;
         }
-        await CompleteOperationAsync(operation, true, CancellationToken.None).ConfigureAwait(false);
+        await BackgroundFailure.CompleteAsync(CompleteOperationAsync(operation, true, CancellationToken.None)).ConfigureAwait(false);
         return result;
     }
 

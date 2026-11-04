@@ -59,12 +59,10 @@ sealed partial class GroupManager
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask DisposeAsyncCore()
-    {
-        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
-        _syncStatus.Stop(OnSyncStatusChanged, resetAll: true);
-        await base.DisposeAsyncCore().ConfigureAwait(false);
-    }
+    protected override ValueTask DisposeAsyncCore() => BackgroundFailure.CleanupAsync(
+        () => new(_updates?.DrainAsync() ?? Task.CompletedTask),
+        () => { _syncStatus.Stop(OnSyncStatusChanged, resetAll: true); return ValueTask.CompletedTask; },
+        base.DisposeAsyncCore);
 
     void OnSyncStatusChanged(ResourceSyncStatus status)
     {

@@ -75,7 +75,7 @@ sealed partial class MessageManager
     {
         _sendRequests.Writer.TryWrite(true);
         if (notifications.RemoveAll(notification => notification == OnTimelineChanged) > 0) OnTimelineChanged();
-        foreach (var notification in notifications) notification();
+        foreach (var notification in notifications) BackgroundFailure.Notify(notification);
     }
 
     internal async Task SendPayloadAsync(string recipient, TypedProtocolModel payload, CancellationToken cancellationToken, IReadOnlyList<string>? recipientDeviceIds = null)
@@ -199,7 +199,7 @@ sealed partial class MessageManager
                 Wake();
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task SendLoopAsync(CancellationToken cancellationToken)
@@ -218,10 +218,10 @@ sealed partial class MessageManager
                             .OrderBy(value => value.CreatedAt).Select(value => value.MessageId).ToArrayAsync(cancellationToken).ConfigureAwait(false);
                     foreach (var messageId in pending) await ProcessSendAsync(messageId, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.SendMessage, null, exception); }
+                catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.SendMessage, null, exception); }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task ProcessSendAsync(string messageId, CancellationToken cancellationToken)
@@ -259,7 +259,7 @@ sealed partial class MessageManager
             {
                 record.State = MessageSendState.Queued;
                 record.NextAttemptAt = Clock.UtcNow;
-                await SaveSendAsync(record, CancellationToken.None).ConfigureAwait(false);
+                await BackgroundFailure.CompleteAsync(SaveSendAsync(record, CancellationToken.None)).ConfigureAwait(false);
                 return;
             }
             MessageDeliveryStatus delivery;
@@ -278,15 +278,15 @@ sealed partial class MessageManager
         {
             if (record.State == MessageSendState.Queued)
             {
-                await TransactAsync(async (database, notifications, token) =>
+                await BackgroundFailure.CompleteAsync(TransactAsync(async (database, notifications, token) =>
                 {
                     var current = await database.MessageOutbox.FindAsync([messageId], token).ConfigureAwait(false);
                     if (current?.State != MessageSendState.Queued) return;
                     current.ErrorMessage = exception.Message;
                     current.NextAttemptAt = NextSendAttempt(exception);
                     notifications.Add(() => OnSendChanged(current));
-                }, CancellationToken.None).ConfigureAwait(false);
-                if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
+                }, CancellationToken.None), exception, cancellationToken).ConfigureAwait(false);
+                BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                 ReportBackgroundError(BackgroundOperation.SendMessage, messageId, exception);
                 return;
             }
@@ -305,8 +305,8 @@ sealed partial class MessageManager
                 record.State = MessageSendState.SubmissionUnknown;
             record.ErrorMessage = exception.Message;
             record.NextAttemptAt = NextSendAttempt(exception);
-            await SaveSendAsync(record, CancellationToken.None).ConfigureAwait(false);
-            if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
+            await BackgroundFailure.CompleteAsync(SaveSendAsync(record, CancellationToken.None), exception, cancellationToken).ConfigureAwait(false);
+            BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
             // Retain the unaccepted request before discovery, which can fail or be interrupted.
             if (routeRejected)
             {
@@ -315,8 +315,9 @@ sealed partial class MessageManager
                     _ = await accountManager.RefreshRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("The account has no published home relay route.");
                 }
-                catch (Exception refreshError) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception refreshError)
                 {
+                    BackgroundFailure.ThrowIfCanceled(refreshError, cancellationToken);
                     ReportBackgroundError(BackgroundOperation.SendMessage, messageId,
                         new AggregateException("Message routing was rejected and route refresh failed.", exception, refreshError));
                     return;
@@ -325,7 +326,7 @@ sealed partial class MessageManager
             ReportBackgroundError(BackgroundOperation.SendMessage, messageId, exception);
             return;
         }
-        await SaveSendAsync(record, CancellationToken.None).ConfigureAwait(false);
+        await BackgroundFailure.CompleteAsync(SaveSendAsync(record, CancellationToken.None)).ConfigureAwait(false);
     }
 
     static DateTimeOffset NextSendAttempt(Exception? error = null)

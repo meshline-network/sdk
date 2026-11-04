@@ -12,7 +12,6 @@ using Org.BouncyCastle.Math.EC.Rfc7748;
 using Org.BouncyCastle.Math.EC.Rfc8032;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -169,7 +168,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             if (encryptionKey is not null)
                 CryptographicOperations.ZeroMemory(encryptionKey);
         }
-        DeviceChanged?.Invoke(this, new(certificate.GetDeviceId(Context)));
+        BackgroundFailure.Notify(() => DeviceChanged?.Invoke(this, new(certificate.GetDeviceId(Context))));
         return certificate;
     }
 
@@ -248,7 +247,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             await relayClients.RebindDeviceAsync(local.DeviceId, certificate).ConfigureAwait(false);
         }
         finally { CryptographicOperations.ZeroMemory(signingKey); }
-        DeviceChanged?.Invoke(this, new(certificate.GetDeviceId(Context)));
+        BackgroundFailure.Notify(() => DeviceChanged?.Invoke(this, new(certificate.GetDeviceId(Context))));
         return certificate;
     }
 
@@ -698,7 +697,7 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         List<Exception> failures = [];
         try { if (_updates is { } updates) await updates.StopAsync().ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
-        try { await Task.WhenAll(_homeRefresh, StopStateQueriesAsync()).ConfigureAwait(false); }
+        try { await BackgroundFailure.DrainAsync(_homeRefresh, StopStateQueriesAsync()).ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
         _homeRefresh = Task.CompletedTask;
         _refreshRequests = null;
@@ -711,21 +710,17 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
             try { await relayClients.InvalidateDeviceAsync().ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
         }
-        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        if (failures.Count > 1) throw new AggregateException(failures);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     /// <inheritdoc/>
     /// <exception cref="AggregateException">A cancellation callback throws while dependent component or relay lifetimes are canceled.</exception>
-    protected override async ValueTask DisposeAsyncCore()
-    {
-        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
-        await StopStateQueriesAsync(dispose: true).ConfigureAwait(false);
-        if (Local is not null)
-            await relayClients.InvalidateDeviceAsync().ConfigureAwait(false);
-        ClearCachedKeys();
-        await base.DisposeAsyncCore().ConfigureAwait(false);
-    }
+    protected override ValueTask DisposeAsyncCore() => BackgroundFailure.CleanupAsync(
+        () => new(_updates?.DrainAsync() ?? Task.CompletedTask),
+        () => new(StopStateQueriesAsync(dispose: true)),
+        () => new(Local is not null ? relayClients.InvalidateDeviceAsync() : Task.CompletedTask),
+        () => { ClearCachedKeys(); return ValueTask.CompletedTask; },
+        base.DisposeAsyncCore);
 
     // Serialize standalone device mutations. Establishment is serialized by the
     // client's account gate and must not overlap caller-initiated device mutations.
@@ -1028,11 +1023,12 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
         else await attempt.CurrentAsync(SaveAsync, cancellationToken).ConfigureAwait(false);
         // Retirement detaches the old sessions during the guarded commit. Drain them
         // outside both state gates so a successor can publish and create new sessions.
-        try
-        {
-            if (changed) DeviceStateChanged?.Invoke(this, EventArgs.Empty);
-        }
-        finally { await retirement.ConfigureAwait(false); }
+        List<Exception> failures = [];
+        try { if (changed) BackgroundFailure.Notify(() => DeviceStateChanged?.Invoke(this, EventArgs.Empty)); }
+        catch (Exception error) { failures.Add(error); }
+        try { await retirement.ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     async Task UseHomeRelayAsync(string relayId, CancellationToken cancellationToken)
@@ -1101,13 +1097,14 @@ public sealed partial class DeviceManager(ClientOptions options, DatabaseOptions
                     var relayId = await GetHomeRelayIdAsync(cancellationToken).ConfigureAwait(false);
                     await UseHomeRelayAsync(relayId, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception exception)
                 {
+                    BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                     ReportBackgroundError(BackgroundOperation.Synchronize, _homeRelayClient?.RelayId, exception);
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     void OnDeviceStateNotification(object? sender, RpcRequest request)

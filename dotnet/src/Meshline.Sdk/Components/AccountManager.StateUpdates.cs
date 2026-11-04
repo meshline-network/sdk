@@ -128,7 +128,7 @@ sealed partial class AccountManager
         }, token).ConfigureAwait(false);
         // Ensure raises its foreground notification after completion so callbacks can
         // publish again. Recovery has no foreground continuation to raise that event.
-        if (changed && (attempt.IsBackground || attempt.Intent["classify"]?.GetValue<bool>() != true)) AccountChanged?.Invoke(this, EventArgs.Empty);
+        if (changed && (attempt.IsBackground || attempt.Intent["classify"]?.GetValue<bool>() != true)) BackgroundFailure.Notify(() => AccountChanged?.Invoke(this, EventArgs.Empty));
         return result;
     }
 

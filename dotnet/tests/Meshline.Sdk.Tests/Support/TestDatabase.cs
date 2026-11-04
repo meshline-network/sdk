@@ -1,5 +1,6 @@
 using Meshline.Storage;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace Meshline.Tests.Support;
 
@@ -23,6 +24,26 @@ internal sealed class TestDatabase : IAsyncDisposable
     }
 
     public MeshlineDbContext Open() => new(Options);
+
+    public async Task<IAsyncDisposable> CreateTriggerAsync(string name, string definition)
+    {
+        var identifier = "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        var sql = $"CREATE TRIGGER {identifier} {definition}";
+        await using var database = Open();
+        await database.Database.ExecuteSqlRawAsync(sql, TestContext.Current.CancellationToken);
+        return new Trigger(this, identifier);
+    }
+
+    sealed class Trigger(TestDatabase owner, string identifier) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await using var database = owner.Open();
+            var sql = $"DROP TRIGGER IF EXISTS {identifier};";
+            await database.Database.ExecuteSqlRawAsync(sql, CancellationToken.None);
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         // Clear only this fixture's connection pool, preserving parallel tests.

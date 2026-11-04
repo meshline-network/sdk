@@ -1,3 +1,4 @@
+using Meshline.Interactions;
 using Meshline.Models.Protocol;
 using Meshline.Tests.Support;
 using Meshline.Transport;
@@ -371,6 +372,118 @@ public sealed class RelayWebSocketTests
         await socket.Completion.WaitAsync(TimeSpan.FromSeconds(10), Token);
 
         Assert.True(socket.ClientStreamDisposed);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    public async Task Renewal_cancellation_drains_socket_even_when_callback_throws(int failureKind, bool dispose)
+    {
+        var clock = new ManualClock();
+        using var time = Clock.Use(clock);
+        using var relay = new OfflineRelay();
+        using var account = new AccountSigner();
+        var pool = relay.Pool(account);
+        relay.SessionSeconds = 30;
+        relay.SocketHandler = (_, _) => Task.CompletedTask;
+        Exception? callbackError = failureKind switch
+        {
+            1 => new IOException("renewal cancellation callback failed"),
+            2 => new OperationCanceledException("renewal cancellation callback failed"),
+            _ => null
+        };
+        var signer = new RenewalSigner(new DeviceSigner(account, clock), callbackError);
+        Task? pending = null;
+        try
+        {
+            var client = await pool.GetAsync(relay.RelayId, signer, Token);
+            var notified = AsyncTest.Signal();
+            var disconnected = AsyncTest.Signal();
+            client.ErrorOccurred += (_, _) => notified.TrySetResult();
+            client.StateChanged += (_, _) => { if (client.ConnectionState == RelayConnectionState.Disconnected) disconnected.TrySetResult(); };
+            await StartNotificationsAsync(client);
+            await AsyncTest.UntilAsync(() => clock.HasTimerDueWithin(TimeSpan.FromSeconds(30)));
+            clock.Advance(TimeSpan.FromSeconds(25));
+            await signer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            pending = client.SendWebSocketAsync("probe", cancellationToken: Token);
+            var socket = relay.Sockets.Single();
+            await AsyncTest.UntilAsync(() => socket.Requests.Any(request => request.Method == "probe"));
+            Task? disposal = null;
+            if (dispose) disposal = client.DisposeAsync().AsTask();
+            else socket.Abort();
+            await signer.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            var requestError = await Record.ExceptionAsync(() => pending.WaitAsync(TimeSpan.FromSeconds(5), Token));
+            Assert.NotNull(requestError);
+            Assert.IsNotType<TimeoutException>(requestError);
+            await notified.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+
+            Exception? cleanupError;
+            if (dispose)
+            {
+                cleanupError = await Record.ExceptionAsync(() => disposal!.WaitAsync(TimeSpan.FromSeconds(5), Token));
+                await client.DisposeAsync();
+            }
+            else
+            {
+                await AsyncTest.UntilAsync(() => clock.HasTimerDueWithin(TimeSpan.FromSeconds(2)));
+                clock.Advance(TimeSpan.FromSeconds(2));
+                if (callbackError is not null)
+                {
+                    await AsyncTest.UntilAsync(() => !pool.Clients.Contains(client));
+                    var replacement = await pool.GetAsync(relay.RelayId, signer, Token);
+                    Assert.NotSame(client, replacement);
+                    client = replacement;
+                    await StartNotificationsAsync(client);
+                }
+                await AsyncTest.UntilAsync(() => relay.Sockets.Count == 2 && relay.Sockets.Last().AuthenticationReplied.IsCompletedSuccessfully);
+                relay.SocketHandler = (request, active) => { active.Reply(request.Id!, "null"); return Task.CompletedTask; };
+                await client.SendWebSocketAsync("after-failure", cancellationToken: Token).WaitAsync(TimeSpan.FromSeconds(5), Token);
+                Assert.Single(relay.Sockets.SelectMany(active => active.Requests), request => request.Method == "probe");
+                cleanupError = await Record.ExceptionAsync(() => pool.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), Token));
+                Assert.Same(cleanupError, await Record.ExceptionAsync(() => pool.DisposeAsync().AsTask()));
+            }
+            if (callbackError is null) Assert.Null(cleanupError);
+            else
+            {
+                Assert.NotNull(cleanupError);
+                var failures = cleanupError is AggregateException aggregate ? aggregate.Flatten().InnerExceptions.ToArray() : [cleanupError];
+                Assert.Same(callbackError, Assert.Single(failures));
+            }
+            Assert.All(relay.Sockets, active => Assert.True(active.ClientStreamDisposed));
+        }
+        finally
+        {
+            await Record.ExceptionAsync(() => pool.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), Token));
+            if (pending is not null) await Record.ExceptionAsync(() => pending.WaitAsync(TimeSpan.FromSeconds(5), Token));
+        }
+    }
+
+    sealed class RenewalSigner(IDeviceSigner inner, Exception? callbackError) : IDeviceSigner
+    {
+        int calls;
+        public TaskCompletionSource Entered { get; } = AsyncTest.Signal();
+        public TaskCompletionSource Canceled { get; } = AsyncTest.Signal();
+        public DeviceCertificate Certificate => inner.Certificate;
+
+        public async Task<byte[]> SignAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref calls) == 3)
+            {
+                using var registration = cancellationToken.Register(() =>
+                {
+                    Canceled.TrySetResult();
+                    if (callbackError is not null) throw callbackError;
+                });
+                Entered.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            return await inner.SignAsync(data, cancellationToken);
+        }
     }
 
     static async Task StartNotificationsAsync(RelayClient client)

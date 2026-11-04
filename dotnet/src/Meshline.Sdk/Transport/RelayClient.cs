@@ -44,7 +44,8 @@ public sealed partial class RelayClient
     Uri? _httpEndpoint;
     AuthenticationIdentity? _identity;
     Session? _httpSession;
-    Task<Session>? _httpAuthentication;
+    SharedOperation<Session>? _httpAuthentication;
+    readonly HashSet<SharedOperation<Session>> _httpAuthentications = [];
     string? _httpAuthenticationOrigin;
     long _backoffStarted;
     double _backoffSeconds;
@@ -150,7 +151,7 @@ public sealed partial class RelayClient
             // Registration may have changed while the descriptor request was in flight.
             await GetActiveRegistrationAsync(token).ConfigureAwait(false);
             return result;
-        }, error => { ReportFailure(error); ErrorOccurred?.Invoke(this, error); }, linked.Token).ConfigureAwait(false)
+        }, error => { ReportFailure(error); BackgroundFailure.Notify(() => ErrorOccurred?.Invoke(this, error)); }, linked.Token).ConfigureAwait(false)
             ?? throw new InvalidDataException("Relay descriptor resolution returned no result.");
         if (descriptor.ExpiresAt <= Clock.GetUtcNow().ToUnixTimeSeconds()) throw new InvalidDataException("The relay descriptor has expired.");
         var endpoint = new Uri(descriptor.Endpoints.First(static value => value.StartsWith("https://", StringComparison.Ordinal)));
@@ -212,7 +213,7 @@ public sealed partial class RelayClient
             if (info.RelayId != RelayId) throw new InvalidDataException("The relay information identifies another relay.");
             ValidateLimits(info.Limits, descriptor);
             return info.Limits;
-        }, error => { ReportFailure(error); ErrorOccurred?.Invoke(this, error); }, linked.Token).ConfigureAwait(false)
+        }, error => { ReportFailure(error); BackgroundFailure.Notify(() => ErrorOccurred?.Invoke(this, error)); }, linked.Token).ConfigureAwait(false)
             ?? throw new InvalidDataException("The relay limits are unavailable.");
         ValidateLimits(limits, descriptor);
         return limits;
@@ -314,26 +315,29 @@ public sealed partial class RelayClient
 
     async Task<Session> GetHttpSessionAsync(Uri endpoint, AuthenticationIdentity identity, CancellationToken cancellationToken)
     {
-        Task<Session> authentication;
+        Task<Session> waiting;
         await _httpAuthenticationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            ThrowIfDisposed();
+            cancellationToken.ThrowIfCancellationRequested();
             var origin = GetOrigin(endpoint);
             if (_httpSession is { } session && session.Origin == origin && session.RemainingSeconds > Math.Min(5, session.LifetimeSeconds * 0.2))
                 return session;
             if (_httpAuthentication is not { IsCompleted: false } || _httpAuthenticationOrigin != origin)
             {
                 _httpAuthenticationOrigin = origin;
-                _httpAuthentication = RefreshHttpSessionAsync(endpoint, identity);
-                _ = _httpAuthentication.ContinueWith(static task => _ = task.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                _httpAuthentications.RemoveWhere(static operation => operation.CanForget);
+                _httpAuthentication = new(RefreshHttpSessionAsync(endpoint, identity));
+                _httpAuthentications.Add(_httpAuthentication);
             }
-            authentication = _httpAuthentication;
+            waiting = _httpAuthentication.WaitAsync(cancellationToken);
         }
         finally
         {
             _httpAuthenticationGate.Release();
         }
-        return await authentication.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return await waiting.ConfigureAwait(false);
     }
 
     async Task<Session> RefreshHttpSessionAsync(Uri endpoint, AuthenticationIdentity identity)
@@ -353,18 +357,19 @@ public sealed partial class RelayClient
         {
             return await CreateSessionAsync(endpoint, send, identity, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error))
         {
             UpdateState(authenticationState: HasValidSession ? AuthenticatedState : RelayAuthenticationState.None);
             throw;
         }
         catch (Exception exception)
         {
+            if (BackgroundFailure.IsRequired(exception)) throw;
             ReportFailure(exception);
             // HTTP session renewal must report loss of the device identity too;
             // a request-level device_unknown may instead describe its recipient.
             if (identity.Mode == Models.Protocol.SessionMode.Device && exception is RelayException { Error.Code: "device_unknown" })
-                ErrorOccurred?.Invoke(this, exception);
+                BackgroundFailure.Notify(() => ErrorOccurred?.Invoke(this, exception));
             throw;
         }
     }
@@ -423,7 +428,7 @@ public sealed partial class RelayClient
             UpdateState(RelayConnectionState.Connected);
             return result;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error))
         {
             if (ConnectionState == RelayConnectionState.Connecting)
                 UpdateState(RelayConnectionState.Disconnected);
@@ -431,6 +436,7 @@ public sealed partial class RelayClient
         }
         catch (Exception exception)
         {
+            if (BackgroundFailure.IsRequired(exception)) throw;
             ReportFailure(exception);
             throw;
         }
@@ -591,7 +597,7 @@ public sealed partial class RelayClient
             _sessionMode = mode;
             _lastError = error;
         }
-        StateChanged?.Invoke(this, EventArgs.Empty);
+        BackgroundFailure.Notify(() => StateChanged?.Invoke(this, EventArgs.Empty));
     }
 
     void ReportFailure(Exception exception)
@@ -607,18 +613,26 @@ public sealed partial class RelayClient
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
+        List<Exception> failures = [];
         try
         {
-            await _lifetime.CancelAsync().ConfigureAwait(false);
+            try { await _lifetime.CancelAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
             await _authenticationGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                await DisposeSocketAsync().ConfigureAwait(false);
-                if (_httpAuthentication is { } authentication)
+                try { await DisposeSocketAsync().ConfigureAwait(false); }
+                catch (Exception error) { failures.Add(error); }
+                SharedOperation<Session>[] authentications;
+                await _httpAuthenticationGate.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    try { await authentication.ConfigureAwait(false); }
-                    catch (Exception) { /* Authentication failures are observed by request callers. */ }
+                    authentications = [.. _httpAuthentications];
+                    _httpAuthentications.Clear();
                 }
+                finally { _httpAuthenticationGate.Release(); }
+                try { await BackgroundFailure.DrainAsync(authentications.Select(static operation => operation.DrainAsync()).ToArray()).ConfigureAwait(false); }
+                catch (Exception error) { failures.Add(error); }
                 _httpSession = null;
                 _identity = null;
             }
@@ -627,6 +641,7 @@ public sealed partial class RelayClient
                 _authenticationGate.Release();
             }
         }
+        catch (Exception error) { failures.Add(error); }
         finally
         {
             try
@@ -637,11 +652,11 @@ public sealed partial class RelayClient
                 if (notifications is not null)
                     await notifications.ConfigureAwait(false);
             }
-            finally
-            {
-                UpdateState(RelayConnectionState.Disconnected, RelayAuthenticationState.None);
-            }
+            catch (Exception error) { failures.Add(error); }
+            try { UpdateState(RelayConnectionState.Disconnected, RelayAuthenticationState.None); }
+            catch (Exception error) { failures.Add(error); }
         }
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     sealed record AuthenticationIdentity

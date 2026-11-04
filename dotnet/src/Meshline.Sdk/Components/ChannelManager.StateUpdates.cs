@@ -94,7 +94,7 @@ sealed partial class ChannelManager
         var previous = await database.Channels.Where(value => value.ChannelId == channel.ChannelId).Select(value => value.DescriptorJson).SingleOrDefaultAsync(token).ConfigureAwait(false);
         await attempt.CurrentAsync(() => SaveDescriptorAsync(channel, result, token, notify: false, published: true), token).ConfigureAwait(false);
         var info = await ReadChannelAsync(channel, token).ConfigureAwait(false);
-        if (previous != info.Descriptor?.ToJson()) ChannelChanged?.Invoke(this, info);
+        if (previous != info.Descriptor?.ToJson()) BackgroundFailure.Notify(() => ChannelChanged?.Invoke(this, info));
         return info;
     }
 

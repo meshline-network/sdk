@@ -340,6 +340,11 @@ public sealed class LifecycleTests
         await using var component = new Component(account);
         var operationError = new InvalidOperationException("operation callback failed");
         var runtimeError = new InvalidOperationException("runtime callback failed");
+        var notifications = 0;
+        component.StateChanged += (_, change) =>
+        {
+            if (change.CurrentState == ComponentState.Disposed) notifications++;
+        };
         component.OperationError = failOperation ? operationError : null;
         component.RuntimeError = failRuntime ? runtimeError : null;
         await component.InitializeAsync(Token);
@@ -378,6 +383,7 @@ public sealed class LifecycleTests
         Assert.Equal(1, component.Disposals);
         await component.DisposeAsync();
         Assert.Equal(1, component.Disposals);
+        Assert.Equal(1, notifications);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => component.OperationAsync());
         await Assert.ThrowsAsync<ObjectDisposedException>(() => component.StartAsync(Token));
     }
@@ -451,17 +457,65 @@ public sealed class LifecycleTests
         using var account = new AccountSigner();
         await using var component = new Component(account);
         var expected = new IOException("resource cleanup failed");
+        var notifications = 0;
+        component.StateChanged += (_, change) =>
+        {
+            if (change.CurrentState == ComponentState.Disposed) notifications++;
+        };
         component.DisposalError = expected;
         try
         {
             Assert.Same(expected, await Assert.ThrowsAsync<IOException>(() => component.DisposeAsync().AsTask()));
             Assert.Contains("DisposeAsyncCore", expected.StackTrace);
             Assert.NotEqual(ComponentState.Disposed, component.LifecycleState);
+            Assert.Equal(0, notifications);
         }
         finally { component.ReleaseForCleanup(); }
 
         await component.DisposeAsync();
         Assert.Equal(ComponentState.Disposed, component.LifecycleState);
         Assert.Equal(2, component.Disposals);
+        Assert.Equal(1, notifications);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Disposal_notifies_once_and_preserves_stop_and_notification_errors(bool failStop, bool failNotification)
+    {
+        using var account = new AccountSigner();
+        await using var component = new Component(account);
+        var stopError = new IOException("stop failed");
+        var notificationError = new IOException("disposed observer failed");
+        component.StopError = failStop ? stopError : null;
+        component.Background.Release.TrySetResult();
+        await component.InitializeAsync(Token);
+        await component.StartAsync(Token);
+        var notifications = 0;
+        component.StateChanged += (_, change) =>
+        {
+            if (change.CurrentState != ComponentState.Disposed) return;
+            notifications++;
+            Assert.Equal(ComponentState.Running, change.PreviousState);
+            Assert.Equal(ComponentState.Disposed, component.LifecycleState);
+            // Notifications run outside the lifecycle gate and can observe completed disposal.
+            component.DisposeAsync().GetAwaiter().GetResult();
+            if (failNotification) throw notificationError;
+        };
+        var error = await Record.ExceptionAsync(() => component.DisposeAsync().AsTask());
+        if (failStop && failNotification)
+        {
+            var errors = Assert.IsType<AggregateException>(error).Flatten().InnerExceptions;
+            Assert.Equal(2, errors.Count);
+            Assert.Contains(stopError, errors);
+            Assert.Contains(notificationError, errors);
+        }
+        else Assert.Same(failStop ? stopError : failNotification ? notificationError : null, error);
+        Assert.Equal(ComponentState.Disposed, component.LifecycleState);
+        await component.DisposeAsync();
+        Assert.Equal(1, notifications);
+        Assert.Equal(1, component.Disposals);
     }
 }

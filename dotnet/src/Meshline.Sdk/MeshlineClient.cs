@@ -7,7 +7,7 @@ using Meshline.Transport;
 using Meshline.Validation;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using System.Runtime.ExceptionServices;
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -45,6 +45,7 @@ public sealed partial class MeshlineClient : ClientComponent
     volatile bool _runtimeActive;
     bool _startWaitCanceled;
     Action? _requestAuthorizationStop;
+    readonly ConcurrentQueue<Exception> _authorizationStopFailures = new();
 
     /// <summary>
     /// The current account's last known route, or <see langword="null"/> when no route is known.
@@ -211,9 +212,16 @@ public sealed partial class MeshlineClient : ClientComponent
             try { await component.StopAsync().ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
         }
+        // Account work can record another route after the message runtime stops.
+        // Drain those observations after their producers have finished as well.
+        if (MessageManager.LifecycleState != ComponentState.Disposed)
+        {
+            try { await MessageManager.StopAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+        }
         _runtimeActive = false;
-        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        if (failures.Count > 1) throw new AggregateException(failures);
+        while (_authorizationStopFailures.TryDequeue(out var error)) failures.Add(error);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     void OnDeviceAuthorizationChanged(object? sender, EventArgs args)
@@ -227,21 +235,24 @@ public sealed partial class MeshlineClient : ClientComponent
 
     async Task StopUnauthorizedDeviceAsync(CancellationToken cancellationToken)
     {
+        IDisposable? operation = null;
         try
         {
-            using var operation = BeginOperation(ref cancellationToken);
+            operation = BeginOperation(ref cancellationToken);
             // The event can be raised by a child task which shutdown must drain.
             // Return to that task before stopping, and bind the queued stop to this
             // runtime so it cannot stop a later start or deadlock with disposal.
             await Task.Yield();
             await StopAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (ObjectDisposedException) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
+        catch (ObjectDisposedException error) when (!BackgroundFailure.IsRequired(error)) { }
         catch (Exception exception)
         {
-            ReportBackgroundError(BackgroundOperation.Synchronize, Options.AccountId, exception);
+            try { ReportBackgroundError(BackgroundOperation.Synchronize, Options.AccountId, exception); }
+            catch (Exception observer) { _authorizationStopFailures.Enqueue(new AggregateException(exception, observer)); }
         }
+        finally { operation?.Dispose(); }
     }
 
     void OnComponentError(object? sender, BackgroundErrorEventArgs args)
@@ -396,15 +407,19 @@ public sealed partial class MeshlineClient : ClientComponent
         ChannelManager.FollowChanged -= OnChannelFollowChanged;
         GroupManager.TimelineChanged -= OnGroupTimelineChanged;
         GroupManager.GroupChanged -= OnGroupChanged;
-        await _conversationLifetime.CancelAsync().ConfigureAwait(false);
-        await _conversationObserver.ConfigureAwait(false);
-        _conversationLifetime.Dispose();
-        await GroupManager.DisposeAsync().ConfigureAwait(false);
-        await ChannelManager.DisposeAsync().ConfigureAwait(false);
-        await MessageManager.DisposeAsync().ConfigureAwait(false);
-        await ProfileManager.DisposeAsync().ConfigureAwait(false);
-        await DeviceManager.DisposeAsync().ConfigureAwait(false);
-        await AccountManager.DisposeAsync().ConfigureAwait(false);
+        List<Exception> failures = [];
+        if (!_conversationsDisposed)
+        {
+            try { await BackgroundFailure.DrainAsync(_conversationLifetime.CancelAsync(), _conversationObserver).ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+            finally { _conversationLifetime.Dispose(); _conversationsDisposed = true; }
+        }
+        ClientComponent[] components = [GroupManager, ChannelManager, MessageManager, ProfileManager, DeviceManager, AccountManager];
+        foreach (var component in components)
+        {
+            try { await component.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+        }
         AccountManager.BackgroundError -= OnComponentError;
         DeviceManager.BackgroundError -= OnComponentError;
         ProfileManager.BackgroundError -= OnComponentError;
@@ -412,5 +427,7 @@ public sealed partial class MeshlineClient : ClientComponent
         MessageManager.BackgroundError -= OnComponentError;
         GroupManager.BackgroundError -= OnComponentError;
         await base.DisposeAsyncCore().ConfigureAwait(false);
+        while (_authorizationStopFailures.TryDequeue(out var error)) failures.Add(error);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 }

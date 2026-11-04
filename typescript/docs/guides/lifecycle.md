@@ -35,6 +35,11 @@ initialized instance with `await client.start()`. After process restart, reopen
 the original store with the original protector, initialize a new client, and start it.
 Do not automatically call account recovery on every launch.
 
+Stopping waits for owned background work, pending route observations and
+read-triggered refreshes, including before the first start or on repeated stops.
+The stop signal can cancel waiting to begin shutdown; once shutdown begins,
+await its completion before releasing shared resources.
+
 Startup reuses retained valid authorization and connects in the background. It
 does not resume unfinished establishment or request account signatures. A removed
 device or a definitive device authentication rejection stops synchronization and

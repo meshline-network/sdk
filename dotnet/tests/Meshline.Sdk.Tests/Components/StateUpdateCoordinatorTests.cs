@@ -15,6 +15,138 @@ public sealed class StateUpdateCoordinatorTests
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task Caller_cancellation_during_a_synchronous_observer_keeps_the_undelivered_outcome_for_drain()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var database = new TestDatabase();
+        await database.MigrateAsync();
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var observerError = new IOException("observer failed after canceling its caller");
+        var coordinator = new TestStateUpdateCoordinator(database.Options, "group.update", (_, _) =>
+        {
+            BackgroundFailure.Notify(() => { caller.Cancel(); throw observerError; });
+            return Task.FromResult<object?>("done");
+        }, (_, error) => Assert.Fail(error.ToString()));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => coordinator.SubmitAsync<string>("resource", new() { ["name"] = "pending" }, caller.Token));
+        Assert.Same(observerError, await Record.ExceptionAsync(coordinator.DrainAsync));
+        await coordinator.DrainAsync();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Detached_publication_retains_observer_failure_without_replacing_newer_intent(bool supersede, bool cancellationError)
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var database = new TestDatabase();
+        await database.MigrateAsync();
+        var entered = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        Exception observerError = cancellationError ? new OperationCanceledException("late observer failed") : new IOException("late observer failed");
+        var coordinator = new TestStateUpdateCoordinator(database.Options, "group.update", async (attempt, _) =>
+        {
+            var name = attempt.Intent["name"]!.GetValue<string>();
+            if (name != "old") return name;
+            entered.TrySetResult();
+            await release.Task;
+            BackgroundFailure.Notify(() => throw observerError);
+            return name;
+        }, (_, error) => Assert.Fail(error.ToString()));
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var first = coordinator.SubmitAsync<string>("resource", new() { ["name"] = "old" }, caller.Token);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            if (supersede)
+            {
+                Assert.Equal("latest", await coordinator.SubmitAsync<string>("resource", new() { ["name"] = "latest" }, Token));
+                await Assert.ThrowsAsync<StateUpdateSupersededException>(() => first);
+            }
+            else
+            {
+                await caller.CancelAsync();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+            }
+            await coordinator.StopAsync().WaitAsync(TimeSpan.FromSeconds(5), Token);
+            release.TrySetResult();
+            Assert.Same(observerError, await Record.ExceptionAsync(() => coordinator.DrainAsync().WaitAsync(TimeSpan.FromSeconds(5), Token)));
+            await coordinator.DrainAsync();
+            await using var read = database.Open();
+            var row = await read.GroupOperations.SingleAsync(Token);
+            Assert.Equal(supersede ? 2 : 1, row.Generation);
+            Assert.Equal(!supersede, row.Pending);
+            if (supersede) Assert.Null(row.IntentJson);
+        }
+        finally { release.TrySetResult(); await Record.ExceptionAsync(coordinator.DrainAsync); }
+    }
+
+    [Fact]
+    public async Task Recovery_aggregates_concurrent_observer_failures_once_and_can_restart()
+    {
+        var clock = new ManualClock();
+        using var time = Clock.Use(clock);
+        await using var database = new TestDatabase();
+        await database.MigrateAsync();
+        var publishing = AsyncTest.Signal();
+        var release = AsyncTest.Signal();
+        var reported = AsyncTest.Signal();
+        var attempts = 0;
+        var reports = 0;
+        var recover = false;
+        var firstError = new IOException("first observer failed");
+        var secondError = new OperationCanceledException("second observer failed");
+        var coordinator = new TestStateUpdateCoordinator(database.Options, "group.update", async (attempt, _) =>
+        {
+            if (recover) return "confirmed";
+            if (attempt.IsBackground)
+            {
+                if (Interlocked.Increment(ref attempts) == 2) publishing.TrySetResult();
+                await release.Task.WaitAsync(Token);
+            }
+            throw new HttpRequestException("offline");
+        }, (resource, _) =>
+        {
+            if (Interlocked.Increment(ref reports) == 2) reported.TrySetResult();
+            throw resource.EndsWith(":first", StringComparison.Ordinal) ? firstError : secondError;
+        });
+        await Assert.ThrowsAsync<HttpRequestException>(() => coordinator.SubmitAsync<string>("first", new() { ["name"] = "first" }, Token));
+        await Assert.ThrowsAsync<HttpRequestException>(() => coordinator.SubmitAsync<string>("second", new() { ["name"] = "second" }, Token));
+        await coordinator.DrainAsync();
+        clock.Advance(TimeSpan.FromSeconds(1));
+        using var runtime = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        coordinator.Start(runtime.Token);
+        try
+        {
+            await publishing.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            release.TrySetResult();
+            await reported.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            var error = await Assert.ThrowsAsync<AggregateException>(() => coordinator.StopAsync().WaitAsync(TimeSpan.FromSeconds(5), Token));
+            Assert.Equal(2, error.InnerExceptions.Count);
+            Assert.Contains(firstError, error.InnerExceptions);
+            Assert.Contains(secondError, error.InnerExceptions);
+            await coordinator.StopAsync();
+        }
+        finally { release.TrySetResult(); await runtime.CancelAsync(); await coordinator.DrainAsync(); }
+
+        recover = true;
+        clock.Advance(TimeSpan.FromSeconds(2));
+        using var restarted = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        coordinator.Start(restarted.Token);
+        try
+        {
+            await AsyncTest.UntilAsync(async () =>
+            {
+                await using var read = database.Open();
+                return !await read.GroupOperations.AnyAsync(value => value.Pending, Token);
+            });
+        }
+        finally { await restarted.CancelAsync(); await coordinator.StopAsync(); await coordinator.DrainAsync(); }
+        Assert.Equal(2, Volatile.Read(ref reports));
+    }
+
+    [Fact]
     public async Task Resume_joins_active_intent_without_overwriting_or_canceling_its_owner()
     {
         using var time = Clock.Use(new ManualClock());
@@ -219,8 +351,11 @@ public sealed class StateUpdateCoordinatorTests
         Assert.Null(row.IntentJson);
     }
 
-    [Fact]
-    public async Task Supersession_does_not_wait_for_cancellation_callbacks_but_draining_does()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Supersession_does_not_wait_for_cancellation_callbacks_but_draining_does(int failureKind)
     {
         using var time = Clock.Use(new ManualClock());
         await using var database = new TestDatabase();
@@ -228,12 +363,18 @@ public sealed class StateUpdateCoordinatorTests
         var entered = AsyncTest.Signal();
         var canceled = AsyncTest.Signal();
         var finish = AsyncTest.Signal();
+        Exception? callbackError = failureKind switch
+        {
+            1 => new IOException("supersession callback failed"),
+            2 => new OperationCanceledException("supersession callback failed"),
+            _ => null
+        };
         using var release = new ManualResetEventSlim();
         var coordinator = new TestStateUpdateCoordinator(database.Options, "group.update", async (attempt, token) =>
         {
             if (attempt.Intent["name"]!.GetValue<string>() == "old")
             {
-                token.Register(() => { canceled.TrySetResult(); release.Wait(); });
+                token.Register(() => { canceled.TrySetResult(); release.Wait(); if (callbackError is not null) throw callbackError; });
                 entered.TrySetResult();
                 await finish.Task;
             }
@@ -252,9 +393,53 @@ public sealed class StateUpdateCoordinatorTests
             await Task.WhenAny(drain, Task.Delay(TimeSpan.FromMilliseconds(100), Token));
             Assert.False(drain.IsCompleted);
             release.Set();
-            await drain.WaitAsync(TimeSpan.FromSeconds(5), Token);
+            var error = await Record.ExceptionAsync(() => drain.WaitAsync(TimeSpan.FromSeconds(5), Token));
+            if (callbackError is null) Assert.Null(error);
+            else Assert.Same(callbackError, Assert.Single(Assert.IsType<AggregateException>(error).Flatten().InnerExceptions));
+            await coordinator.StopAsync();
         }
         finally { release.Set(); finish.TrySetResult(); await coordinator.DrainAsync(); }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Recovery_retains_publication_observer_failure_and_error_observer_failure(bool cancellationError, bool reportFails)
+    {
+        var clock = new ManualClock();
+        using var time = Clock.Use(clock);
+        await using var database = new TestDatabase();
+        await database.MigrateAsync();
+        var reported = AsyncTest.Signal();
+        var attempts = 0;
+        Exception publicationError = cancellationError ? new OperationCanceledException("publication observer failed") : new IOException("publication observer failed");
+        var reportError = new IOException("error observer failed");
+        var coordinator = new TestStateUpdateCoordinator(database.Options, "group.update", (_, _) =>
+        {
+            if (Interlocked.Increment(ref attempts) == 1) throw new HttpRequestException("offline");
+            BackgroundFailure.Notify(() => throw publicationError);
+            return Task.FromResult<object?>("done");
+        }, (_, _) => { reported.TrySetResult(); if (reportFails) throw reportError; });
+        await Assert.ThrowsAsync<HttpRequestException>(() => coordinator.SubmitAsync<string>("resource", new() { ["name"] = "pending" }, Token));
+        using var runtime = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        coordinator.Start(runtime.Token);
+        try
+        {
+            await AsyncTest.UntilAsync(() => clock.HasTimerDueWithin(TimeSpan.FromSeconds(1)));
+            clock.Advance(TimeSpan.FromSeconds(1));
+            await reported.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+        }
+        finally { await runtime.CancelAsync(); }
+        var error = await Record.ExceptionAsync(() => coordinator.StopAsync().WaitAsync(TimeSpan.FromSeconds(5), Token));
+        Assert.NotNull(error);
+        var failures = error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions.ToArray() : [error];
+        Assert.Equal(reportFails ? 2 : 1, failures.Length);
+        Assert.Contains(publicationError, failures);
+        if (reportFails) Assert.Contains(reportError, failures);
+        await coordinator.StopAsync();
+        await coordinator.DrainAsync();
     }
 
     [Theory]

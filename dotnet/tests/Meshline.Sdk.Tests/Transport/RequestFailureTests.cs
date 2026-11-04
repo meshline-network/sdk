@@ -11,6 +11,24 @@ public sealed class RequestFailureTests
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Expired_deadline_preserves_observer_cancellation_but_classifies_transport_cancellation(bool observerFailure)
+    {
+        var clock = new ManualClock();
+        using var deadline = new RequestDeadline("test", TimeSpan.FromSeconds(1), Token, clock);
+        var original = new OperationCanceledException("operation failed");
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var error = await Record.ExceptionAsync(() => deadline.RunAsync<int>(_ =>
+        {
+            if (observerFailure) BackgroundFailure.Notify(() => throw original);
+            throw original;
+        }));
+        if (observerFailure) Assert.Same(original, error);
+        else Assert.Same(original, Assert.IsType<TimeoutException>(error).InnerException);
+    }
+
+    [Theory]
     [InlineData(false, "timeout")]
     [InlineData(false, "caller")]
     [InlineData(false, "dependency")]

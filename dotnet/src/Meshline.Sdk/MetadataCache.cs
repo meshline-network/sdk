@@ -14,6 +14,7 @@ sealed class MetadataCache<T>(T? value = null, DateTimeOffset? refreshedAt = nul
     DateTimeOffset retryAfter;
     Task<Result>? refresh;
     Task? stopping;
+    readonly List<Exception> failures = [];
     long generation;
     long freshnessVersion;
     bool disposed;
@@ -112,6 +113,10 @@ sealed class MetadataCache<T>(T? value = null, DateTimeOffset? refreshedAt = nul
                 try { report(error); }
                 catch (Exception observer) { error = new AggregateException(error, observer); }
             }
+            // Refresh results can be replaced by later reads. Keep required failures
+            // until shutdown even when the caller already received a cached value.
+            if (BackgroundFailure.IsRequired(error))
+                lock (gate) failures.Add(error);
             return new(null, ExceptionDispatchInfo.Capture(error));
         }
     }
@@ -146,7 +151,14 @@ sealed class MetadataCache<T>(T? value = null, DateTimeOffset? refreshedAt = nul
         await Task.Yield();
         Task<Result>? pending;
         lock (gate) pending = refresh;
-        try { await Task.WhenAll(lifetime.CancelAsync(), (Task?)pending ?? Task.CompletedTask).ConfigureAwait(false); }
+        List<Exception> errors = [];
+        try
+        {
+            try { await BackgroundFailure.DrainAsync(lifetime.CancelAsync(), (Task?)pending ?? Task.CompletedTask).ConfigureAwait(false); }
+            catch (Exception error) { errors.Add(error); }
+            lock (gate) { errors.AddRange(failures); failures.Clear(); }
+            BackgroundFailure.ThrowIfAny(errors);
+        }
         finally
         {
             lock (gate)

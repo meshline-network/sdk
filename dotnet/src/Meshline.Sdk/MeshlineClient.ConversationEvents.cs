@@ -12,6 +12,7 @@ sealed partial class MeshlineClient
     readonly HashSet<string> _pendingConversations = new(StringComparer.Ordinal);
     readonly Channel<bool> _conversationRequests = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
     readonly CancellationTokenSource _conversationLifetime = new();
+    bool _conversationsDisposed;
     HashSet<string> _conversationIds = new(StringComparer.Ordinal);
     Task _conversationObserver = Task.CompletedTask;
 
@@ -64,8 +65,9 @@ sealed partial class MeshlineClient
                     await using var database = new MeshlineDbContext(_databaseOptions);
                     present = new(await QueryConversationIds(database, Options.AccountId).Where(value => ids.Contains(value)).ToListAsync(cancellationToken).ConfigureAwait(false), StringComparer.Ordinal);
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception exception)
                 {
+                    BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                     ReportBackgroundError(BackgroundOperation.Synchronize, null, exception);
                     QueueConversationChanges(ids);
                     await Task.Delay(TimeSpan.FromSeconds(1), Clock.Provider, cancellationToken).ConfigureAwait(false);
@@ -82,10 +84,10 @@ sealed partial class MeshlineClient
                 foreach (var change in changes)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    ConversationChanged?.Invoke(this, change);
+                    BackgroundFailure.Notify(() => ConversationChanged?.Invoke(this, change));
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 }

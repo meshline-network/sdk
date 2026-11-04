@@ -134,7 +134,7 @@ sealed partial class DeviceManager
     {
         MetadataCache<AccountDeviceState>[] caches;
         lock (_stateCacheGate) { _stateStopping = true; caches = [.. _stateQueries.Values]; }
-        try { await Task.WhenAll(caches.Select(cache => cache.StopAsync(dispose))).ConfigureAwait(false); }
+        try { await BackgroundFailure.DrainAsync(caches.Select(cache => cache.StopAsync(dispose)).ToArray()).ConfigureAwait(false); }
         finally
         {
             lock (_stateCacheGate)

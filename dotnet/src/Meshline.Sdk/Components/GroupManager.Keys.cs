@@ -187,8 +187,8 @@ sealed partial class GroupManager
             }
             await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            if (messages.Count > 0) TimelineChanged?.Invoke(this, new(messages));
-            foreach (var notification in notifications) notification();
+            if (messages.Count > 0) BackgroundFailure.Notify(() => TimelineChanged?.Invoke(this, new(messages)));
+            foreach (var notification in notifications) BackgroundFailure.Notify(notification);
         }
     }
 }

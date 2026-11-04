@@ -23,7 +23,7 @@ sealed class RequestDeadline : IDisposable
 
     public Exception Classify(Exception error)
     {
-        if (error is not OperationCanceledException || external.IsCancellationRequested || !deadline.IsCancellationRequested)
+        if (error is not OperationCanceledException || BackgroundFailure.IsRequired(error) || external.IsCancellationRequested || !deadline.IsCancellationRequested)
             return error;
         var timeout = new TimeoutException($"Request '{operation}' timed out after {duration.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} seconds.", error);
         timeout.Data["operation"] = operation;

@@ -17,7 +17,7 @@ database ownership.
 | --- | --- |
 | `InitializeAsync` | Load local state once. A failed initialization leaves the component uninitialized so its cause can be corrected before retrying. |
 | `StartAsync` | Start component background work and resume durable retries after authorization checks. Completion does not wait for pending publications, WebSocket readiness or history synchronization. |
-| `StopAsync` | Stop background processing and drain pending refreshes, including those triggered by reads before start or after a previous stop. It drains runtime device sessions and preserves the database for a later session. |
+| `StopAsync` | Stop background processing and wait for owned refreshes and pending local writes, including work triggered by reads before start or after a previous stop. Preserve stored state for a later session. |
 | `DisposeAsync` | End the component lifetime, release owned resources, and drain active work, including superseded attempts and cancellation callbacks. A disposed component cannot be reused. |
 
 Observe `LifecycleState` and `StateChanged` for lifecycle changes. Pass cancellation tokens to awaited operations. Shutdown itself must still be awaited when the application's ordinary operation token is canceled; the examples call `StopAsync` without that canceled token.
@@ -29,6 +29,8 @@ preserves the last verified state and readable local history. Network failures,
 certificate expiry and peer/recipient authorization errors do not establish
 revocation. Background reads never request wallet signatures; deliberate
 reauthorization belongs to `EstablishAccountAsync`.
+`StartAsync` never republishes device authorization. Applications using standalone
+managers own the coordination of their runtime shutdown.
 
 Normal stop and authentication suspension drain device sessions across all relays,
 including notifications, reconnects and renewal tasks. Account sessions and verified
@@ -36,20 +38,18 @@ relay metadata remain cached. A later start authenticates a fresh device session
 no device authentication continues in the stopped runtime. Stopping before runtime
 attachment leaves setup sessions alone.
 
-Shutdown attempts every child and releases its subscriptions and sessions even if
-another cleanup task fails. It raises the completed running-to-stopped transition
+Shutdown attempts every child and each independent resource cleanup step even if
+another step fails. It raises completed transitions to `Stopped` or `Disposed`
 before reporting errors to the explicit caller, or through `BackgroundError` for
 automatic suspension. Multiple failures are retained in `AggregateException`.
 If storage prevented saving an interrupted send's status, correct the problem and
 reopen the client to reconcile its retained message ID and ciphertext.
 
-Disposal requests lifetime cancellation before waiting for initialization/startup,
-including startup waiting for account establishment. Concurrent disposals share
-cancellation and serialize cleanup. Always await disposal: cancellation alone does
-not mean active work has drained. After an error, `Disposed` is terminal and repeated
-disposal is harmless; if resource cleanup failed before reaching that state, correct
-the cause and retry disposal. A signer, key store or transport that ignores cancellation
-can delay disposal. New tracked operations remain blocked.
+Disposal cancels initialization, startup and active operations, then waits for them
+to finish. Always await it: a signer, key store or transport that ignores cancellation
+can delay completion. After an error, `Disposed` is terminal and repeated disposal
+is harmless. If resource cleanup failed before reaching that state, correct the
+cause and retry disposal; new operations remain blocked.
 
 ## Reopen an authorized device
 
@@ -132,7 +132,7 @@ Source: [Sessions.cs](../../examples/Meshline.Sdk.Examples/Sessions.cs). The dat
 
 `MeshlineClient` owns its six managers. Dispose the client before the application-owned `RelayClientPool`, and dispose a caller-supplied `HttpClient` after that pool. Readers from local queries own SQLite snapshot transactions and must also be disposed promptly. The signer, registry, and protector remain application-owned.
 
-Independently composed components follow their constructor dependencies. Initialize and start dependencies before dependents; stop and dispose dependents first. The coordinated client's order is account, device, profile, messages, channels, then groups; shutdown reverses that order. Prefer the coordinated client unless the application needs to manage these relationships explicitly.
+Independently composed components follow their constructor dependencies. Initialize and start dependencies before dependents; stop and dispose dependents first, and wait for work produced during shutdown to finish. Prefer the coordinated client unless the application needs to manage these relationships explicitly.
 
 Starting activates background work; it does not wait for resources to catch up. See [synchronization](synchronization.md) for foreground refreshes, polling, notifications, and progress snapshots.
 
@@ -140,14 +140,6 @@ Starting activates background work; it does not wait for resources to catch up. 
 starting its children. Once startup begins, establishment that would change
 authorization requires stopping synchronization, even before the facade reports
 Running. Canceling a startup wait does not cancel the establishment operation.
-
-During runtime, a verified complete device list which removes the local device
-causes MeshlineClient to stop all six managers asynchronously. Observe StateChanged
-for the transition to Stopped. Local history remains readable after that transition.
-Failed queries, unknown authorization and certificate expiry alone do not trigger
-this removal policy. Explicit establishment and account signing are required to
-reauthorize; StartAsync never republishes device authorization. Applications using
-standalone managers own the coordination of their runtime shutdown.
 
 ## API reference
 

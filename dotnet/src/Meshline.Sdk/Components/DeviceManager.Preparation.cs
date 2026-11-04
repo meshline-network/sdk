@@ -205,7 +205,7 @@ sealed partial class DeviceManager
             if (signingKey is not null) CryptographicOperations.ZeroMemory(signingKey);
             if (encryptionKey is not null) CryptographicOperations.ZeroMemory(encryptionKey);
         }
-        DeviceChanged?.Invoke(this, new(certificate.GetDeviceId(Context)));
+        BackgroundFailure.Notify(() => DeviceChanged?.Invoke(this, new(certificate.GetDeviceId(Context))));
         return certificate;
     }
 

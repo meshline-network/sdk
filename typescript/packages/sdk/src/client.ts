@@ -166,7 +166,14 @@ export class MeshlineClient extends ClientComponent {
     protected override async onStop(): Promise<void> {
         // A canceled start waiting behind setup has not acquired any child runtime.
         if (this.#starting && !this.#runtimeReserved) return;
-        const errors: unknown[] = []; for (const component of [...this.#components].reverse()) { try { await component.stop(); } catch (error) { errors.push(error); } }
+        const errors: unknown[] = [];
+        for (const component of [...this.#components].reverse()) {
+            try { await component.stop(); } catch (error) { errors.push(error); }
+        }
+        // Account work can record another route after the message runtime stops.
+        if (this.messageManager.lifecycleState !== 'disposed') {
+            try { await this.messageManager.stop(); } catch (error) { errors.push(error); }
+        }
         await this.#authorizationWatch;
         try { await this.#pool.invalidateDevice(); } catch (error) { errors.push(error); }
         this.#runtimeReserved = false;

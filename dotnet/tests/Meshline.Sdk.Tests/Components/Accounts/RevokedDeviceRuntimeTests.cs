@@ -130,7 +130,10 @@ public sealed class RevokedDeviceRuntimeTests
         };
         var failure = await Record.ExceptionAsync(() => fixture.Client.StartAsync(Token).WaitAsync(TimeSpan.FromSeconds(10), Token));
         Assert.NotNull(observation);
-        await observation.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        // Confirming revocation starts shutdown, which can cancel the confirming read.
+        var observationError = await Record.ExceptionAsync(() => observation.WaitAsync(TimeSpan.FromSeconds(10), Token));
+        Assert.True(observationError is null or OperationCanceledException, observationError?.ToString());
+        Assert.Empty(fixture.Client.DeviceState!.Certificates);
         await AsyncTest.UntilAsync(() => fixture.Client.LifecycleState == ComponentState.Stopped);
         Assert.False(failure is TimeoutException, failure?.ToString());
         Assert.Equal(ComponentState.Stopped, fixture.Client.MessageManager.LifecycleState);
@@ -154,6 +157,8 @@ public sealed class RevokedDeviceRuntimeTests
             pool, fixture.Protector, signerAvailable ? fixture.Account : null);
         await client.InitializeAsync(Token);
         await client.StartAsync(Token);
+        // Settle startup refreshes before injecting rejection and advancing cache freshness.
+        await client.DeviceManager.GetOwnDeviceStateAsync(fixture.Relay.RelayId, Token);
         var stopped = AsyncTest.Signal();
         client.StateChanged += (_, _) =>
         {
@@ -169,7 +174,9 @@ public sealed class RevokedDeviceRuntimeTests
         if (backgroundRead)
         {
             fixture.Relay.Clock.Advance(TimeSpan.FromMinutes(61));
-            await client.DeviceManager.GetDeviceStateAsync(cancellationToken: Token);
+            // Authentication rejection can stop refresh admission before this cached read enters.
+            var error = await Record.ExceptionAsync(() => client.DeviceManager.GetDeviceStateAsync(cancellationToken: Token));
+            Assert.True(error is null or OperationCanceledException, error?.ToString());
         }
         else
         {
@@ -471,7 +478,10 @@ public sealed class RevokedDeviceRuntimeTests
         var deviceEntered = AsyncTest.Signal();
         var accountEntered = AsyncTest.Signal();
         var canceled = AsyncTest.Signal();
-        var release = AsyncTest.Signal();
+        var deviceCallback = AsyncTest.Signal();
+        var accountCallback = AsyncTest.Signal();
+        var releaseDevice = AsyncTest.Signal();
+        var releaseAccount = AsyncTest.Signal();
         var deviceFailure = new IOException("device query cancellation failed");
         var accountFailure = new IOException("account query cancellation failed");
         fixture.Relay.Handler = async (request, token) =>
@@ -479,9 +489,13 @@ public sealed class RevokedDeviceRuntimeTests
             if (request.Method == "device.state.resolve" || failAccountToo && request.Method == "account.route.resolve")
             {
                 var deviceQuery = request.Method == "device.state.resolve";
-                using var registration = token.Register(() => throw (deviceQuery ? deviceFailure : accountFailure));
+                using var registration = token.Register(() =>
+                {
+                    (deviceQuery ? deviceCallback : accountCallback).TrySetResult();
+                    throw deviceQuery ? deviceFailure : accountFailure;
+                });
                 (deviceQuery ? deviceEntered : accountEntered).TrySetResult();
-                await AsyncTest.WaitForCancellationAndCleanupAsync(token, canceled, release.Task);
+                await AsyncTest.WaitForCancellationAndCleanupAsync(token, canceled, deviceQuery ? releaseDevice.Task : releaseAccount.Task);
             }
             return fixture.Relay.Respond(request);
         };
@@ -496,8 +510,13 @@ public sealed class RevokedDeviceRuntimeTests
             await canceled.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
             Assert.False(stopping.IsCompleted);
             Assert.Equal(ComponentState.Stopping, fixture.Client.LifecycleState);
+            // Managers stop in sequence. Keep each query alive until its throwing
+            // callback runs, so cleanup cannot unregister that callback first.
+            await deviceCallback.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+            releaseDevice.TrySetResult();
+            if (failAccountToo) await accountCallback.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
         }
-        finally { release.TrySetResult(); }
+        finally { releaseDevice.TrySetResult(); releaseAccount.TrySetResult(); }
 
         var failure = await Assert.ThrowsAsync<AggregateException>(() => stopping!.WaitAsync(TimeSpan.FromSeconds(10), Token));
         Assert.Contains(deviceFailure, failure.Flatten().InnerExceptions);

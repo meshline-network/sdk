@@ -155,11 +155,11 @@ public sealed class CachedRelayRegistry : IRelayRegistry, IAsyncDisposable
     /// Cancels and drains cache refreshes without disposing the source registry.
     /// </summary>
     /// <returns>A value task that completes after the wrapper's pending refreshes have ended.</returns>
-    /// <exception cref="AggregateException">A cancellation callback throws while refreshes are canceled.</exception>
+    /// <exception cref="AggregateException">A cancellation callback throws, or multiple refresh cleanup failures occur.</exception>
     public async ValueTask DisposeAsync()
     {
         MetadataCache<Lookup>[] pending;
         lock (gate) { disposed = true; pending = [.. entries.Values]; }
-        await Task.WhenAll(pending.Select(cache => cache.StopAsync(dispose: true)).Append(directory.StopAsync(dispose: true))).ConfigureAwait(false);
+        await BackgroundFailure.DrainAsync(pending.Select(cache => cache.StopAsync(dispose: true)).Append(directory.StopAsync(dispose: true)).ToArray()).ConfigureAwait(false);
     }
 }

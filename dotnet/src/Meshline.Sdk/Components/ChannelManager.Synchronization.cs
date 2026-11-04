@@ -4,7 +4,6 @@ using Meshline.Storage;
 using Meshline.Transport;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
-using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading.Channels;
 
@@ -42,7 +41,7 @@ sealed partial class ChannelManager
         List<Exception> failures = [];
         try { if (_updates is { } updates) await updates.StopAsync().ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
-        try { await Task.WhenAll(_refresh, _poll, StopDescriptorsAsync()).ConfigureAwait(false); }
+        try { await BackgroundFailure.DrainAsync(_refresh, _poll, StopDescriptorsAsync()).ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
         _refresh = _poll = Task.CompletedTask;
         RelayClient[] relays;
@@ -59,8 +58,7 @@ sealed partial class ChannelManager
         _subscriptionWorker = null;
         try { _syncStatus.Stop(OnSyncStatusChanged); }
         catch (Exception error) { failures.Add(error); }
-        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        if (failures.Count > 1) throw new AggregateException(failures);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     void QueueRefresh()
@@ -75,7 +73,7 @@ sealed partial class ChannelManager
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30), Clock.Provider);
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false)) QueueRefresh();
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task RefreshFollowedAsync(CancellationToken cancellationToken)
@@ -97,33 +95,35 @@ sealed partial class ChannelManager
                     {
                         RelayClient relay;
                         try { relay = await GetHostingRelayAsync(group.Key, cancellationToken).ConfigureAwait(false); }
-                        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                        catch (Exception exception)
                         {
+                            BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                             foreach (var record in group) _syncStatus.Block(record.ChannelId, exception, OnSyncStatusChanged);
                             ReportBackgroundError(BackgroundOperation.Connect, group.Key, exception);
                             continue;
                         }
                         try { await SubscribeAsync(relay, group.Select(value => value.ChannelId).ToArray(), cancellationToken).ConfigureAwait(false); }
-                        catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Connect, relay.RelayId, exception); }
+                        catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Connect, relay.RelayId, exception); }
                         foreach (var record in group)
                         {
                             try
                             {
                                 await SynchronizeChannelAsync(new() { ChannelId = record.ChannelId, RelayId = record.RelayId }, cancellationToken).ConfigureAwait(false);
                             }
-                            catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, record.ChannelId, exception); }
+                            catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, record.ChannelId, exception); }
                         }
                     }
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception exception)
                 {
+                    BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                     ReportBackgroundError(BackgroundOperation.Synchronize, null, exception);
                     await Task.Delay(TimeSpan.FromSeconds(5), Clock.Provider, cancellationToken).ConfigureAwait(false);
                     QueueRefresh();
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task<ResourceSyncStatus> SynchronizeChannelAsync(ChannelRef channel, CancellationToken cancellationToken, bool manual = false)
@@ -198,7 +198,7 @@ sealed partial class ChannelManager
                         if (!await database.ChannelOperations.AnyAsync(value => value.RelayId == operation.RelayId && value.ResourceId == operation.ResourceId && value.Method == operation.Method && value.DocumentJson == operation.DocumentJson, cancellationToken).ConfigureAwait(false)) continue;
                     await ApplyPostOperationAsync(relay, post, operation, request, recovering: true, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, operation.ResourceId, exception); }
+                catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, operation.ResourceId, exception); }
             }
         }
         finally { _writeGate.Release(); }

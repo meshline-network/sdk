@@ -74,7 +74,7 @@ sealed partial class ProfileManager
         if (published || result.Profile.Account != AccountId) await SaveAsync().ConfigureAwait(false);
         else await Updates.SaveDiscoveredAsync(SaveAsync, cancellationToken).ConfigureAwait(false);
         if (confirmed && notify) NotifyUpdateStateChanged();
-        if (changed && notify) ProfileChanged?.Invoke(this, EventArgs.Empty);
+        if (changed && notify) BackgroundFailure.Notify(() => ProfileChanged?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>Awaits profile refresh, bypassing the success interval but retaining the one-minute failure cooldown.</summary>
@@ -90,17 +90,15 @@ sealed partial class ProfileManager
     async Task StopProfilesAsync(bool dispose = false)
     {
         Task pending;
-        lock (_profileCacheGate) { _profilesStopping = true; pending = Task.WhenAll(_profiles.Values.Select(cache => cache.StopAsync(dispose))); }
+        lock (_profileCacheGate) { _profilesStopping = true; pending = BackgroundFailure.DrainAsync(_profiles.Values.Select(cache => cache.StopAsync(dispose)).ToArray()); }
         try { await pending.ConfigureAwait(false); }
         finally { lock (_profileCacheGate) _profilesStopping = dispose; }
     }
     /// <inheritdoc/>
-    protected override Task OnStopAsync() => Task.WhenAll(_updates?.StopAsync() ?? Task.CompletedTask, StopProfilesAsync());
+    protected override Task OnStopAsync() => BackgroundFailure.DrainAsync(_updates?.StopAsync() ?? Task.CompletedTask, StopProfilesAsync());
     /// <inheritdoc/>
-    protected override async ValueTask DisposeAsyncCore()
-    {
-        if (_updates is { } updates) await updates.DrainAsync().ConfigureAwait(false);
-        await StopProfilesAsync(dispose: true).ConfigureAwait(false);
-        await base.DisposeAsyncCore().ConfigureAwait(false);
-    }
+    protected override ValueTask DisposeAsyncCore() => BackgroundFailure.CleanupAsync(
+        () => new(_updates?.DrainAsync() ?? Task.CompletedTask),
+        () => new(StopProfilesAsync(dispose: true)),
+        base.DisposeAsyncCore);
 }

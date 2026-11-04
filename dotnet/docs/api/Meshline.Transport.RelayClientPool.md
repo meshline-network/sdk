@@ -171,7 +171,7 @@ A value task that completes when owned resources and active work have been relea
 #### Exceptions
 
 [System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
-A registered cancellation callback throws while pool or session lifetimes are canceled\.
+A cancellation callback throws, or multiple failures occur while background work and pooled resources are released\.
 
 <a name='Meshline.Transport.RelayClientPool.GetAsync(string,Meshline.Interactions.IAccountSigner,System.Threading.CancellationToken)'></a>
 

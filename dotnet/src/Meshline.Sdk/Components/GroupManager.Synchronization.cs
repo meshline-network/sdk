@@ -144,7 +144,7 @@ sealed partial class GroupManager
             await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
-        foreach (var notification in notifications) notification();
+        foreach (var notification in notifications) BackgroundFailure.Notify(notification);
         return true;
     }
 

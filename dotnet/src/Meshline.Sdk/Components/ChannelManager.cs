@@ -590,7 +590,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
             accepted = await ResolveDescriptorAsync(relay, channel, descriptor.Revision, cancellationToken).ConfigureAwait(false);
             if (accepted.Descriptor.ToJson() != descriptor.ToJson())
             {
-                await SaveDescriptorAsync(channel, accepted, CancellationToken.None, operation).ConfigureAwait(false);
+                await BackgroundFailure.CompleteAsync(SaveDescriptorAsync(channel, accepted, CancellationToken.None, operation)).ConfigureAwait(false);
                 throw new InvalidOperationException("The channel revision is occupied by a different descriptor.");
             }
         }
@@ -600,7 +600,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
             await SendOperationAsync(relay, operation, request, recovering, cancellationToken).ConfigureAwait(false);
             accepted = new ChannelResolveResult { Descriptor = descriptor, SignerCertificate = Certificate };
         }
-        await SaveDescriptorAsync(channel, accepted, CancellationToken.None, operation).ConfigureAwait(false);
+        await BackgroundFailure.CompleteAsync(SaveDescriptorAsync(channel, accepted, CancellationToken.None, operation)).ConfigureAwait(false);
         QueueRefresh();
     }
 
@@ -613,7 +613,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
             sequence = result.Sequence;
         }
         var post = new ChannelPostRef { Channel = channel, Sequence = sequence.Value };
-        await CompletePostOperationAsync(channel, operation, null, CancellationToken.None).ConfigureAwait(false);
+        await BackgroundFailure.CompleteAsync(CompletePostOperationAsync(channel, operation, null, CancellationToken.None)).ConfigureAwait(false);
         if (!recovering) await ConfirmPublicationAsync(relay, post, request, cancellationToken).ConfigureAwait(false);
         return post;
     }
@@ -636,7 +636,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     async Task ApplyPostOperationAsync(RelayClient relay, ChannelPostRef post, ChannelOperationRecord operation, TypedProtocolModel request, bool recovering, CancellationToken cancellationToken)
     {
         await SendOperationAsync(relay, operation, request, recovering, cancellationToken).ConfigureAwait(false);
-        await CompletePostOperationAsync(post.Channel, operation, request is ChannelPostDelete ? post : null, CancellationToken.None).ConfigureAwait(false);
+        await BackgroundFailure.CompleteAsync(CompletePostOperationAsync(post.Channel, operation, request is ChannelPostDelete ? post : null, CancellationToken.None)).ConfigureAwait(false);
         if (!recovering) await SynchronizeAsync(relay, post.Channel, post.Sequence - 1, false, cancellationToken).ConfigureAwait(false);
     }
 
@@ -662,9 +662,13 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
         }
         catch (RelayException exception) when (!recovering && exception.Error.IsDefinitiveRejection())
         {
-            await using var database = new MeshlineDbContext(databaseOptions);
-            await RemoveOperationAsync(database, operation, CancellationToken.None).ConfigureAwait(false);
-            await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+            async Task RemoveRejectedAsync()
+            {
+                await using var database = new MeshlineDbContext(databaseOptions);
+                await RemoveOperationAsync(database, operation, CancellationToken.None).ConfigureAwait(false);
+                await database.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            await BackgroundFailure.CompleteAsync(RemoveRejectedAsync(), exception).ConfigureAwait(false);
             throw;
         }
     }

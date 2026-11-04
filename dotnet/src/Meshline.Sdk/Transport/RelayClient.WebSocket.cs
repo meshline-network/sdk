@@ -65,6 +65,7 @@ sealed partial class RelayClient
         await Task.Yield();
         var failures = 0;
         var terminal = false;
+        List<Exception> errors = [];
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -72,12 +73,12 @@ sealed partial class RelayClient
                 try
                 {
                     var socket = await GetSocketAsync(cancellationToken).ConfigureAwait(false);
-                    SocketConnected?.Invoke(this, EventArgs.Empty);
+                    BackgroundFailure.Notify(() => SocketConnected?.Invoke(this, EventArgs.Empty));
                     lock (_notificationGate)
                         _socketReady.TrySetResult(socket);
                     failures = 0;
                     await foreach (var notification in socket.Notifications.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-                        NotificationReceived?.Invoke(this, notification);
+                        BackgroundFailure.Notify(() => NotificationReceived?.Invoke(this, notification));
                     throw new IOException("The relay notification stream ended.");
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -87,40 +88,47 @@ sealed partial class RelayClient
                     // cancels the dispatcher. Report that failure before ending the loop.
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        ErrorOccurred?.Invoke(this, exception);
-                        return;
+                        if (BackgroundFailure.IsRequired(exception)) throw;
+                        BackgroundFailure.Notify(() => ErrorOccurred?.Invoke(this, exception));
+                        break;
                     }
+                    if (BackgroundFailure.IsRequired(exception)) errors.Add(exception);
                     lock (_notificationGate)
                         if (_socketReady.Task.IsCompleted)
                             _socketReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
                     var retry = exception is HttpRequestException or WebSocketException or OperationCanceledException or TimeoutException
                         || exception is IOException
                         || exception is RelayException { Error.Code: "unauthorized" or "temporarily_unavailable" or "bad_gateway" or "rate_limited" };
-                    ErrorOccurred?.Invoke(this, exception);
+                    BackgroundFailure.Notify(() => ErrorOccurred?.Invoke(this, exception));
                     if (!retry)
                     {
                         terminal = true;
-                        Faulted?.Invoke(this, EventArgs.Empty);
+                        BackgroundFailure.Notify(() => Faulted?.Invoke(this, EventArgs.Empty));
                         lock (_notificationGate)
                         {
                             _socketReady.TrySetException(exception);
                             _ = _socketReady.Task.Exception;
                         }
-                        return;
+                        break;
                     }
                     var seconds = Math.Min(30, Math.Pow(2, Math.Min(failures++, 5))) + Random.Shared.NextDouble();
                     await Task.Delay(TimeSpan.FromSeconds(seconds), Clock, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
+        catch (Exception error) { errors.Add(error); }
         finally
         {
             lock (_notificationGate)
                 _socketReady.TrySetCanceled(cancellationToken);
             if (cancellationToken.IsCancellationRequested && !terminal)
-                ErrorOccurred?.Invoke(this, new InvalidOperationException("The relay connection was disposed or invalidated."));
+            {
+                try { BackgroundFailure.Notify(() => ErrorOccurred?.Invoke(this, new InvalidOperationException("The relay connection was disposed or invalidated."))); }
+                catch (Exception error) { errors.Add(error); }
+            }
         }
+        BackgroundFailure.ThrowIfAny(errors);
     }
 
     /// <summary>
@@ -216,6 +224,7 @@ sealed partial class RelayClient
             if (_socket is { } previous)
             {
                 previous.Stop(new WebSocketException("The previous relay session is no longer usable."));
+                _socket = null;
                 await ReleaseSocketAsync(previous).ConfigureAwait(false);
             }
             var socket = new SocketSession(new(endpoint), _lifetime.Token, OnSocketStopped);
@@ -238,8 +247,9 @@ sealed partial class RelayClient
             catch (Exception exception)
             {
                 socket.Stop(exception);
-                await ReleaseSocketAsync(socket).ConfigureAwait(false);
                 _socket = null;
+                try { await ReleaseSocketAsync(socket).ConfigureAwait(false); }
+                catch (Exception cleanup) { throw new AggregateException(exception, cleanup); }
                 throw;
             }
         }
@@ -320,6 +330,7 @@ sealed partial class RelayClient
         }
         catch (Exception exception)
         {
+            if (BackgroundFailure.IsRequired(exception)) throw;
             if (socket.Failure is { } failure)
             {
                 ReportFailure(failure);
@@ -399,6 +410,7 @@ sealed partial class RelayClient
         catch (Exception exception)
         {
             socket.Stop(exception);
+            if (BackgroundFailure.IsRequired(exception)) throw;
         }
         finally
         {
@@ -448,7 +460,7 @@ sealed partial class RelayClient
                 catch (RelayException exception) when (exception.Error.Code != "unauthorized" && session.RemainingSeconds > 0)
                 {
                     UpdateState(RelayConnectionState.Connected, AuthenticatedState, exception);
-                    ErrorOccurred?.Invoke(this, exception);
+                    BackgroundFailure.Notify(() => ErrorOccurred?.Invoke(this, exception));
                     await Task.Delay(TimeSpan.FromSeconds(Math.Min(5, session.RemainingSeconds)), Clock, socket.Lifetime.Token).ConfigureAwait(false);
                 }
             }
@@ -456,6 +468,7 @@ sealed partial class RelayClient
         catch (Exception exception)
         {
             socket.Stop(exception);
+            if (BackgroundFailure.IsRequired(exception)) throw;
         }
     }
 
@@ -479,9 +492,8 @@ sealed partial class RelayClient
 
     static async Task ReleaseSocketAsync(SocketSession socket)
     {
-        await Task.WhenAll(socket.ReceiveTask, socket.RenewalTask).ConfigureAwait(false);
-        socket.Connection.Dispose();
-        socket.Lifetime.Dispose();
+        try { await BackgroundFailure.DrainAsync(socket.Stopping, socket.ReceiveTask, socket.RenewalTask).ConfigureAwait(false); }
+        finally { socket.Connection.Dispose(); socket.Lifetime.Dispose(); }
     }
 
     void OnSocketStopped(SocketSession socket, Exception error)
@@ -514,19 +526,34 @@ sealed partial class RelayClient
         public Exception? Failure => _failure;
         public Task ReceiveTask { get; set; } = Task.CompletedTask;
         public Task RenewalTask { get; set; } = Task.CompletedTask;
+        public Task Stopping => _stopped.Task;
+        readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
         Exception? _failure;
 
         public void Stop(Exception exception)
         {
             if (Interlocked.CompareExchange(ref _failure, exception, null) is not null)
                 return;
-            Lifetime.Cancel();
-            Connection.Abort();
+            List<Exception> failures = [];
+            try { Lifetime.Cancel(); }
+            catch (Exception error) { failures.Add(error); }
+            try { Connection.Abort(); }
+            catch (Exception error) { failures.Add(error); }
             foreach (var (id, pending) in Pending)
                 if (Pending.TryRemove(id, out _))
                     pending.TrySetException(exception);
             Notifications.Writer.TryComplete(exception);
-            stopped(this, exception);
+            try { stopped(this, exception); }
+            catch (Exception error) { failures.Add(error); }
+            // Reentrant stop calls share cleanup; release waits for its owner and
+            // reports callback failures after all mandatory cleanup has finished.
+            if (failures.Count == 0) _stopped.TrySetResult();
+            else
+            {
+                foreach (var error in failures) BackgroundFailure.Preserve(error);
+                _stopped.TrySetException(failures);
+                _ = _stopped.Task.Exception;
+            }
         }
     }
 }

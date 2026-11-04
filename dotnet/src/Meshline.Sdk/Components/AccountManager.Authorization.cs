@@ -129,7 +129,7 @@ sealed partial class AccountManager
                     attempt++;
                     continue;
                 }
-                if (beforePublication != result.ToJson()) AccountChanged?.Invoke(this, EventArgs.Empty);
+                if (beforePublication != result.ToJson()) BackgroundFailure.Notify(() => AccountChanged?.Invoke(this, EventArgs.Empty));
                 // A notification can publish a newer route before this call returns.
                 var confirmed = Route!;
                 if (confirmed.RelayId != relayId)

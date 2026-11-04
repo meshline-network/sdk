@@ -5,7 +5,6 @@ using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
-using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -71,7 +70,7 @@ sealed partial class GroupManager
         List<Exception> failures = [];
         try { if (_updates is { } updates) await updates.StopAsync().ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
-        try { await Task.WhenAll(_refresh, _poll).ConfigureAwait(false); }
+        try { await BackgroundFailure.DrainAsync(_refresh, _poll).ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
         _refresh = _poll = Task.CompletedTask;
         RelayClient[] relays;
@@ -82,8 +81,7 @@ sealed partial class GroupManager
         _subscriptionWorker = null;
         try { _syncStatus.Stop(OnSyncStatusChanged); }
         catch (Exception error) { failures.Add(error); }
-        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        if (failures.Count > 1) throw new AggregateException(failures);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     void OnAccountTimelineChanged(object? sender, EventArgs args) => Wake();
@@ -97,7 +95,7 @@ sealed partial class GroupManager
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30), Clock.Provider);
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false)) Wake();
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task RefreshGroupsAsync(CancellationToken cancellationToken)
@@ -108,7 +106,7 @@ sealed partial class GroupManager
             {
                 while (_refreshRequests.Reader.TryRead(out _)) { }
                 try { await RunAsync(ProcessAccountMessagesAsync, cancellationToken).ConfigureAwait(false); }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
+                catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
                 try
                 {
                     await RecoverLocalMessagesAsync(cancellationToken).ConfigureAwait(false);
@@ -122,7 +120,7 @@ sealed partial class GroupManager
                     {
                         var subscribed = hosting.Where(value => value.Membership == GroupMembershipState.Member).Select(value => value.GroupId).ToArray();
                         try { if (subscribed.Length > 0) await SubscribeAsync(hosting.Key, subscribed, cancellationToken).ConfigureAwait(false); }
-                        catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Connect, hosting.Key, exception); }
+                        catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Connect, hosting.Key, exception); }
                         foreach (var record in hosting)
                         {
                             try
@@ -134,14 +132,14 @@ sealed partial class GroupManager
                                     await ShareCurrentKeyAsync(group, token).ConfigureAwait(false);
                                 }, cancellationToken).ConfigureAwait(false);
                             }
-                            catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, record.GroupId, exception); }
+                            catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, record.GroupId, exception); }
                         }
                     }
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
+                catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task RecoverOperationsAsync(CancellationToken cancellationToken)
@@ -157,14 +155,15 @@ sealed partial class GroupManager
                 if (GetTimelinePayload(ReadOperationRequest(operation)) is not null)
                 {
                     try { await SynchronizeCoreAsync(group, cancellationToken, false).ConfigureAwait(false); }
-                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                    catch (Exception exception)
                     {
+                        BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                         ReportBackgroundError(BackgroundOperation.Synchronize, operation.GroupId, exception);
                     }
                 }
                 await SubmitOperationAsync(operation, recovering: true, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, operation.GroupId, exception); }
+            catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, operation.GroupId, exception); }
         }
     }
 
@@ -221,8 +220,8 @@ sealed partial class GroupManager
         lock (_subscriptionGate)
             if (!_subscriptions.TryGetValue(relay.RelayId, out var current) || !ReferenceEquals(current, relay)) return;
         var group = new GroupRef { RelayId = relay.RelayId, GroupId = id.GetString()! };
-        if (request.Method == "group.application.changed") ApplicationsChanged?.Invoke(this, new(group));
-        else if (request.Method == "group.member.recovery.changed") KeyRecoveryChanged?.Invoke(this, new(group));
+        if (request.Method == "group.application.changed") BackgroundFailure.Notify(() => ApplicationsChanged?.Invoke(this, new(group)));
+        else if (request.Method == "group.member.recovery.changed") BackgroundFailure.Notify(() => KeyRecoveryChanged?.Invoke(this, new(group)));
         else Wake();
     }
 }

@@ -14,6 +14,7 @@ sealed partial class MessageManager
     readonly Dictionary<string, RelayClient> _observedRelays = new(StringComparer.Ordinal);
 
     readonly HashSet<string> _pendingTimelineRelays = new(StringComparer.Ordinal);
+    readonly HashSet<Task> _routeRecorders = [];
     Task _routeRecorder = Task.CompletedTask;
     string? _lastHomeRelayId;
     bool _observingRoutes;
@@ -35,15 +36,23 @@ sealed partial class MessageManager
                 _pendingTimelineRelays.Add(route.RelayId);
             }
             if (_pendingTimelineRelays.Count > 0)
+            {
+                _routeRecorders.RemoveWhere(static recorder => recorder.IsCompletedSuccessfully);
                 _routeRecorder = PersistObservedRoutesAsync(_routeRecorder);
+                _routeRecorders.Add(_routeRecorder);
+            }
             return _routeRecorder;
         }
     }
 
-    async Task PersistObservedRoutesAsync(Task? previous = null)
+    async Task PersistObservedRoutesAsync(Task? previous = null, bool throwOnFailure = false)
     {
         await Task.Yield();
-        if (previous is not null) await previous.ConfigureAwait(false);
+        if (previous is not null)
+        {
+            try { await previous.ConfigureAwait(false); }
+            catch { /* Failures remain available to shutdown without blocking later writes. */ }
+        }
         while (true)
         {
             string[] relayIds;
@@ -60,11 +69,36 @@ sealed partial class MessageManager
             }
             catch (Exception exception)
             {
-                ReportBackgroundError(BackgroundOperation.Synchronize, null, exception);
+                try { ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
+                catch (Exception observer)
+                {
+                    throw new AggregateException(exception, observer);
+                }
+                if (throwOnFailure) throw;
                 return;
             }
             lock (_relayGate) _pendingTimelineRelays.ExceptWith(relayIds);
             _syncRequests.Writer.TryWrite(true);
+        }
+    }
+
+    async Task DrainRouteRecorderAsync()
+    {
+        Task recorder;
+        Task[] pending;
+        lock (_relayGate)
+        {
+            recorder = _routeRecorder;
+            pending = [.. _routeRecorders];
+        }
+        try { await BackgroundFailure.DrainAsync(pending).ConfigureAwait(false); }
+        finally
+        {
+            lock (_relayGate)
+            {
+                _routeRecorders.ExceptWith(pending);
+                if (ReferenceEquals(_routeRecorder, recorder)) _routeRecorder = Task.CompletedTask;
+            }
         }
     }
 
@@ -78,8 +112,9 @@ sealed partial class MessageManager
                 try
                 {
                     try { await accountManager.GetRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false); }
-                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                    catch (Exception exception)
                     {
+                        BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                         ReportBackgroundError(BackgroundOperation.Connect, accountManager.Route?.RelayId, exception);
                     }
                     await ObserveAccountRoute().WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -93,13 +128,13 @@ sealed partial class MessageManager
                         {
                             await SynchronizePassAsync(relayId, cancellationToken, observe: true).ConfigureAwait(false);
                         }
-                        catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, relayId, exception); }
+                        catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, relayId, exception); }
                     }
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
+                catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Synchronize, null, exception); }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task<ResourceSyncStatus> SynchronizePassAsync(string relayId, CancellationToken cancellationToken, bool observe = false)
@@ -118,7 +153,7 @@ sealed partial class MessageManager
                         if ((await relay.GetDescriptorAsync(cancellationToken).ConfigureAwait(false)).Endpoints.Any(value => value.StartsWith("wss://", StringComparison.Ordinal)))
                             relay.StartNotifications();
                     }
-                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested) { ReportBackgroundError(BackgroundOperation.Connect, relayId, exception); }
+                    catch (Exception exception) { BackgroundFailure.ThrowIfCanceled(exception, cancellationToken); ReportBackgroundError(BackgroundOperation.Connect, relayId, exception); }
                 }
                 await SynchronizeTimelineAsync(relay, cancellationToken).ConfigureAwait(false);
                 return null;

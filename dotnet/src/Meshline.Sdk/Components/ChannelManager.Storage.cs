@@ -41,7 +41,7 @@ sealed partial class ChannelManager
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         finally { _stateGate.Release(); }
-        FollowChanged?.Invoke(this, new(channel.ChannelId, followed));
+        BackgroundFailure.Notify(() => FollowChanged?.Invoke(this, new(channel.ChannelId, followed)));
     }
 
     async Task SaveDescriptorAsync(ChannelRef channel, ChannelResolveResult result, CancellationToken cancellationToken, ChannelOperationRecord? completedOperation = null, bool notify = true, bool published = false)
@@ -60,7 +60,7 @@ sealed partial class ChannelManager
             if (result.Descriptor.Revision == record.Revision) CacheDescriptor(channel, result, completedOperation is not null || published ? Clock.UtcNow : null);
         }
         finally { _stateGate.Release(); }
-        if (changed is not null && notify) ChannelChanged?.Invoke(this, changed);
+        if (changed is not null && notify) BackgroundFailure.Notify(() => ChannelChanged?.Invoke(this, changed));
     }
 
     static async Task<ChannelRecord> GetChannelRecordAsync(MeshlineDbContext database, ChannelRef channel, CancellationToken cancellationToken)
@@ -140,7 +140,7 @@ sealed partial class ChannelManager
         }
         finally { _stateGate.Release(); }
         QueueRefresh();
-        if (change is not null) TimelineChanged?.Invoke(this, new(channel, [change]));
+        if (change is not null) BackgroundFailure.Notify(() => TimelineChanged?.Invoke(this, new(channel, [change])));
     }
 
     async Task<ChannelReadPage> ReadPageAsync(RelayClient relay, ChannelRef channel, ChannelReadQuery query, bool advance, CancellationToken cancellationToken)
@@ -218,8 +218,8 @@ sealed partial class ChannelManager
                 if (descriptors.TryGetValue(channelRecord.Revision, out var latest)) CacheDescriptor(channel, latest);
             }
             finally { _stateGate.Release(); }
-            if (channelChange is not null) ChannelChanged?.Invoke(this, channelChange);
-            if (changes.Count > 0) TimelineChanged?.Invoke(this, new(channel, changes));
+            if (channelChange is not null) BackgroundFailure.Notify(() => ChannelChanged?.Invoke(this, channelChange));
+            if (changes.Count > 0) BackgroundFailure.Notify(() => TimelineChanged?.Invoke(this, new(channel, changes)));
             return null;
         }
         // Fetch missing originals outside the state gate. Re-read local projections

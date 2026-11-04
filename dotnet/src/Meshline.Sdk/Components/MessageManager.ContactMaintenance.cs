@@ -63,8 +63,9 @@ sealed partial class MessageManager
                         current.DeviceNotificationRevision = own.Revision;
                     }, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception exception)
                 {
+                    BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                     Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
                     ReportBackgroundError(BackgroundOperation.Synchronize, contact.AccountId, exception);
                 }
@@ -84,8 +85,9 @@ sealed partial class MessageManager
                 try
                 {
                     try { await QueueDeviceStateNotificationsAsync(cancellationToken).ConfigureAwait(false); }
-                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                    catch (Exception exception)
                     {
+                        BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                         Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
                         ReportBackgroundError(BackgroundOperation.Synchronize, null, exception);
                     }
@@ -100,8 +102,9 @@ sealed partial class MessageManager
                         foreach (var contact in contacts)
                         {
                             try { await MaintainContactAsync(contact, cancellationToken).ConfigureAwait(false); }
-                            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                            catch (Exception exception)
                             {
+                                BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                                 Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
                                 ReportBackgroundError(BackgroundOperation.Synchronize, contact.AccountId, exception);
                             }
@@ -109,14 +112,15 @@ sealed partial class MessageManager
                         after = contacts[^1].AccountId;
                     }
                 }
-                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception exception)
                 {
+                    BackgroundFailure.ThrowIfCanceled(exception, cancellationToken);
                     Interlocked.Exchange(ref _contactMaintenanceRetryPending, 1);
                     ReportBackgroundError(BackgroundOperation.Synchronize, null, exception);
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && !BackgroundFailure.IsRequired(error)) { }
     }
 
     async Task ProcessContactSendChangeAsync(MeshlineDbContext database, MessageOutboxRecord change, List<Action> notifications, CancellationToken cancellationToken)

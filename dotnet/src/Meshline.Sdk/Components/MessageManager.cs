@@ -5,7 +5,6 @@ using Meshline.Storage;
 using Meshline.Transport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -57,8 +56,11 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         foreach (var timeline in await database.AccountTimelines.AsNoTracking().Where(value => value.HasRetentionGap).ToListAsync(cancellationToken).ConfigureAwait(false))
             _syncStatus.ObserveGap(timeline.RelayId);
-        accountManager.AccountChanged += OnAccountChanged;
-        lock (_relayGate) _observingRoutes = true;
+        lock (_relayGate)
+        {
+            if (!_observingRoutes) accountManager.AccountChanged += OnAccountChanged;
+            _observingRoutes = true;
+        }
         await ObserveAccountRoute().ConfigureAwait(false);
     }
 
@@ -102,14 +104,15 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
         deviceManager.DeviceChanged -= OnDeviceChanged;
         deviceManager.DeviceStateChanged -= OnOwnDeviceStateChanged;
         List<Exception> failures = [];
-        try { await Task.WhenAll(_sender, _synchronizer, _poller, _refresh).ConfigureAwait(false); }
+        try { await BackgroundFailure.DrainAsync(_sender, _synchronizer, _poller, _refresh).ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
         _sender = _synchronizer = _poller = _refresh = Task.CompletedTask;
         DetachRelays();
+        try { await DrainRouteRecorderAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
         try { _syncStatus.Stop(OnSyncStatusChanged); }
         catch (Exception error) { failures.Add(error); }
-        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        if (failures.Count > 1) throw new AggregateException(failures);
+        BackgroundFailure.ThrowIfAny(failures);
     }
 
     /// <inheritdoc/>
@@ -118,17 +121,13 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
     protected override async ValueTask DisposeAsyncCore()
     {
-        Task recorder;
-        lock (_relayGate)
-        {
-            _observingRoutes = false;
-            recorder = _routeRecorder;
-        }
+        lock (_relayGate) _observingRoutes = false;
         accountManager.AccountChanged -= OnAccountChanged;
-        await recorder.ConfigureAwait(false);
-        await PersistObservedRoutesAsync().ConfigureAwait(false);
-        _syncStatus.Stop(OnSyncStatusChanged, resetAll: true);
-        await base.DisposeAsyncCore().ConfigureAwait(false);
+        await BackgroundFailure.CleanupAsync(
+            () => new(DrainRouteRecorderAsync()),
+            () => new(PersistObservedRoutesAsync(throwOnFailure: true)),
+            () => { _syncStatus.Stop(OnSyncStatusChanged, resetAll: true); return ValueTask.CompletedTask; },
+            base.DisposeAsyncCore).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -327,12 +326,12 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
         return await CancelAsync(messageId, cancellationToken).ConfigureAwait(false);
     }
 
-    void OnTimelineChanged() => TimelineChanged?.Invoke(this, EventArgs.Empty);
+    void OnTimelineChanged() => BackgroundFailure.Notify(() => TimelineChanged?.Invoke(this, EventArgs.Empty));
 
-    void OnMessageReceived(IReadOnlyList<MessageInfo> messages) => MessageReceived?.Invoke(this, new(messages));
+    void OnMessageReceived(IReadOnlyList<MessageInfo> messages) => BackgroundFailure.Notify(() => MessageReceived?.Invoke(this, new(messages)));
 
     void OnSendChanged(MessageOutboxRecord record)
     {
-        if (record.IsDirect) SendStatusChanged?.Invoke(this, new(ToStatus(record)));
+        if (record.IsDirect) BackgroundFailure.Notify(() => SendStatusChanged?.Invoke(this, new(ToStatus(record))));
     }
 }

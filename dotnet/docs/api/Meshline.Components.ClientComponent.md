@@ -194,6 +194,9 @@ A component cleanup hook cannot save its pending local observations\.
 [System\.AggregateException](https://learn.microsoft.com/en-us/dotnet/api/system.aggregateexception 'System\.AggregateException')<br>
 A lifetime cancellation callback fails, or multiple cleanup failures are reported after the remaining cleanup steps have been attempted\.
 
+### Remarks
+A completed transition to [Disposed](Meshline.Components.ComponentState.md#Meshline.Components.ComponentState.Disposed 'Meshline\.Components\.ComponentState\.Disposed') raises [StateChanged](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.StateChanged 'Meshline\.Components\.ClientComponent\.StateChanged') before cleanup errors are reported\. If resource cleanup fails before that transition, correct the cause and retry disposal; new operations remain blocked\.
+
 <a name='Meshline.Components.ClientComponent.DisposeAsyncCore()'></a>
 
 ## ClientComponent\.DisposeAsyncCore\(\) Method
@@ -459,8 +462,8 @@ A stopped background operation cannot save its pending local state\.
 A runtime cancellation callback fails, or multiple shutdown failures are reported after runtime cleanup\.
 
 ### Remarks
-The cancellation token controls waiting to enter the lifecycle operation\. Once stopping begins, background work is drained without that token, including demand\-triggered refreshes created before start or after a previous stop\. The application\-owned relay pool remains available to other components\.<br>
-A completed running\-to\-stopped transition raises StateChanged even when cleanup reports an error\. Cleanup errors remain observable to the caller\.
+Once stopping begins, background work and its pending local writes are drained without the caller's token, including refreshes triggered before start or after a previous stop\. The application\-owned relay pool remains available to other components\.<br>
+A completed running\-to\-stopped transition raises [StateChanged](Meshline.Components.ClientComponent.md#Meshline.Components.ClientComponent.StateChanged 'Meshline\.Components\.ClientComponent\.StateChanged') before cleanup errors are reported to the caller\.
 ### Events
 
 <a name='Meshline.Components.ClientComponent.BackgroundError'></a>
