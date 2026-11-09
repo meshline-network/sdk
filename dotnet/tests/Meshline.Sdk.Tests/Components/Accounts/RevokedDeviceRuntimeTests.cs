@@ -34,20 +34,31 @@ public sealed class RevokedDeviceRuntimeTests
         };
         fixture.Relay.Requests.Clear();
         Revoke(fixture);
+        Exception? observationError;
         if (backgroundRead)
         {
             fixture.Relay.Clock.Advance(TimeSpan.FromMinutes(61));
             // The cached read can return before its owned refresh notices removal.
-            await fixture.Client.DeviceManager.GetDeviceStateAsync(cancellationToken: Token);
+            observationError = await Record.ExceptionAsync(() => fixture.Client.DeviceManager.GetDeviceStateAsync(cancellationToken: Token));
         }
-        else await fixture.Client.DeviceManager.GetOwnDeviceStateAsync(fixture.Relay.RelayId, Token);
+        else observationError = await Record.ExceptionAsync(() => fixture.Client.DeviceManager.GetOwnDeviceStateAsync(fixture.Relay.RelayId, Token));
+        // Confirming revocation starts shutdown, which can cancel this same refresh
+        // after its verified result was saved but before the read returns.
+        Assert.False(Token.IsCancellationRequested);
+        Assert.True(observationError is null or OperationCanceledException, observationError?.ToString());
         await stopped.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
 
+        Assert.Empty(fixture.Client.DeviceState!.Certificates);
         Assert.All(new ClientComponent[] { fixture.Client.AccountManager, fixture.Client.DeviceManager, fixture.Client.ProfileManager,
             fixture.Client.MessageManager, fixture.Client.ChannelManager, fixture.Client.GroupManager }, child => Assert.Equal(ComponentState.Stopped, child.LifecycleState));
         Assert.Equal(device, fixture.Client.Device!.ToJson());
         Assert.DoesNotContain(fixture.Relay.Requests, value => value.Method is "device.state.publish" or "account.route.publish");
-        await using (var db = fixture.Database.Open()) Assert.Single(await db.LocalDevices.ToListAsync(Token));
+        await using (var db = fixture.Database.Open())
+        {
+            Assert.Single(await db.LocalDevices.ToListAsync(Token));
+            var saved = await db.DeviceStates.SingleAsync(value => value.AccountId == fixture.Account.AccountId, Token);
+            Assert.Empty(ProtocolModel.FromJson<AccountDeviceState>(saved.DocumentJson)!.Certificates);
+        }
         // Local history is available without restarting or authorizing the runtime.
         await using (var history = await fixture.Client.MessageManager.GetMessageHistoryAsync(cancellationToken: Token)) { }
         await fixture.Client.EstablishAccountAsync(cancellationToken: Token);
