@@ -26,6 +26,22 @@ public static async Task<MessageSendStatus> SendTextAsync(
 
 Source: [Messaging.cs](../../examples/Meshline.Sdk.Examples/Messaging.cs). `SendMessageAsync` queues a local outbox operation and returns `MessageSendStatus`. Direct messages automatically request offline push notifications. The running component submits pending messages. Retain the message ID to query `GetSendStatusAsync` and observe `SendStatusChanged` for progress.
 
+New sends enter only the outbox. `GetOutboxAsync` returns `OutgoingMessageInfo`
+items: `Message` contains the plaintext body, attachment references, and reply
+reference; `Status` contains the message ID, recipient, creation time, and send
+state. Both come from the same fixed database snapshot, without separate reads
+for each message. `GetOutgoingMessageAsync(messageId)` returns the same complete
+`OutgoingMessageInfo` for one direct-message outbox entry, or `null` if absent or
+evicted. Its content and status are read together in one local query. Messages
+enter history only after the
+account timeline is synchronized and verified. Combine outbox items with history
+by the current sender account and `Status.MessageId` so a send appears once. Outbox
+entries have no `LocalSequence`; their display position is temporary until history
+assigns one. Failure or cancellation
+before synchronization does not create a history row. Source acceptance and
+destination delivery are separate: once synchronized, a message remains history
+even if delivery later fails. Synchronization does not terminate a pending send.
+
 Sending reuses both accounts' valid device states and fetches necessary cache misses concurrently. Authorization checks still run; a necessary lookup failure or cancellation prevents enqueueing. See [metadata caching](accounts-and-devices.md#metadata-reads-and-refreshes).
 
 ## Interpret send status
@@ -96,9 +112,25 @@ uncertain result; another `SendMessageAsync` call creates a separate message.
 
 ## Retained send history
 
-The SDK retains the newest 1000 terminal outbox records (`TargetAccepted`, `Failed`, and `Canceled`) across this account, including internal protocol messages. Retention uses `CreatedAt` descending, then ordinal `MessageId` descending to break ties; it follows creation order, not completion order. Pending records are never evicted by this limit. Initialization and send-state transactions prune excess terminal records without removing message history. Retained records include the original encrypted request and remain queryable after restart through `GetSendStatusAsync`; `GetOutboxAsync` includes retained direct-message terminal records unless filtered out.
+`GetOutboxAsync` returns a fixed snapshot of direct messages matching its optional
+recipient and send-state filters, ordered by creation time and then ordinal message
+ID ascending. Each `OutgoingMessageInfo` contains plaintext in `Message` and send
+metadata in `Status`. `GetOutgoingMessageAsync` reads the same information for one
+message. Both reject missing or invalid content and exclude internal protocol
+messages. Open a new reader to observe later changes.
 
-`GetSendStatusAsync` returns `null` for an unknown or evicted record. This does not identify a delivery failure, prove delivery, or distinguish eviction from a message never recorded locally. Previously discarded results cannot be reconstructed from message history alone. Observe status events for progress and use stored messages for history rather than treating the bounded outbox as a permanent delivery ledger.
+The outbox retains the newest 1000 eligible terminal records (`TargetAccepted`,
+`Failed`, `Canceled`) across the account, including internal protocol messages,
+ordered by creation time and then ordinal message ID descending. Pending records
+and source-accepted direct messages awaiting local history synchronization are
+protected, regardless of their eventual delivery outcome. Completed internal
+protocol messages remain eligible without local history. Initialization and
+message transactions prune excess eligible records; message history is preserved.
+
+`GetSendStatusAsync` reads status only, including internal operations. An unknown
+or evicted record returns `null`; this says nothing about delivery success or
+failure, and history cannot reconstruct an evicted outcome. Observe status events
+for progress and use stored messages for lasting conversation history.
 
 <!-- snippet: outbox -->
 ```csharp
@@ -113,7 +145,7 @@ public static async Task PrintPendingMessagesAsync(
         var batch = await reader.ReadNextAsync(50, cancellationToken);
         if (batch.Count == 0) break;
         foreach (var message in batch)
-            Console.WriteLine($"{message.MessageId}: {message.State}");
+            Console.WriteLine($"{message.Status.MessageId}: {message.Status.State} — {message.Message.Body?.Text}");
     }
 }
 ```
@@ -133,4 +165,4 @@ and [conversations](conversations.md).
 
 ## API reference
 
-[MessageManager](../api/Meshline.Components.MessageManager.md) · [DirectMessageDraft](../api/Meshline.Models.Client.DirectMessageDraft.md) · [MessageSendStatus](../api/Meshline.Models.Client.MessageSendStatus.md) · [MessageSendState](../api/Meshline.Models.Client.MessageSendState.md) · [MessageBody](../api/Meshline.Models.Protocol.MessageBody.md) · [ContentReference](../api/Meshline.Models.Protocol.ContentReference.md)
+[MessageManager](../api/Meshline.Components.MessageManager.md) · [DirectMessageDraft](../api/Meshline.Models.Client.DirectMessageDraft.md) · [OutgoingMessageInfo](../api/Meshline.Models.Client.OutgoingMessageInfo.md) · [MessageSendStatus](../api/Meshline.Models.Client.MessageSendStatus.md) · [MessageSendState](../api/Meshline.Models.Client.MessageSendState.md) · [MessageBody](../api/Meshline.Models.Protocol.MessageBody.md) · [ContentReference](../api/Meshline.Models.Protocol.ContentReference.md)

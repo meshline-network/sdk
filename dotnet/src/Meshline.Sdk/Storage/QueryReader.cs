@@ -68,6 +68,7 @@ public sealed class QueryReader<T> : IAsyncDisposable
     /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>.</exception>
     /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
     /// <exception cref="JsonException">A stored or received protocol document cannot be serialized or deserialized.</exception>
+    /// <exception cref="InvalidDataException">A stored direct-message outbox entry is missing its required content.</exception>
     /// <exception cref="OverflowException">Advancing the reader offset exceeds the maximum signed 32-bit item count.</exception>
     /// <exception cref="ArgumentException">A stored account, group, channel, or message identifier is invalid when a result is materialized.</exception>
     /// <exception cref="NotSupportedException">A stored account identifier uses an unsupported namespace when the result is materialized.</exception>

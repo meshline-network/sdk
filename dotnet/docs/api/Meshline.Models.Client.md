@@ -51,6 +51,7 @@ Application\-facing options, drafts, queries, result models, and pagination type
 | [MessageInfo](Meshline.Models.Client.MessageInfo.md 'Meshline\.Models\.Client\.MessageInfo') | Contains a verified and decrypted direct message retained in local storage\. |
 | [MessageRef](Meshline.Models.Client.MessageRef.md 'Meshline\.Models\.Client\.MessageRef') | Identifies a direct message by the sender account and message identifier\. |
 | [MessageSendStatus](Meshline.Models.Client.MessageSendStatus.md 'Meshline\.Models\.Client\.MessageSendStatus') | Contains the locally tracked submission and delivery state of an outgoing direct message\. |
+| [OutgoingMessageInfo](Meshline.Models.Client.OutgoingMessageInfo.md 'Meshline\.Models\.Client\.OutgoingMessageInfo') | Contains the plaintext content and send status of a retained outgoing direct message from one local snapshot\. |
 | [Page&lt;T&gt;](Meshline.Models.Client.Page_T_.md 'Meshline\.Models\.Client\.Page\<T\>') | Contains one page of results and an optional cursor for the next page\. |
 | [PageRequest](Meshline.Models.Client.PageRequest.md 'Meshline\.Models\.Client\.PageRequest') | Specifies an optional page size and continuation cursor for a relay\-backed query\. |
 | [ProfileUpdate](Meshline.Models.Client.ProfileUpdate.md 'Meshline\.Models\.Client\.ProfileUpdate') | Describes field assignments and deletions to apply to the current account's profile\. |

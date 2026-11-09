@@ -101,6 +101,9 @@ The SQLite database cannot be opened or a database command fails, for example be
 [System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
 A stored or received protocol document cannot be serialized or deserialized\.
 
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+A stored direct\-message outbox entry is missing its required content\.
+
 [System\.OverflowException](https://learn.microsoft.com/en-us/dotnet/api/system.overflowexception 'System\.OverflowException')<br>
 Advancing the reader offset exceeds the maximum signed 32\-bit item count\.
 

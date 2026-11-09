@@ -69,7 +69,7 @@ public static class Messaging
             var batch = await reader.ReadNextAsync(50, cancellationToken);
             if (batch.Count == 0) break;
             foreach (var message in batch)
-                Console.WriteLine($"{message.MessageId}: {message.State}");
+                Console.WriteLine($"{message.Status.MessageId}: {message.Status.State} — {message.Message.Body?.Text}");
         }
     }
     #endregion

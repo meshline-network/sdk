@@ -25,6 +25,7 @@
 - [`GetMessageHistoryAsync(string, HistoryRange, CancellationToken)`](#Meshline.Components.MessageManager.GetMessageHistoryAsync%28string%2CMeshline.Models.Client.HistoryRange%2CSystem.Threading.CancellationToken%29)
 - [`GetMessageHistoryAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetMessageHistoryAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetOutboxAsync(string, MessageSendState, CancellationToken)`](#Meshline.Components.MessageManager.GetOutboxAsync%28string%2CMeshline.Models.Client.MessageSendState%2CSystem.Threading.CancellationToken%29)
+- [`GetOutgoingMessageAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetOutgoingMessageAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetSendStatusAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetSendStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`RemoveContactAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.RemoveContactAsync%28string%2CSystem.Threading.CancellationToken%29)
@@ -790,10 +791,10 @@ This query reads local storage without fetching missing relay history\. Its snap
 
 ## MessageManager\.GetOutboxAsync\(string, MessageSendState, CancellationToken\) Method
 
-Opens a snapshot reader for direct\-message outbox entries matching the recipient and state filters\.
+Opens a snapshot reader for the content and send status of direct\-message outbox entries matching the recipient and state filters\.
 
 ```csharp
-public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.MessageSendStatus>> GetOutboxAsync(string? recipient=null, Meshline.Models.Client.MessageSendState state=Meshline.Models.Client.MessageSendState.All, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+public System.Threading.Tasks.Task<Meshline.Storage.QueryReader<Meshline.Models.Client.OutgoingMessageInfo>> GetOutboxAsync(string? recipient=null, Meshline.Models.Client.MessageSendState state=Meshline.Models.Client.MessageSendState.All, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
 ```
 #### Parameters
 
@@ -816,13 +817,13 @@ The outbox states to include; flags may be combined and the default includes all
 A token that can cancel the operation\.
 
 #### Returns
-[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[Meshline\.Storage\.QueryReader&lt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[MessageSendStatus](Meshline.Models.Client.MessageSendStatus.md 'Meshline\.Models\.Client\.MessageSendStatus')[&gt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[Meshline\.Storage\.QueryReader&lt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[OutgoingMessageInfo](Meshline.Models.Client.OutgoingMessageInfo.md 'Meshline\.Models\.Client\.OutgoingMessageInfo')[&gt;](Meshline.Storage.QueryReader_T_.md 'Meshline\.Storage\.QueryReader\<T\>')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
 A snapshot reader for the matching local results\. The caller must dispose the reader after use\.
 
 #### Exceptions
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
-The operation observes cancellation of [cancellationToken](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetOutboxAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken).cancellationToken 'Meshline\.Components\.MessageManager\.GetOutboxAsync\(string, Meshline\.Models\.Client\.MessageSendState, System\.Threading\.CancellationToken\)\.cancellationToken')\. Disposal of the component or relay session can also cancel pending work\.
+The caller or component lifetime cancels the local read\.
 
 [System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
 This component or a required component has not completed initialization\.
@@ -837,8 +838,68 @@ The SQLite database cannot be opened or a database command fails, for example be
 The send\-state filter contains unsupported flags\.
 
 ### Remarks
-This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.<br>
-Results include retained terminal records\. The SDK retains the newest 1000 terminal records by creation time and then ordinal message identifier across the account's entire outbox, including internal protocol messages\.
+
+Each result contains plaintext content and send status from the same local snapshot, ordered by creation<br>
+            time and then ordinal message identifier ascending. Outbox entries have no local history sequence.<br>
+            Open a new reader to observe later changes; consuming a record with missing or invalid content raises an error.<br>
+
+Results include retained terminal records. The SDK retains the newest 1000 eligible terminal records<br>
+            across the account's entire outbox, including internal protocol messages. Source-accepted direct messages<br>
+            without synchronized history remain protected from eviction. This query returns direct messages only.
+
+<a name='Meshline.Components.MessageManager.GetOutgoingMessageAsync(string,System.Threading.CancellationToken)'></a>
+
+## MessageManager\.GetOutgoingMessageAsync\(string, CancellationToken\) Method
+
+Reads the content and send status of one retained outgoing direct message\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.OutgoingMessageInfo?> GetOutgoingMessageAsync(string messageId, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.MessageManager.GetOutgoingMessageAsync(string,System.Threading.CancellationToken).messageId'></a>
+
+`messageId` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The outgoing message identifier\.
+
+<a name='Meshline.Components.MessageManager.GetOutgoingMessageAsync(string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels the local read\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[OutgoingMessageInfo](Meshline.Models.Client.OutgoingMessageInfo.md 'Meshline\.Models\.Client\.OutgoingMessageInfo')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+The complete outgoing message, or null if the direct\-message outbox entry is absent or has been evicted\.
+
+#### Exceptions
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The message identifier is invalid\.
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+This component or a required component has not completed initialization\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The component has been disposed\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The call or component lifetime is canceled\.
+
+[Microsoft\.Data\.Sqlite\.SqliteException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlite.sqliteexception 'Microsoft\.Data\.Sqlite\.SqliteException')<br>
+Local storage cannot be accessed\.
+
+[System\.IO\.InvalidDataException](https://learn.microsoft.com/en-us/dotnet/api/system.io.invaliddataexception 'System\.IO\.InvalidDataException')<br>
+The direct\-message outbox entry is missing its required content\.
+
+[System\.Text\.Json\.JsonException](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonexception 'System\.Text\.Json\.JsonException')<br>
+The stored content violates protocol JSON representation rules\.
+
+### Remarks
+Content and status are read together from local storage, as in [GetOutboxAsync\(string, MessageSendState, CancellationToken\)](Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetOutboxAsync(string,Meshline.Models.Client.MessageSendState,System.Threading.CancellationToken) 'Meshline\.Components\.MessageManager\.GetOutboxAsync\(string, Meshline\.Models\.Client\.MessageSendState, System\.Threading\.CancellationToken\)')\.<br>
+            Direct outbox messages have no local history sequence\. Internal protocol messages are excluded\.
 
 <a name='Meshline.Components.MessageManager.GetSendStatusAsync(string,System.Threading.CancellationToken)'></a>
 

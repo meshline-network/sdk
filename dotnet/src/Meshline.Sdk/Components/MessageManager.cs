@@ -252,37 +252,6 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     }
 
     /// <summary>
-    /// Opens a snapshot reader for direct-message outbox entries matching the recipient and state filters.
-    /// </summary>
-    /// <param name="recipient">An optional recipient account filter; <see langword="null"/> includes all recipients.</param>
-    /// <param name="state">The outbox states to include; flags may be combined and the default includes all states.</param>
-    /// <param name="cancellationToken">A token that can cancel the operation.</param>
-    /// <returns>A snapshot reader for the matching local results. The caller must dispose the reader after use.</returns>
-    /// <remarks>
-    /// This query reads local storage without fetching missing relay history. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes.
-    /// Results include retained terminal records. The SDK retains the newest 1000 terminal records by creation time and then ordinal message identifier across the account's entire outbox, including internal protocol messages.
-    /// </remarks>
-    /// <exception cref="OperationCanceledException">The operation observes cancellation of <paramref name="cancellationToken"/>. Disposal of the component or relay session can also cancel pending work.</exception>
-    /// <exception cref="InvalidOperationException">This component or a required component has not completed initialization.</exception>
-    /// <exception cref="ObjectDisposedException">This component or a component used by the operation has been disposed.</exception>
-    /// <exception cref="SqliteException">The SQLite database cannot be opened or a database command fails, for example because the schema is not migrated or the file is locked.</exception>
-    /// <exception cref="ArgumentException">The send-state filter contains unsupported flags.</exception>
-    public async Task<QueryReader<MessageSendStatus>> GetOutboxAsync(string? recipient = null, MessageSendState state = MessageSendState.All, CancellationToken cancellationToken = default)
-    {
-        EnsureInitialized();
-        using var operation = BeginOperation(ref cancellationToken);
-        if ((state & ~MessageSendState.All) != 0) throw new ArgumentException("The query contains an unsupported send state.", nameof(state));
-        return await QueryReader<MessageSendStatus>.OpenAsync(databaseOptions, database =>
-        {
-            var records = database.MessageOutbox.AsNoTracking().Where(value => value.IsDirect);
-            if (recipient is not null) records = records.Where(value => value.Recipient == recipient);
-            if (state != MessageSendState.All) records = records.Where(value => (value.State & state) != 0);
-            return records.OrderBy(value => value.CreatedAt).ThenBy(value => value.MessageId)
-                .Select(record => new MessageSendStatus { MessageId = record.MessageId, Recipient = record.Recipient, CreatedAt = record.CreatedAt, State = record.State, AcceptedRelayId = record.AcceptedAt == null ? null : record.RelayId, AcceptedAt = record.AcceptedAt, ErrorMessage = record.ErrorMessage });
-        }, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
     /// Reads the locally tracked outbox status of a message.
     /// </summary>
     /// <param name="messageId">The canonical message identifier.</param>

@@ -24,6 +24,7 @@ public sealed class SendHistoryTests
             .ToDictionary(state => Identifiers.CreateMessageId(), state => state);
         await using (var database = fixture.Database.Open())
         {
+            database.Messages.Add(History(fixture, AcceptedId));
             database.MessageOutbox.AddRange(
                 Record(fixture, AcceptedId, MessageSendState.TargetAccepted, 0),
                 Record(fixture, FailedId, MessageSendState.Failed, 10),
@@ -44,7 +45,8 @@ public sealed class SendHistoryTests
         await using var history = await manager.GetOutboxAsync(state: MessageSendState.TargetAccepted | MessageSendState.Failed | MessageSendState.Canceled, cancellationToken: Token);
         var retained = await history.ReadNextAsync(1100, Token);
         Assert.Equal(999, retained.Count);
-        Assert.Equal(CanceledId, retained[0].MessageId);
+        Assert.Equal(CanceledId, retained[0].Status.MessageId);
+        Assert.Equal(CanceledId, retained[0].Message.Body!.Text);
         Assert.Null(await manager.GetSendStatusAsync(Identifiers.CreateMessageId(), Token));
         Assert.Null(await manager.GetSendStatusAsync(AcceptedId, Token));
         Assert.Null(await manager.GetSendStatusAsync(FailedId, Token));
@@ -53,7 +55,7 @@ public sealed class SendHistoryTests
     }
 
     [Fact]
-    public async Task Completion_atomically_prunes_by_creation_order_and_retains_message_history()
+    public async Task Completion_atomically_prunes_by_creation_order_and_retains_only_synchronized_history()
     {
         using var time = Clock.Use(new ManualClock());
         await using var fixture = new TestClient();
@@ -62,6 +64,7 @@ public sealed class SendHistoryTests
         var old = await manager.SendMessageAsync(fixture.Account.AccountId, new() { Body = new() { ContentType = "text/plain", Text = "completed later" } }, Token);
         await using (var database = fixture.Database.Open())
         {
+            database.Messages.Add(History(fixture, AcceptedId));
             database.MessageOutbox.Add(Record(fixture, AcceptedId, MessageSendState.TargetAccepted, 50));
             for (var index = 0; index < 999; index++)
                 database.MessageOutbox.Add(Record(fixture, Identifiers.CreateMessageId(), MessageSendState.Canceled, 100));
@@ -89,13 +92,61 @@ public sealed class SendHistoryTests
         Assert.Equal([old.MessageId, recent.MessageId], canceled);
         Assert.Null(await manager.GetSendStatusAsync(AcceptedId, Token));
         await using (var messages = await manager.GetMessageHistoryAsync(fixture.Account.AccountId, Token))
-            Assert.Equal(2, (await messages.ReadNextAsync(10, Token)).Count);
+            Assert.Equal(AcceptedId, Assert.Single(await messages.ReadNextAsync(10, Token)).Key.MessageId);
 
         await fixture.ReopenAsync();
         Assert.Equal(MessageSendState.Canceled, (await fixture.Client.MessageManager.GetSendStatusAsync(recent.MessageId, Token))!.State);
         await using var check = fixture.Database.Open();
         Assert.Equal(1000, await check.MessageOutbox.CountAsync(Token));
     }
+
+    [Fact]
+    public async Task Completed_internal_message_addressed_only_to_another_device_can_be_pruned()
+    {
+        using var time = Clock.Use(new ManualClock());
+        await using var fixture = new TestClient();
+        await fixture.InitializeAsync();
+        var other = new DeviceSigner(fixture.Account, fixture.Relay.Clock);
+        var otherId = other.Certificate.GetDeviceId(TestNetwork.Context);
+        var localId = fixture.Client.Device!.GetDeviceId(TestNetwork.Context);
+        await fixture.Client.DeviceManager.PublishDeviceStateAsync(fixture.Relay.RelayId,
+            [fixture.Client.Device!, other.Certificate], cancellationToken: Token);
+        await fixture.Client.MessageManager.SendPayloadAsync(fixture.Account.AccountId,
+            new AccountContactSync { Records = [] }, Token, recipientDeviceIds: [otherId]);
+        string messageId;
+        await using (var database = fixture.Database.Open())
+        {
+            var sent = await database.MessageOutbox.SingleAsync(Token);
+            messageId = sent.MessageId;
+            var request = ProtocolModel.FromJson<MessageSendRequest>(sent.RequestJson)!;
+            Assert.False(sent.IsDirect);
+            Assert.Null(request.SenderBoxes);
+            Assert.Equal(otherId, Assert.Single(request.RecipientBoxes).DeviceId);
+            Assert.DoesNotContain(request.RecipientBoxes, box => box.DeviceId == localId);
+            sent.State = MessageSendState.TargetAccepted;
+            sent.AcceptedAt = Clock.UtcNow;
+            for (var index = 0; index < 1000; index++)
+                database.MessageOutbox.Add(Record(fixture, Identifiers.CreateMessageId(), MessageSendState.Canceled, 1));
+            await database.SaveChangesAsync(Token);
+        }
+        await fixture.ReopenAsync();
+        await using var check = fixture.Database.Open();
+        Assert.Empty(await check.Messages.ToListAsync(Token));
+        Assert.Null(await check.MessageOutbox.FindAsync([messageId], Token));
+        Assert.Equal(1000, await check.MessageOutbox.CountAsync(Token));
+    }
+
+    static StoredMessageRecord History(TestClient fixture, string id) => new()
+    {
+        MessageId = id,
+        Sender = fixture.Account.AccountId,
+        Recipient = fixture.Account.AccountId,
+        SenderDeviceId = "dev_AAAAAAAAAAAAAAAAAAAAAA",
+        CreatedAt = Clock.UtcNow,
+        IsDirect = true,
+        PayloadType = "meshline.message.direct",
+        PayloadJson = new DirectMessage { Body = new() { ContentType = "text/plain", Text = "synchronized" } }.ToJson()
+    };
 
     static MessageOutboxRecord Record(TestClient fixture, string id, MessageSendState state, int seconds) => new()
     {
@@ -106,6 +157,7 @@ public sealed class SendHistoryTests
         State = state,
         RelayId = fixture.Relay.RelayId,
         RequestJson = "{}",
+        PayloadJson = new DirectMessage { Body = new() { ContentType = "text/plain", Text = id } }.ToJson(),
         AcceptedAt = state is MessageSendState.RelayAccepted or MessageSendState.TargetAccepted ? Clock.UtcNow : null,
         NextAttemptAt = Clock.UtcNow
     };

@@ -749,6 +749,9 @@ namespace Meshline.Storage.Migrations
                     b.Property<long>("NextAttemptAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Recipient")
                         .IsRequired()
                         .HasMaxLength(256)

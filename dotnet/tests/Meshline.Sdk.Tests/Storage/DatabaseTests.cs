@@ -68,8 +68,7 @@ public sealed class DatabaseTests
             // Seed the original versioned device schema and publication without an execution key.
             await baseline.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO LocalDevice (DeviceId, CertificateJson, ProtectedSigningKey, ProtectedEncryptionKey, Version) VALUES ({local.DeviceId}, {local.CertificateJson}, {local.ProtectedSigningKey}, {local.ProtectedEncryptionKey}, {3})", token);
             await baseline.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO SignedRequests (Method, RelayId, DocumentJson, Revision, Pending) VALUES ({pending.Method}, {pending.RelayId}, {pending.DocumentJson}, {pending.Revision}, {pending.Pending})", token);
-            baseline.Messages.Add(message);
-            await baseline.SaveChangesAsync(token);
+            await baseline.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO Messages (Sender, MessageId, SenderDeviceId, Recipient, CreatedAt, PayloadType, PayloadJson, IsDirect) VALUES ({message.Sender}, {message.MessageId}, {message.SenderDeviceId}, {message.Recipient}, {message.CreatedAt.UtcTicks}, {message.PayloadType}, {message.PayloadJson}, {message.IsDirect})", token);
         }
 
         await MeshlineDatabase.MigrateAsync(database.Options, token);
@@ -164,9 +163,9 @@ public sealed class DatabaseTests
         {
             await previous.GetService<IMigrator>().MigrateAsync("20261023152940_DeviceCreationPushGateway", token);
             previous.Bindings.Add(new() { Id = 1, Context = "network", AccountId = "own" });
-            previous.DeviceStates.Add(new() { AccountId = "peer", DocumentJson = "peer-state", Revision = 99 });
-            if (ownStateKnown) previous.DeviceStates.Add(new() { AccountId = "own", DocumentJson = "own-state", Revision = 7 });
-            previous.MessageOutbox.Add(pending);
+            await previous.Database.ExecuteSqlRawAsync("INSERT INTO DeviceStates (AccountId, DocumentJson, Revision) VALUES ('peer', 'peer-state', 99)", token);
+            if (ownStateKnown) await previous.Database.ExecuteSqlRawAsync("INSERT INTO DeviceStates (AccountId, DocumentJson, Revision) VALUES ('own', 'own-state', 7)", token);
+            await previous.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO MessageOutbox (MessageId, Recipient, RelayId, RequestJson, CreatedAt, NextAttemptAt, State, IsDirect) VALUES ({pending.MessageId}, {pending.Recipient}, {pending.RelayId}, {pending.RequestJson}, {pending.CreatedAt.UtcTicks}, {pending.NextAttemptAt.UtcTicks}, {(int)pending.State}, {pending.IsDirect})", token);
             await previous.SaveChangesAsync(token);
             await previous.Database.ExecuteSqlRawAsync("""
                 INSERT INTO Contacts (AccountId, Alias, State, UpdatedAt, GrantFromJson, GrantToJson, ConfirmedGrantToJson, RequiredDeviceRevision)

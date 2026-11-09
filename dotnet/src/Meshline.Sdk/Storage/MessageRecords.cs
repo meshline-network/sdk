@@ -42,6 +42,7 @@ sealed class MessageOutboxRecord
     [MaxLength(42)]
     public required string RelayId { get; set; }
     public required string RequestJson { get; set; }
+    public string? PayloadJson { get; set; }
     public DateTimeOffset? AcceptedAt { get; set; }
     public string? ErrorMessage { get; set; }
     public DateTimeOffset NextAttemptAt { get; set; }

@@ -68,6 +68,7 @@ sealed partial class MessageManager
 
     Task<int> PruneSendHistoryAsync(MeshlineDbContext database, CancellationToken cancellationToken) =>
         database.MessageOutbox.Where(value => value.State == MessageSendState.TargetAccepted || value.State == MessageSendState.Failed || value.State == MessageSendState.Canceled)
+            .Where(value => !value.IsDirect || value.AcceptedAt == null || database.Messages.Any(message => message.Sender == Options.AccountId && message.MessageId == value.MessageId))
             .OrderByDescending(value => value.CreatedAt).ThenByDescending(value => value.MessageId)
             .Skip(SendHistoryLimit).ExecuteDeleteAsync(cancellationToken);
 
@@ -126,16 +127,12 @@ sealed partial class MessageManager
             CreatedAt = now,
             RelayId = route.RelayId,
             RequestJson = request.ToJson(),
+            PayloadJson = payload is DirectMessage ? payload.ToJson() : null,
             State = MessageSendState.Queued,
             NextAttemptAt = now,
             IsDirect = payload is DirectMessage
         };
         database.MessageOutbox.Add(record);
-        if (payload is DirectMessage)
-        {
-            var message = new StoredMessageRecord { Sender = Options.AccountId, MessageId = messageId, SenderDeviceId = certificate.GetDeviceId(Context), Recipient = recipient, CreatedAt = now, PayloadType = payload.Type, PayloadJson = payload.ToJson(), IsDirect = true };
-            database.Messages.Add(message);
-        }
         notifications.Add(() => OnSendChanged(record));
         return record;
     }

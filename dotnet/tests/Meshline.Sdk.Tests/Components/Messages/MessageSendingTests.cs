@@ -60,7 +60,8 @@ public sealed class MessageSendingTests
         var request = ProtocolModel.FromJson<MessageSendRequest>(record.RequestJson)!;
         Assert.True(request.Envelope.Notify);
         Assert.True(Ed25519.Verify(request.Envelope.DeviceSignature.AsSpan(), fixture.Client.Device!.SigningPublicKey.AsSpan(), request.Envelope.GetSigningInput(TestNetwork.Context)));
-        using var plaintext = JsonDocument.Parse((await db.Messages.SingleAsync(row => row.MessageId == queued.MessageId, Token)).PayloadJson!);
+        Assert.False(await db.Messages.AnyAsync(row => row.MessageId == queued.MessageId, Token));
+        using var plaintext = JsonDocument.Parse((await fixture.Client.MessageManager.GetOutgoingMessageAsync(queued.MessageId, Token))!.Message.ToJson());
         Assert.False(plaintext.RootElement.TryGetProperty("notify", out _));
     }
 
