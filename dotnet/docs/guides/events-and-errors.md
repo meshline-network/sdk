@@ -51,7 +51,7 @@ Events indicate changes; local queries provide the durable current view. Use `Co
 | Client | `ConversationChanged` | Re-query the affected local conversation. |
 | Account/device/profile managers | `AccountChanged`, `DeviceChanged`, `DeviceStateChanged`, `ProfileChanged` | Refresh route, local certificate, authorization or profile views, including changes confirmed by background recovery. |
 | Profile manager | `UpdateStateChanged` | Read `GetUpdateStateAsync` for [pending edits and publication status](profiles-and-contacts.md#display-pending-edits-and-synchronization-status). |
-| Message manager | `MessageReceived`, `TimelineChanged`, `SendStatusChanged` | Display received messages and track outgoing operations. |
+| Message manager | `MessageReceived`, `TimelineChanged`, `SendStatusChanged` | Refresh available local messages and track sends; `TimelineChanged` reports account-timeline synchronization. |
 | Message manager | `ContactChanged`, `ContactRequestChanged` | Refresh contacts and pending requests. |
 | Channel manager | `ChannelChanged`, `TimelineChanged`, `FollowChanged` | Refresh channel metadata, posts, or follow state. |
 | Group manager | `GroupChanged`, `TimelineChanged`, `ApplicationsChanged`, `KeyRecoveryChanged` | Refresh membership, readable history, admission, or key recovery. |
@@ -59,7 +59,11 @@ Events indicate changes; local queries provide the durable current view. Use `Co
 | All client components | `StateChanged`, `BackgroundError` | Observe lifecycle and background failures. |
 
 The coordinated client forwards its managers' background errors. When composing
-managers independently, subscribe to each component. Ordinary .NET event handlers
+managers independently, subscribe to each component. Data events also report
+imported history: imports notify synchronously after each committed change and
+outside the write lock, including during partial success. Earlier notifications
+remain valid if a later record fails. Use conversation read positions, not message
+notifications, to determine unread status. Ordinary .NET event handlers
 run synchronously on the calling thread, including background threads. Handle
 application callback failures locally; do not assume every event isolates observer
 exceptions. Never synchronously wait for component operations inside a handler.

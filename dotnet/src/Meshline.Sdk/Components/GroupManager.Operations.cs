@@ -187,7 +187,7 @@ sealed partial class GroupManager
         var bans = await database.GroupBans.Where(value => value.GroupId == group.GroupId).ToDictionaryAsync(value => value.AccountId, StringComparer.Ordinal, cancellationToken).ConfigureAwait(false);
         var advances = operation is GroupApplicationApproval or GroupMemberLeave or GroupMemberRemoval or GroupMemberRecoveryApproval or GroupSecretRotation
             || operation is GroupMemberBan ban && ban.Accounts.Any(members.ContainsKey);
-        ApplyManagement(database, record, members, bans, new() { Sequence = record.Sequence + 1, Epoch = record.Epoch + (advances ? 1 : 0), AcceptedAt = Clock.UtcNow.ToUnixTimeSeconds(), Payload = operation }, Options.AccountId);
+        ApplyManagement(database, record, members, bans, record.Sequence + 1, record.Epoch + (advances ? 1 : 0), operation, Options.AccountId);
         return true;
     }
 

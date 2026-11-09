@@ -15,6 +15,9 @@ Application\-facing options, drafts, queries, result models, and pagination type
 | [AccountEstablishmentOptions](Meshline.Models.Client.AccountEstablishmentOptions.md 'Meshline\.Models\.Client\.AccountEstablishmentOptions') | Configures idempotent account setup without starting background synchronization\. |
 | [AccountInitialProfile](Meshline.Models.Client.AccountInitialProfile.md 'Meshline\.Models\.Client\.AccountInitialProfile') | Creation\-only profile values used by account establishment\. |
 | [AccountRecoveryOptions](Meshline.Models.Client.AccountRecoveryOptions.md 'Meshline\.Models\.Client\.AccountRecoveryOptions') | Configures explicit account recovery, including prior device state and revision overrides\. |
+| [BackupOptions](Meshline.Models.Client.BackupOptions.md 'Meshline\.Models\.Client\.BackupOptions') | Controls the optional parts of an SDK data backup\. |
+| [BackupReport](Meshline.Models.Client.BackupReport.md 'Meshline\.Models\.Client\.BackupReport') | Committed or exported record counts for an SDK backup operation\. |
+| [BackupSelection](Meshline.Models.Client.BackupSelection.md 'Meshline\.Models\.Client\.BackupSelection') | An immutable selection of all, no, or specified conversations for backup history\. |
 | [ChannelInfo](Meshline.Models.Client.ChannelInfo.md 'Meshline\.Models\.Client\.ChannelInfo') | Combines a channel reference with its known descriptor and local following state\. |
 | [ChannelPostDraft](Meshline.Models.Client.ChannelPostDraft.md 'Meshline\.Models\.Client\.ChannelPostDraft') | Supplies the body and attachments for a new public channel post\. |
 | [ChannelPostInfo](Meshline.Models.Client.ChannelPostInfo.md 'Meshline\.Models\.Client\.ChannelPostInfo') | Contains the current locally materialized content and identity of a channel post\. |

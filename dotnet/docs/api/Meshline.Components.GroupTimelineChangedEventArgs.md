@@ -27,7 +27,7 @@ Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system
 
 ## GroupTimelineChangedEventArgs\.Messages Property
 
-The verified messages made available by this timeline update\.
+The messages made available by this local timeline update\.
 
 ```csharp
 public System.Collections.Generic.IReadOnlyList<Meshline.Models.Client.GroupMessageInfo> Messages { get; }
@@ -35,3 +35,6 @@ public System.Collections.Generic.IReadOnlyList<Meshline.Models.Client.GroupMess
 
 #### Property Value
 [System\.Collections\.Generic\.IReadOnlyList&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')[GroupMessageInfo](Meshline.Models.Client.GroupMessageInfo.md 'Meshline\.Models\.Client\.GroupMessageInfo')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')
+
+### Remarks
+Includes synchronized, decrypted and restored history\. Read status follows the target conversation's read position\.

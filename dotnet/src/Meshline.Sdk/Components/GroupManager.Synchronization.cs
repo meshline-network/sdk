@@ -66,73 +66,15 @@ sealed partial class GroupManager
             if (record.RelayId != group.RelayId) throw new InvalidDataException("The group is bound to another hosting relay.");
             var members = await database.GroupMembers.Where(value => value.GroupId == group.GroupId).ToDictionaryAsync(value => value.AccountId, StringComparer.Ordinal, cancellationToken).ConfigureAwait(false);
             var bans = await database.GroupBans.Where(value => value.GroupId == group.GroupId).ToDictionaryAsync(value => value.AccountId, StringComparer.Ordinal, cancellationToken).ConfigureAwait(false);
-            var pending = await database.GroupOperations.Where(value => value.GroupId == group.GroupId && value.Method != "group.update").ToListAsync(cancellationToken).ConfigureAwait(false);
-            var expected = pending.ToDictionary(value => value, value => GetTimelinePayload(ReadOperationRequest(value))?.ToJson());
             var change = (GroupChangeKind)0;
             foreach (var entry in page.Events)
             {
-                if (entry.Sequence <= record.Sequence || entry.Epoch < 0 || entry.AcceptedAt < 0 || entry.AcceptedAt > DateTimeOffset.MaxValue.ToUnixTimeSeconds())
-                    throw new InvalidDataException("The group event order, epoch or timestamp is invalid.");
-                if (record.Status == GroupStatus.Closed && record.Sequence >= 0) throw new InvalidDataException("A closed group cannot append events.");
+                if (entry.AcceptedAt < 0 || entry.AcceptedAt > DateTimeOffset.MaxValue.ToUnixTimeSeconds())
+                    throw new InvalidDataException("The group event timestamp is invalid.");
                 DeviceCertificate? certificate = null;
                 if (entry.SignerDeviceId is { } id && !certificates.TryGetValue(id, out certificate)) throw new InvalidDataException("The event signing certificate is missing.");
                 var stored = new GroupEventRecord { GroupId = group.GroupId, Sequence = entry.Sequence, Epoch = entry.Epoch, PayloadJson = entry.Payload.ToJson(), CertificateJson = certificate?.ToJson() };
-                if (entry.Payload is GroupMessageEnvelope envelope)
-                {
-                    if (record.Sequence < 0 || entry.Epoch != record.Epoch) throw new InvalidDataException("The message does not use the current verified group epoch.");
-                    try
-                    {
-                        if (certificate is null || !members.ContainsKey(certificate.Account) || bans.ContainsKey(certificate.Account) || envelope.GroupId != group.GroupId || envelope.Epoch != entry.Epoch)
-                            throw new InvalidDataException("The group message has an invalid account, group or epoch binding.");
-                        VerifySignature(envelope, certificate);
-                        if (envelope.CreatedAt > DateTimeOffset.MaxValue.ToUnixTimeSeconds()) throw new InvalidDataException("The group message timestamp is outside the supported range.");
-                        var existing = await database.GroupEvents.AsNoTracking().SingleOrDefaultAsync(value => value.Sender == certificate.Account && value.MessageId == envelope.MessageId && value.GroupId == group.GroupId, cancellationToken).ConfigureAwait(false);
-                        if (existing is not null) throw new InvalidDataException("The relay assigned another sequence to an existing logical group message.");
-                        stored.MessageId = envelope.MessageId;
-                        stored.Sender = certificate.Account;
-                        stored.SenderDeviceId = entry.SignerDeviceId;
-                        stored.CreatedAt = DateTimeOffset.FromUnixTimeSeconds(envelope.CreatedAt);
-                    }
-                    catch (Exception exception) when (exception is InvalidDataException or CryptographicException or JsonException)
-                    {
-                        stored.Rejection = exception.Message;
-                        notifications.Add(() => ReportBackgroundError(BackgroundOperation.Synchronize, group.GroupId, exception));
-                    }
-                }
-                else if (entry.Payload is GroupKeyRotated)
-                {
-                    if (record.Sequence < 0 || certificate is not null || entry.SignerDeviceId is not null || entry.Epoch <= record.Epoch) throw new InvalidDataException("The relay key rotation is invalid.");
-                }
-                else
-                {
-                    if (certificate is null) throw new InvalidDataException("The management event has no signing device.");
-                    VerifySignature(entry.Payload, certificate);
-                    change |= ApplyManagement(database, record, members, bans, entry, certificate.Account);
-                    record.ManagementHash = ManagementHash(entry.Payload);
-                }
-                if (record.Epoch != entry.Epoch)
-                {
-                    var epoch = await database.GroupEpochs.FindAsync([group.GroupId, entry.Epoch], cancellationToken).ConfigureAwait(false);
-                    if (epoch is null) database.GroupEpochs.Add(epoch = new() { GroupId = group.GroupId, Epoch = entry.Epoch });
-                    epoch.Commitment = record.Commitment ?? throw new InvalidDataException("A group epoch has no verified client secret commitment.");
-                    epoch.MemberPublicKey = members.GetValueOrDefault(Options.AccountId)?.PublicKey;
-                }
-                record.Epoch = entry.Epoch;
-                record.Sequence = entry.Sequence;
-                database.GroupEvents.Add(stored);
-                if (stored.Rejection is null)
-                {
-                    foreach (var operation in pending.Where(value => expected[value] == stored.PayloadJson).ToArray())
-                    {
-                        database.GroupOperations.Remove(operation);
-                        pending.Remove(operation);
-                        if (operation.Method == "group.close") record.LocallyClosed = true;
-                        if (operation.Method == "group.secret.rotation.commit" && await database.GroupRotations.FindAsync([group.GroupId], cancellationToken).ConfigureAwait(false) is { } rotation)
-                            database.GroupRotations.Remove(rotation);
-                        if (operation.Method == "group.application.approve") notifications.Add(() => ApplicationsChanged?.Invoke(this, new(group)));
-                        if (operation.Method == "group.member.recovery.approve") notifications.Add(() => KeyRecoveryChanged?.Invoke(this, new(group)));
-                    }
-                }
+                change |= await ApplyTimelineEventAsync(database, record, members, bans, stored, entry.Payload, certificate, notifications, cancellationToken).ConfigureAwait(false);
                 // Each following event observes all preceding changes from this page.
                 await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -148,6 +90,96 @@ sealed partial class GroupManager
         return true;
     }
 
+    // Shared by live synchronization and offline restore. The caller commits the event,
+    // its projection and matching operation confirmations together, then publishes notifications.
+    // Backup import may supply a signature already checked against this exact payload and certificate.
+    async Task<GroupChangeKind> ApplyTimelineEventAsync(MeshlineDbContext database, GroupRecord record,
+        Dictionary<string, GroupMemberRecord> members, Dictionary<string, GroupBanRecord> bans,
+        GroupEventRecord stored, TypedProtocolModel payload, DeviceCertificate? certificate,
+        List<Action> notifications, CancellationToken cancellationToken, bool signatureVerified = false)
+    {
+        var change = (GroupChangeKind)0;
+        if (stored.Sequence <= record.Sequence || stored.Epoch < 0)
+            throw new InvalidDataException("The group event order or epoch is invalid.");
+        if (record.Status == GroupStatus.Closed && record.Sequence >= 0) throw new InvalidDataException("A closed group cannot append events.");
+        if (payload is GroupMessageEnvelope envelope)
+        {
+            if (record.Sequence < 0 || stored.Epoch != record.Epoch) throw new InvalidDataException("The message does not use the current verified group epoch.");
+            try
+            {
+                if (certificate is null || !members.ContainsKey(certificate.Account) || bans.ContainsKey(certificate.Account) || envelope.GroupId != record.GroupId || envelope.Epoch != stored.Epoch)
+                    throw new InvalidDataException("The group message has an invalid account, group or epoch binding.");
+                if (!signatureVerified) VerifySignature(envelope, certificate);
+                if (envelope.CreatedAt > DateTimeOffset.MaxValue.ToUnixTimeSeconds()) throw new InvalidDataException("The group message timestamp is outside the supported range.");
+                var existing = await database.GroupEvents.AsNoTracking().SingleOrDefaultAsync(value => value.Sender == certificate.Account && value.MessageId == envelope.MessageId && value.GroupId == record.GroupId, cancellationToken).ConfigureAwait(false);
+                if (existing is not null) throw new InvalidDataException("The relay assigned another sequence to an existing logical group message.");
+                stored.MessageId = envelope.MessageId;
+                stored.Sender = certificate.Account;
+                stored.SenderDeviceId = certificate.GetDeviceId(Context);
+                stored.CreatedAt = DateTimeOffset.FromUnixTimeSeconds(envelope.CreatedAt);
+            }
+            catch (Exception exception) when (exception is InvalidDataException or CryptographicException or JsonException)
+            {
+                stored.Rejection = exception.Message;
+                notifications.Add(() => ReportBackgroundError(BackgroundOperation.Synchronize, record.GroupId, exception));
+            }
+        }
+        else if (payload is GroupKeyRotated)
+        {
+            if (record.Sequence < 0 || certificate is not null || stored.Epoch <= record.Epoch) throw new InvalidDataException("The relay key rotation is invalid.");
+        }
+        else
+        {
+            if (certificate is null) throw new InvalidDataException("The management event has no signing device.");
+            if (!signatureVerified) VerifySignature(payload, certificate);
+            change |= ApplyManagement(database, record, members, bans, stored.Sequence, stored.Epoch, payload, certificate.Account);
+            record.ManagementHash = ManagementHash(payload);
+        }
+        if (record.Epoch != stored.Epoch)
+        {
+            var epoch = await database.GroupEpochs.FindAsync([record.GroupId, stored.Epoch], cancellationToken).ConfigureAwait(false);
+            if (epoch is null) database.GroupEpochs.Add(epoch = new() { GroupId = record.GroupId, Epoch = stored.Epoch });
+            if (epoch.Commitment is not null && epoch.Commitment != record.Commitment
+                || epoch.MemberPublicKey is not null && !epoch.MemberPublicKey.AsSpan().SequenceEqual(members.GetValueOrDefault(Options.AccountId)?.PublicKey))
+                throw new InvalidDataException("The group epoch conflicts with retained key evidence.");
+            epoch.Commitment = record.Commitment ?? throw new InvalidDataException("A group epoch has no verified client secret commitment.");
+            epoch.MemberPublicKey = members.GetValueOrDefault(Options.AccountId)?.PublicKey;
+        }
+        record.Epoch = stored.Epoch;
+        record.Sequence = stored.Sequence;
+
+        if (stored.Rejection is not null)
+        {
+            stored.DecryptedPayloadJson = null;
+            stored.IsMessage = false;
+        }
+        // Only new events advance the timeline. History at or below the committed cursor is
+        // merged by the backup importer; an event and its cursor are always committed together.
+        database.GroupEvents.Add(stored);
+
+        var group = new GroupRef { GroupId = record.GroupId, RelayId = record.RelayId };
+        if (stored.Rejection is null)
+        {
+            // Latest group updates are retired by their state-update coordinator.
+            var pending = await database.GroupOperations.Where(value => value.GroupId == record.GroupId && value.Method != "group.update").ToListAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var operation in pending.Where(value => GetTimelinePayload(ReadOperationRequest(value))?.ToJson() == stored.PayloadJson))
+            {
+                database.GroupOperations.Remove(operation);
+                if (operation.Method == "group.close") record.LocallyClosed = true;
+                if (operation.Method == "group.secret.rotation.commit" && await database.GroupRotations.FindAsync([record.GroupId], cancellationToken).ConfigureAwait(false) is { } rotation)
+                    database.GroupRotations.Remove(rotation);
+                if (operation.Method == "group.application.approve") notifications.Add(() => ApplicationsChanged?.Invoke(this, new(group)));
+                if (operation.Method == "group.member.recovery.approve") notifications.Add(() => KeyRecoveryChanged?.Invoke(this, new(group)));
+            }
+        }
+        if (stored.IsMessage)
+        {
+            var message = MessageSnapshot(group, stored);
+            notifications.Add(() => TimelineChanged?.Invoke(this, new([message])));
+        }
+        return change;
+    }
+
     Dictionary<string, DeviceCertificate> ReadCertificates(IEnumerable<DeviceCertificate> certificates)
     {
         var result = new Dictionary<string, DeviceCertificate>(StringComparer.Ordinal);
@@ -159,13 +191,13 @@ sealed partial class GroupManager
         return result;
     }
 
-    GroupChangeKind ApplyManagement(MeshlineDbContext database, GroupRecord record, Dictionary<string, GroupMemberRecord> members, Dictionary<string, GroupBanRecord> bans, GroupEvent entry, string actor)
+    GroupChangeKind ApplyManagement(MeshlineDbContext database, GroupRecord record, Dictionary<string, GroupMemberRecord> members, Dictionary<string, GroupBanRecord> bans, long sequence, long epoch, TypedProtocolModel payload, string actor)
     {
         var advances = false;
         GroupChangeKind change;
-        if (entry.Payload is GroupCreate create)
+        if (payload is GroupCreate create)
         {
-            if (record.Sequence != -1 || entry.Sequence != 0 || entry.Epoch != 0 || create.Owner.Account != actor || create.GroupId != record.GroupId
+            if (record.Sequence != -1 || sequence != 0 || epoch != 0 || create.Owner.Account != actor || create.GroupId != record.GroupId
                 || Identifiers.DeriveGroupId(actor, record.RelayId, create.Nonce.AsSpan(), Context) != record.GroupId || !Enum.IsDefined(create.InvitePolicy))
                 throw new InvalidDataException("The group creation event does not establish the expected group.");
             record.Name = create.Name; record.Description = create.Description; record.Owner = actor;
@@ -175,7 +207,7 @@ sealed partial class GroupManager
         }
         else
         {
-            if (entry.Payload is not GroupManagementOperation operation) throw new NotSupportedException("The group contains an unsupported management event: " + entry.Payload.Type);
+            if (payload is not GroupManagementOperation operation) throw new NotSupportedException("The group contains an unsupported management event: " + payload.Type);
             if (record.ManagementHash is null || operation.GroupId != record.GroupId || operation.PrevHash != record.ManagementHash || !members.TryGetValue(actor, out var author) || bans.ContainsKey(actor))
                 throw new InvalidDataException("The group management chain or actor authorization is invalid.");
             var owner = author.Role == GroupRole.Owner;
@@ -280,7 +312,7 @@ sealed partial class GroupManager
                     break;
                 default: throw new NotSupportedException("The management operation is not supported.");
             }
-            if (advances ? entry.Epoch <= record.Epoch : entry.Epoch != record.Epoch) throw new InvalidDataException("The management event has an invalid epoch transition.");
+            if (advances ? epoch <= record.Epoch : epoch != record.Epoch) throw new InvalidDataException("The management event has an invalid epoch transition.");
         }
         record.MemberCount = members.Count;
         record.Role = members.GetValueOrDefault(Options.AccountId)?.Role;
@@ -292,7 +324,7 @@ sealed partial class GroupManager
         static void Require(bool authorized) { if (!authorized) throw new InvalidDataException("The management actor is not authorized for this operation."); }
         void AddMember(GroupMemberKey key, GroupRole role)
         {
-            var member = new GroupMemberRecord { GroupId = record.GroupId, AccountId = key.Account, Role = role, PublicKey = key.MemberEncryptionPublicKey.ToArray(), JoinedAtSequence = entry.Sequence };
+            var member = new GroupMemberRecord { GroupId = record.GroupId, AccountId = key.Account, Role = role, PublicKey = key.MemberEncryptionPublicKey.ToArray(), JoinedAtSequence = sequence };
             members.Add(key.Account, member); database.GroupMembers.Add(member);
         }
         void Remove(string account, GroupMembershipState membership)

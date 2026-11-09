@@ -18,6 +18,7 @@
 - [`CancelMessageAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.CancelMessageAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`CreateInviteAsync(DateTimeOffset, CancellationToken)`](#Meshline.Components.MessageManager.CreateInviteAsync%28System.DateTimeOffset%2CSystem.Threading.CancellationToken%29)
 - [`DismissContactRequestAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.DismissContactRequestAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`ExportBackupAsync(BackupSelection, CancellationToken)`](#Meshline.Components.MessageManager.ExportBackupAsync%28Meshline.Models.Client.BackupSelection%2CSystem.Threading.CancellationToken%29)
 - [`GetContactAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetContactAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetContactRequestsAsync(string, ContactRequestDirection, CancellationToken)`](#Meshline.Components.MessageManager.GetContactRequestsAsync%28string%2CMeshline.Models.Client.ContactRequestDirection%2CSystem.Threading.CancellationToken%29)
 - [`GetContactsAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetContactsAsync%28string%2CSystem.Threading.CancellationToken%29)
@@ -28,6 +29,7 @@
 - [`GetOutgoingMessageAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetOutgoingMessageAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetSendStatusAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetSendStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`ImportBackupAsync(IAsyncEnumerable<JsonElement>, CancellationToken)`](#Meshline.Components.MessageManager.ImportBackupAsync%28System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_%2CSystem.Threading.CancellationToken%29)
 - [`RemoveContactAsync(string, CancellationToken)`](#Meshline.Components.MessageManager.RemoveContactAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`SendMessageAsync(string, DirectMessageDraft, CancellationToken)`](#Meshline.Components.MessageManager.SendMessageAsync%28string%2CMeshline.Models.Client.DirectMessageDraft%2CSystem.Threading.CancellationToken%29)
 - [`SetAliasAsync(string, string, CancellationToken)`](#Meshline.Components.MessageManager.SetAliasAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
@@ -500,6 +502,36 @@ The SQLite database cannot be opened or a database command fails, for example be
 
 [Microsoft\.EntityFrameworkCore\.DbUpdateException](https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.dbupdateexception 'Microsoft\.EntityFrameworkCore\.DbUpdateException')<br>
 Persisting local changes fails, including database constraint or optimistic\-concurrency failures\.
+
+<a name='Meshline.Components.MessageManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken)'></a>
+
+## MessageManager\.ExportBackupAsync\(BackupSelection, CancellationToken\) Method
+
+Exports this component's portable logical records from a consistent local snapshot\.
+
+```csharp
+public System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> ExportBackupAsync(Meshline.Models.Client.BackupSelection? history=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.MessageManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken).history'></a>
+
+`history` [BackupSelection](Meshline.Models.Client.BackupSelection.md 'Meshline\.Models\.Client\.BackupSelection')
+
+Optional private conversation history selection; defaults to [None](Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.None 'Meshline\.Models\.Client\.BackupSelection\.None')\. Base data is always exported\.
+
+<a name='Meshline.Components.MessageManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels enumeration; component disposal also cancels it\.
+
+#### Returns
+[System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')<br>
+Complete JSON records with `type` and `data` fields, independent of internal documents and valid after enumeration ends\.
+
+### Remarks
+Records are plaintext\. Use [MeshlineClient](Meshline.MeshlineClient.md 'Meshline\.MeshlineClient') for encrypted backup files\. This operation does not access the network\.
 
 <a name='Meshline.Components.MessageManager.GetContactAsync(string,System.Threading.CancellationToken)'></a>
 
@@ -987,6 +1019,41 @@ This component has been disposed\.
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The operation was canceled\.
 
+<a name='Meshline.Components.MessageManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)'></a>
+
+## MessageManager\.ImportBackupAsync\(IAsyncEnumerable\<JsonElement\>, CancellationToken\) Method
+
+Incrementally merges this component's logical backup records\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.BackupReport> ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> records, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.MessageManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).records'></a>
+
+`records` [System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')
+
+Complete JSON records with `type` and `data` fields, in SDK backup order\. The caller must ensure they belong to this account and network, and keep their documents alive while records are processed or supply cloned elements\.
+
+<a name='Meshline.Components.MessageManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels import; component disposal also cancels it\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[BackupReport](Meshline.Models.Client.BackupReport.md 'Meshline\.Models\.Client\.BackupReport')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+Counts for committed records\.
+
+### Remarks
+
+Each completed record is committed. Failure or cancellation retains earlier records;<br>
+            retrying the stream merges them without duplicates.<br>
+
+Committed business changes raise existing component events after the write lock is released.<br>
+            Import performs no network I/O and does not replay message processing.
+
 <a name='Meshline.Components.MessageManager.RemoveContactAsync(string,System.Threading.CancellationToken)'></a>
 
 ## MessageManager\.RemoveContactAsync\(string, CancellationToken\) Method
@@ -1351,7 +1418,7 @@ public event EventHandler<ContactRequestChangedEventArgs>? ContactRequestChanged
 
 ## MessageManager\.MessageReceived Event
 
-Occurs after verified direct messages are committed to local storage\.
+Occurs after direct messages become available in local storage\.
 
 ```csharp
 public event EventHandler<MessageReceivedEventArgs>? MessageReceived;
@@ -1359,6 +1426,9 @@ public event EventHandler<MessageReceivedEventArgs>? MessageReceived;
 
 #### Event Type
 [System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[MessageReceivedEventArgs](Meshline.Components.MessageReceivedEventArgs.md 'Meshline\.Components\.MessageReceivedEventArgs')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
+
+### Remarks
+Includes newly imported history\. This is a local data notification, not an indication of new unread messages\. Backup import does not replay message processing\.
 
 <a name='Meshline.Components.MessageManager.SendStatusChanged'></a>
 

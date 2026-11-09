@@ -1,8 +1,9 @@
 namespace Meshline.Components;
 
 /// <summary>
-/// Describes a change to the local following state of a channel.
+/// Describes the local following state made available by a channel update.
 /// </summary>
+/// <remarks>A restored channel entry reports its initial state, including an unfollowed state.</remarks>
 public sealed class ChannelFollowChangedEventArgs : EventArgs
 {
     /// <summary>

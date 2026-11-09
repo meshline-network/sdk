@@ -15,13 +15,16 @@
 
 ## ChannelFollowChangedEventArgs Class
 
-Describes a change to the local following state of a channel\.
+Describes the local following state made available by a channel update\.
 
 ```csharp
 public sealed class ChannelFollowChangedEventArgs : System.EventArgs
 ```
 
 Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system.object 'System\.Object') → [System\.EventArgs](https://learn.microsoft.com/en-us/dotnet/api/system.eventargs 'System\.EventArgs') → ChannelFollowChangedEventArgs
+
+### Remarks
+A restored channel entry reports its initial state, including an unfollowed state\.
 ### Properties
 
 <a name='Meshline.Components.ChannelFollowChangedEventArgs.ChannelId'></a>

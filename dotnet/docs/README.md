@@ -34,7 +34,7 @@ not yet be available in that package.
 
 | Guide | Task |
 | --- | --- |
-| [Recovery and home-relay migration](guides/recovery-and-migration.md) | Restore account access deliberately and move authorization to another relay. |
+| [Recovery and home-relay migration](guides/recovery-and-migration.md) | Restore account access, export/merge encrypted backups, and move authorization to another relay. |
 | [Transport and dependency injection](guides/transport-and-di.md) | Configure HTTP, use relay sessions, and integrate with Microsoft DI. |
 | [Events and errors](guides/events-and-errors.md) | Subscribe to changes and distinguish deadlines, cancellation, and operation failures. |
 | [Troubleshooting](guides/troubleshooting.md) | Diagnose symptoms and resume safely from retained state. |

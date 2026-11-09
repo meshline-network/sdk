@@ -29,20 +29,23 @@ namespace Meshline.Components;
 public sealed partial class GroupManager(ClientOptions options, DatabaseOptions databaseOptions, RelayClientPool relayClients, DeviceManager deviceManager, MessageManager messageManager, ISecretProtector secretProtector) : ClientComponent(options)
 {
     /// <summary>
-    /// Occurs when locally synchronized group properties or membership information changes.
+    /// Occurs when locally stored group properties or membership information changes.
     /// </summary>
     public event EventHandler<GroupChangedEventArgs>? GroupChanged;
     /// <summary>
     /// Occurs when decrypted group messages become available in the local timeline.
     /// </summary>
+    /// <remarks>Includes newly imported history and messages decrypted later. This event does not indicate new unread messages.</remarks>
     public event EventHandler<GroupTimelineChangedEventArgs>? TimelineChanged;
     /// <summary>
-    /// Occurs when the relay announces changed group admission applications.
+    /// Occurs when group admission applications need to be refreshed.
     /// </summary>
+    /// <remarks>Raised for relay notifications and locally confirmed approvals.</remarks>
     public event EventHandler<GroupApplicationsChangedEventArgs>? ApplicationsChanged;
     /// <summary>
-    /// Occurs when the relay announces changed group member key recovery requests.
+    /// Occurs when group member key recovery requests need to be refreshed.
     /// </summary>
+    /// <remarks>Raised for relay notifications and locally confirmed approvals.</remarks>
     public event EventHandler<GroupKeyRecoveryChangedEventArgs>? KeyRecoveryChanged;
 
     readonly SemaphoreSlim _groupGate = new(1, 1);

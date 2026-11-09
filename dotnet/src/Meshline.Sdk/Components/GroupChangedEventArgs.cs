@@ -8,8 +8,9 @@ namespace Meshline.Components;
 public sealed class GroupChangedEventArgs : EventArgs
 {
     /// <summary>
-    /// The updated group snapshot.
+    /// The updated local group snapshot.
     /// </summary>
+    /// <remarks>Reflects committed timeline progress, including a partially restored backup. Current relay access is reported by synchronization status.</remarks>
     public GroupInfo Group { get; }
     /// <summary>
     /// The kind or combination of changes reported by this event.

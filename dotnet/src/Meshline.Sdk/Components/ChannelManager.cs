@@ -36,7 +36,7 @@ public sealed partial class ChannelManager(ClientOptions options, DatabaseOption
     /// </summary>
     public event EventHandler<ChannelTimelineChangedEventArgs>? TimelineChanged;
     /// <summary>
-    /// Occurs when a channel's local following state changes.
+    /// Occurs when a channel's local following state changes or an entry is first made available.
     /// </summary>
     public event EventHandler<ChannelFollowChangedEventArgs>? FollowChanged;
 

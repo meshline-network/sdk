@@ -30,8 +30,9 @@ public sealed partial class MessageManager(ClientOptions options, DatabaseOption
     /// </summary>
     public event EventHandler? TimelineChanged;
     /// <summary>
-    /// Occurs after verified direct messages are committed to local storage.
+    /// Occurs after direct messages become available in local storage.
     /// </summary>
+    /// <remarks>Includes newly imported history. This is a local data notification, not an indication of new unread messages. Backup import does not replay message processing.</remarks>
     public event EventHandler<MessageReceivedEventArgs>? MessageReceived;
     /// <summary>
     /// Occurs when a locally tracked outgoing-message status changes.

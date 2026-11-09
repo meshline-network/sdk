@@ -8,7 +8,7 @@ SQLite is the supported database engine, configured internally through EF Core. 
 
 SQLite stores device state, selected protected secrets, contacts, messages, pending operations, synchronization positions, and local conversation read positions. Create the database directory and apply `MeshlineDatabase.MigrateAsync` before initialization. The database is bound to the configured account and network; do not reuse it for another account or network.
 
-Keep a distinct database for each local account/device session. Preserve its protection keys as well as the database. Restoring a file without the ability to decrypt its secret values does not restore a usable device. Selected secret protection does not encrypt the full database. Backups and access controls belong to the application; coordinate backups with SQLite rather than copying an actively changing database file blindly.
+Keep a distinct database for each local account/device session. Retaining a device database also requires its original protection keys and a consistent SQLite snapshot. To transfer logical data to an independently initialized device, use [portable export/import](recovery-and-migration.md#export-and-merge-a-portable-backup). Selected secret protection does not encrypt the full database; file storage and access controls remain the application's responsibility.
 
 Schema migrations are applied explicitly. Use the SDK migration entry point instead of editing internal tables or invoking EF migration classes directly. The `InitialCreate` migration is the 1.0.0 database baseline; pre-1.0 development databases built from a different initial migration are outside that upgrade baseline.
 

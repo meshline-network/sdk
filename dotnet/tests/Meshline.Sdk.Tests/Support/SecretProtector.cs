@@ -9,10 +9,12 @@ internal sealed class SecretProtector : ISecretProtector
     readonly byte[] key = RandomNumberGenerator.GetBytes(32);
     internal bool Fail { get; set; }
     internal Func<string, Exception?>? ReadFailure { get; set; }
+    internal Func<string, Exception?>? WriteFailure { get; set; }
 
     public Task<byte[]> ProtectAsync(ReadOnlyMemory<byte> plaintext, string purpose, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (WriteFailure?.Invoke(purpose) is { } failure) throw failure;
         if (Fail)
             throw new IOException("Injected secret protection failure");
         var output = new byte[12 + plaintext.Length + 16];

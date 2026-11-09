@@ -41,7 +41,7 @@ public Meshline.Components.GroupChangeKind ChangeKind { get; }
 
 ## GroupChangedEventArgs\.Group Property
 
-The updated group snapshot\.
+The updated local group snapshot\.
 
 ```csharp
 public Meshline.Models.Client.GroupInfo Group { get; }
@@ -49,3 +49,6 @@ public Meshline.Models.Client.GroupInfo Group { get; }
 
 #### Property Value
 [GroupInfo](Meshline.Models.Client.GroupInfo.md 'Meshline\.Models\.Client\.GroupInfo')
+
+### Remarks
+Reflects committed timeline progress, including a partially restored backup\. Current relay access is reported by synchronization status\.

@@ -14,12 +14,14 @@
 - [`CreateChannelAsync(string, string, string, IReadOnlyList<string>, CancellationToken)`](#Meshline.Components.ChannelManager.CreateChannelAsync%28string%2Cstring%2Cstring%2CSystem.Collections.Generic.IReadOnlyList_string_%2CSystem.Threading.CancellationToken%29)
 - [`DeletePostAsync(ChannelPostRef, CancellationToken)`](#Meshline.Components.ChannelManager.DeletePostAsync%28Meshline.Models.Client.ChannelPostRef%2CSystem.Threading.CancellationToken%29)
 - [`EditPostAsync(ChannelPostRef, ChannelPostUpdate, CancellationToken)`](#Meshline.Components.ChannelManager.EditPostAsync%28Meshline.Models.Client.ChannelPostRef%2CMeshline.Models.Client.ChannelPostUpdate%2CSystem.Threading.CancellationToken%29)
+- [`ExportBackupAsync(CancellationToken)`](#Meshline.Components.ChannelManager.ExportBackupAsync%28System.Threading.CancellationToken%29)
 - [`FollowAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.FollowAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`GetChannelAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.GetChannelAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
 - [`GetFollowedAsync(string, CancellationToken)`](#Meshline.Components.ChannelManager.GetFollowedAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetPostsAsync(string, string, HistoryRange, CancellationToken)`](#Meshline.Components.ChannelManager.GetPostsAsync%28string%2Cstring%2CMeshline.Models.Client.HistoryRange%2CSystem.Threading.CancellationToken%29)
 - [`GetPostsAsync(string, string, CancellationToken)`](#Meshline.Components.ChannelManager.GetPostsAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.ChannelManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`ImportBackupAsync(IAsyncEnumerable<JsonElement>, CancellationToken)`](#Meshline.Components.ChannelManager.ImportBackupAsync%28System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_%2CSystem.Threading.CancellationToken%29)
 - [`LoadChannelHistoryAsync(ChannelRef, PageRequest, CancellationToken)`](#Meshline.Components.ChannelManager.LoadChannelHistoryAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
 - [`PublishPostAsync(ChannelRef, ChannelPostDraft, CancellationToken)`](#Meshline.Components.ChannelManager.PublishPostAsync%28Meshline.Models.Client.ChannelRef%2CMeshline.Models.Client.ChannelPostDraft%2CSystem.Threading.CancellationToken%29)
 - [`RefreshChannelAsync(ChannelRef, CancellationToken)`](#Meshline.Components.ChannelManager.RefreshChannelAsync%28Meshline.Models.Client.ChannelRef%2CSystem.Threading.CancellationToken%29)
@@ -422,6 +424,30 @@ The channel metadata, post content, or field update violates protocol constraint
 [System\.UnauthorizedAccessException](https://learn.microsoft.com/en-us/dotnet/api/system.unauthorizedaccessexception 'System\.UnauthorizedAccessException')<br>
 The current account is not permitted to publish or modify this channel resource\.
 
+<a name='Meshline.Components.ChannelManager.ExportBackupAsync(System.Threading.CancellationToken)'></a>
+
+## ChannelManager\.ExportBackupAsync\(CancellationToken\) Method
+
+Exports this component's portable logical records from a consistent local snapshot\.
+
+```csharp
+public System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> ExportBackupAsync(System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ChannelManager.ExportBackupAsync(System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels enumeration; component disposal also cancels it\.
+
+#### Returns
+[System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')<br>
+Complete JSON records with `type` and `data` fields, independent of internal documents and valid after enumeration ends\.
+
+### Remarks
+Records are plaintext\. Use [MeshlineClient](Meshline.MeshlineClient.md 'Meshline\.MeshlineClient') for encrypted backup files\. This operation does not access the network\.
+
 <a name='Meshline.Components.ChannelManager.FollowAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)'></a>
 
 ## ChannelManager\.FollowAsync\(ChannelRef, CancellationToken\) Method
@@ -759,6 +785,41 @@ This component has been disposed\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The operation was canceled\.
+
+<a name='Meshline.Components.ChannelManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)'></a>
+
+## ChannelManager\.ImportBackupAsync\(IAsyncEnumerable\<JsonElement\>, CancellationToken\) Method
+
+Incrementally merges this component's logical backup records\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.BackupReport> ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> records, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.ChannelManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).records'></a>
+
+`records` [System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')
+
+Complete JSON records with `type` and `data` fields, in SDK backup order\. The caller must ensure they belong to this account and network, and keep their documents alive while records are processed or supply cloned elements\.
+
+<a name='Meshline.Components.ChannelManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels import; component disposal also cancels it\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[BackupReport](Meshline.Models.Client.BackupReport.md 'Meshline\.Models\.Client\.BackupReport')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+Counts for committed records\.
+
+### Remarks
+
+Each completed record is committed. Failure or cancellation retains earlier records;<br>
+            retrying the stream merges them without duplicates.<br>
+
+Committed business changes raise existing component events after the write lock is released.<br>
+            Import performs no network I/O and does not replay message processing.
 
 <a name='Meshline.Components.ChannelManager.LoadChannelHistoryAsync(Meshline.Models.Client.ChannelRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken)'></a>
 
@@ -1275,7 +1336,7 @@ public event EventHandler<ChannelInfo>? ChannelChanged;
 
 ## ChannelManager\.FollowChanged Event
 
-Occurs when a channel's local following state changes\.
+Occurs when a channel's local following state changes or an entry is first made available\.
 
 ```csharp
 public event EventHandler<ChannelFollowChangedEventArgs>? FollowChanged;

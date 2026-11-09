@@ -18,9 +18,15 @@ sealed partial class MessageManager
         Exception? rejection = null;
         try
         {
+            ValidateEnvelopeSignature(envelope, certificate);
             bool exists;
+            bool locallySent;
             await using (var database = new MeshlineDbContext(databaseOptions))
+            {
                 exists = await database.Messages.AnyAsync(value => value.Sender == envelope.From && value.MessageId == envelope.MessageId, cancellationToken).ConfigureAwait(false);
+                locallySent = envelope.From == Options.AccountId && envelope.FromDeviceId == deviceManager.Local?.GetDeviceId(Context)
+                    && await database.MessageOutbox.AnyAsync(value => value.MessageId == envelope.MessageId, cancellationToken).ConfigureAwait(false);
+            }
             if (!exists)
             {
                 if (envelope.CreatedAt < 0 || envelope.CreatedAt > DateTimeOffset.MaxValue.ToUnixTimeSeconds()) throw new InvalidDataException("The message timestamp is outside the supported range.");
@@ -31,9 +37,10 @@ sealed partial class MessageManager
                     await using var database = new MeshlineDbContext(databaseOptions);
                     authorization = await ReadContactAuthorizationAsync(database, envelope.From, cancellationToken).ConfigureAwait(false);
                 }
+                if (payload is DirectMessage or AccountContactSync && payload.Validate(Context) is { } payloadViolation)
+                    throw new InvalidDataException(payloadViolation.Message);
                 if (payload is DirectMessage)
                 {
-                    if (payload.Validate(Context) is { } violation) throw new InvalidDataException(violation.Message);
                     if (envelope.To == Options.AccountId)
                         own = await ReadOwnMessageStateAsync(state => envelope.From == Options.AccountId
                             ? state.ValidateDeviceAuthorization(envelope.FromDeviceId, Context) is null
@@ -50,7 +57,8 @@ sealed partial class MessageManager
                     PayloadJson = IsSecretPayload(payload) ? null : payload.ToJson(),
                     IsDirect = payload is DirectMessage
                 };
-                contactEffect = await PrepareContactMessageAsync(record, payload, cancellationToken).ConfigureAwait(false);
+                if (!locallySent)
+                    contactEffect = await PrepareContactMessageAsync(record, payload, cancellationToken).ConfigureAwait(false);
                 await ProtectPayloadAsync(record, payload, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -92,6 +100,12 @@ sealed partial class MessageManager
         {
             var progress = await database.AccountTimelines.FindAsync([relayId], token).ConfigureAwait(false);
             if (progress is null) database.AccountTimelines.Add(progress = new() { RelayId = relayId });
+            var known = await database.Messages.SingleOrDefaultAsync(value => value.Sender == entry.Envelope.From && value.MessageId == entry.Envelope.MessageId, token).ConfigureAwait(false);
+            if (rejection is null && known is not null)
+            {
+                if (known.Recipient != entry.Envelope.To || known.SenderDeviceId != entry.Envelope.FromDeviceId || known.CreatedAt.ToUnixTimeSeconds() != entry.Envelope.CreatedAt)
+                    throw new InvalidDataException("The timeline entry conflicts with retained message metadata.");
+            }
             if (progress.Sequence >= entry.Sequence) return;
             if (rejection is null && record is not null && !await database.Messages.AnyAsync(value => value.Sender == record.Sender && value.MessageId == record.MessageId, token).ConfigureAwait(false))
             {

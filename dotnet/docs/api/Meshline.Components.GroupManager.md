@@ -19,6 +19,7 @@
 - [`CreateGroupAsync(string, GroupCreateOptions, CancellationToken)`](#Meshline.Components.GroupManager.CreateGroupAsync%28string%2CMeshline.Models.Client.GroupCreateOptions%2CSystem.Threading.CancellationToken%29)
 - [`CreateInviteAsync(GroupRef, DateTimeOffset, Nullable<long>, CancellationToken)`](#Meshline.Components.GroupManager.CreateInviteAsync%28Meshline.Models.Client.GroupRef%2CSystem.DateTimeOffset%2CSystem.Nullable_long_%2CSystem.Threading.CancellationToken%29)
 - [`CreateInviteAsync(GroupRef, string, DateTimeOffset, CancellationToken)`](#Meshline.Components.GroupManager.CreateInviteAsync%28Meshline.Models.Client.GroupRef%2Cstring%2CSystem.DateTimeOffset%2CSystem.Threading.CancellationToken%29)
+- [`ExportBackupAsync(BackupSelection, CancellationToken)`](#Meshline.Components.GroupManager.ExportBackupAsync%28Meshline.Models.Client.BackupSelection%2CSystem.Threading.CancellationToken%29)
 - [`GetApplicationsAsync(GroupRef, PageRequest, CancellationToken)`](#Meshline.Components.GroupManager.GetApplicationsAsync%28Meshline.Models.Client.GroupRef%2CMeshline.Models.Client.PageRequest%2CSystem.Threading.CancellationToken%29)
 - [`GetBansAsync(GroupRef, string, CancellationToken)`](#Meshline.Components.GroupManager.GetBansAsync%28Meshline.Models.Client.GroupRef%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`GetGroupAsync(GroupInvite, CancellationToken)`](#Meshline.Components.GroupManager.GetGroupAsync%28Meshline.Models.Client.GroupInvite%2CSystem.Threading.CancellationToken%29)
@@ -31,6 +32,7 @@
 - [`GetMessagesAsync(string, string, HistoryRange, CancellationToken)`](#Meshline.Components.GroupManager.GetMessagesAsync%28string%2Cstring%2CMeshline.Models.Client.HistoryRange%2CSystem.Threading.CancellationToken%29)
 - [`GetMessagesAsync(string, string, CancellationToken)`](#Meshline.Components.GroupManager.GetMessagesAsync%28string%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`GetSyncStatusAsync(string, CancellationToken)`](#Meshline.Components.GroupManager.GetSyncStatusAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`ImportBackupAsync(IAsyncEnumerable<JsonElement>, CancellationToken)`](#Meshline.Components.GroupManager.ImportBackupAsync%28System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_%2CSystem.Threading.CancellationToken%29)
 - [`LeaveGroupAsync(GroupRef, CancellationToken)`](#Meshline.Components.GroupManager.LeaveGroupAsync%28Meshline.Models.Client.GroupRef%2CSystem.Threading.CancellationToken%29)
 - [`RejectApplicationsAsync(GroupRef, IReadOnlyList<string>, CancellationToken)`](#Meshline.Components.GroupManager.RejectApplicationsAsync%28Meshline.Models.Client.GroupRef%2CSystem.Collections.Generic.IReadOnlyList_string_%2CSystem.Threading.CancellationToken%29)
 - [`RejectKeyRecoveryAsync(GroupRef, IReadOnlyList<string>, CancellationToken)`](#Meshline.Components.GroupManager.RejectKeyRecoveryAsync%28Meshline.Models.Client.GroupRef%2CSystem.Collections.Generic.IReadOnlyList_string_%2CSystem.Threading.CancellationToken%29)
@@ -786,6 +788,36 @@ The invitation lifetime exceeds the hosting relay limit\.
 [System\.UnauthorizedAccessException](https://learn.microsoft.com/en-us/dotnet/api/system.unauthorizedaccessexception 'System\.UnauthorizedAccessException')<br>
 The current membership, group status, or invitation policy does not permit creating this invitation\.
 
+<a name='Meshline.Components.GroupManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken)'></a>
+
+## GroupManager\.ExportBackupAsync\(BackupSelection, CancellationToken\) Method
+
+Exports this component's portable logical records from a consistent local snapshot\.
+
+```csharp
+public System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> ExportBackupAsync(Meshline.Models.Client.BackupSelection? history=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.GroupManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken).history'></a>
+
+`history` [BackupSelection](Meshline.Models.Client.BackupSelection.md 'Meshline\.Models\.Client\.BackupSelection')
+
+Optional group history selection; defaults to [None](Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.None 'Meshline\.Models\.Client\.BackupSelection\.None')\. Base data is always exported\.
+
+<a name='Meshline.Components.GroupManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels enumeration; component disposal also cancels it\.
+
+#### Returns
+[System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')<br>
+Complete JSON records with `type` and `data` fields, independent of internal documents and valid after enumeration ends\.
+
+### Remarks
+Records are plaintext\. Use [MeshlineClient](Meshline.MeshlineClient.md 'Meshline\.MeshlineClient') for encrypted backup files\. This operation does not access the network\. A local device is required only when unprotecting group secrets\.
+
 <a name='Meshline.Components.GroupManager.GetApplicationsAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken)'></a>
 
 ## GroupManager\.GetApplicationsAsync\(GroupRef, PageRequest, CancellationToken\) Method
@@ -1537,6 +1569,41 @@ This component has been disposed\.
 
 [System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
 The operation was canceled\.
+
+<a name='Meshline.Components.GroupManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)'></a>
+
+## GroupManager\.ImportBackupAsync\(IAsyncEnumerable\<JsonElement\>, CancellationToken\) Method
+
+Incrementally merges this component's logical backup records\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.BackupReport> ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> records, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.GroupManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).records'></a>
+
+`records` [System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')
+
+Complete JSON records with `type` and `data` fields, in SDK backup order\. The caller must ensure they belong to this account and network, and keep their documents alive while records are processed or supply cloned elements\.
+
+<a name='Meshline.Components.GroupManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels import; component disposal also cancels it\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[BackupReport](Meshline.Models.Client.BackupReport.md 'Meshline\.Models\.Client\.BackupReport')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+Counts for committed records\.
+
+### Remarks
+
+Each completed record is committed. Failure or cancellation retains earlier records;<br>
+            retrying the stream merges them without duplicates.<br>
+
+Committed business changes raise existing component events after the write lock is released.<br>
+            Import performs no network I/O and does not replay message processing.
 
 <a name='Meshline.Components.GroupManager.LeaveGroupAsync(Meshline.Models.Client.GroupRef,System.Threading.CancellationToken)'></a>
 
@@ -2678,7 +2745,7 @@ The generated request contains a group, invitation, or account identifier that v
 
 ## GroupManager\.ApplicationsChanged Event
 
-Occurs when the relay announces changed group admission applications\.
+Occurs when group admission applications need to be refreshed\.
 
 ```csharp
 public event EventHandler<GroupApplicationsChangedEventArgs>? ApplicationsChanged;
@@ -2687,11 +2754,14 @@ public event EventHandler<GroupApplicationsChangedEventArgs>? ApplicationsChange
 #### Event Type
 [System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[GroupApplicationsChangedEventArgs](Meshline.Components.GroupApplicationsChangedEventArgs.md 'Meshline\.Components\.GroupApplicationsChangedEventArgs')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
 
+### Remarks
+Raised for relay notifications and locally confirmed approvals\.
+
 <a name='Meshline.Components.GroupManager.GroupChanged'></a>
 
 ## GroupManager\.GroupChanged Event
 
-Occurs when locally synchronized group properties or membership information changes\.
+Occurs when locally stored group properties or membership information changes\.
 
 ```csharp
 public event EventHandler<GroupChangedEventArgs>? GroupChanged;
@@ -2704,7 +2774,7 @@ public event EventHandler<GroupChangedEventArgs>? GroupChanged;
 
 ## GroupManager\.KeyRecoveryChanged Event
 
-Occurs when the relay announces changed group member key recovery requests\.
+Occurs when group member key recovery requests need to be refreshed\.
 
 ```csharp
 public event EventHandler<GroupKeyRecoveryChangedEventArgs>? KeyRecoveryChanged;
@@ -2712,6 +2782,9 @@ public event EventHandler<GroupKeyRecoveryChangedEventArgs>? KeyRecoveryChanged;
 
 #### Event Type
 [System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[GroupKeyRecoveryChangedEventArgs](Meshline.Components.GroupKeyRecoveryChangedEventArgs.md 'Meshline\.Components\.GroupKeyRecoveryChangedEventArgs')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
+
+### Remarks
+Raised for relay notifications and locally confirmed approvals\.
 
 <a name='Meshline.Components.GroupManager.SyncStatusChanged'></a>
 
@@ -2738,3 +2811,6 @@ public event EventHandler<GroupTimelineChangedEventArgs>? TimelineChanged;
 
 #### Event Type
 [System\.EventHandler&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')[GroupTimelineChangedEventArgs](Meshline.Components.GroupTimelineChangedEventArgs.md 'Meshline\.Components\.GroupTimelineChangedEventArgs')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.eventhandler-1 'System\.EventHandler\`1')
+
+### Remarks
+Includes newly imported history and messages decrypted later\. This event does not indicate new unread messages\.

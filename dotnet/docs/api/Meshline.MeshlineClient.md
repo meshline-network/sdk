@@ -9,8 +9,10 @@
 - [`MeshlineClient(ClientOptions, DatabaseOptions, RelayClientPool, ISecretProtector, IAccountSigner)`](#Meshline.MeshlineClient.MeshlineClient%28Meshline.Models.Client.ClientOptions%2CMeshline.Storage.DatabaseOptions%2CMeshline.Transport.RelayClientPool%2CMeshline.Interactions.ISecretProtector%2CMeshline.Interactions.IAccountSigner%29)
 - [`ChangeHomeRelayAsync(string, CancellationToken)`](#Meshline.MeshlineClient.ChangeHomeRelayAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`EstablishAccountAsync(AccountEstablishmentOptions, CancellationToken)`](#Meshline.MeshlineClient.EstablishAccountAsync%28Meshline.Models.Client.AccountEstablishmentOptions%2CSystem.Threading.CancellationToken%29)
+- [`ExportBackupAsync(Stream, string, BackupOptions, CancellationToken)`](#Meshline.MeshlineClient.ExportBackupAsync%28System.IO.Stream%2Cstring%2CMeshline.Models.Client.BackupOptions%2CSystem.Threading.CancellationToken%29)
 - [`GetConversationAsync(string, CancellationToken)`](#Meshline.MeshlineClient.GetConversationAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetConversationsAsync(ConversationQuery, CancellationToken)`](#Meshline.MeshlineClient.GetConversationsAsync%28Meshline.Models.Client.ConversationQuery%2CSystem.Threading.CancellationToken%29)
+- [`ImportBackupAsync(Stream, string, CancellationToken)`](#Meshline.MeshlineClient.ImportBackupAsync%28System.IO.Stream%2Cstring%2CSystem.Threading.CancellationToken%29)
 - [`MarkReadAsync(string, long, CancellationToken)`](#Meshline.MeshlineClient.MarkReadAsync%28string%2Clong%2CSystem.Threading.CancellationToken%29)
 - [`MarkReadAsync(string, CancellationToken)`](#Meshline.MeshlineClient.MarkReadAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`RecoverAccountAsync(AccountRecoveryOptions, CancellationToken)`](#Meshline.MeshlineClient.RecoverAccountAsync%28Meshline.Models.Client.AccountRecoveryOptions%2CSystem.Threading.CancellationToken%29)
@@ -388,6 +390,73 @@ Stop synchronization before changing authorization. Do not overlap this method w
             CreateDeviceAsync, RenewDeviceAsync, RemoveDeviceAsync or PublishDeviceStateAsync on this client's DeviceManager,<br>
             including from signing or event callbacks. Await completion, failure or cancellation before starting the other operation.
 
+<a name='Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,string,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken)'></a>
+
+## MeshlineClient\.ExportBackupAsync\(Stream, string, BackupOptions, CancellationToken\) Method
+
+Exports a password\-encrypted backup of local data\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.BackupReport> ExportBackupAsync(System.IO.Stream destination, string password, Meshline.Models.Client.BackupOptions? options=null, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,string,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken).destination'></a>
+
+`destination` [System\.IO\.Stream](https://learn.microsoft.com/en-us/dotnet/api/system.io.stream 'System\.IO\.Stream')
+
+The writable stream, left open\. Discard partial output if export fails\.
+
+<a name='Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,string,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken).password'></a>
+
+`password` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+A nonempty password, normalized to Unicode NFC and encoded as UTF\-8 by the SDK\. Spaces and case are preserved\.
+
+<a name='Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,string,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken).options'></a>
+
+`options` [BackupOptions](Meshline.Models.Client.BackupOptions.md 'Meshline\.Models\.Client\.BackupOptions')
+
+Optional direct and group history selections; both default to [None](Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.None 'Meshline\.Models\.Client\.BackupSelection\.None')\.
+
+<a name='Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,string,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels export; client disposal also cancels it\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[BackupReport](Meshline.Models.Client.BackupReport.md 'Meshline\.Models\.Client\.BackupReport')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+Exported record counts\.
+
+#### Exceptions
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+Initialization is missing, or group secrets require a local device that is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+Client disposal has begun\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The password is null, empty, or contains invalid Unicode; or a history selection is null or has invalid identifiers\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller or client lifetime cancels export\.
+
+[System\.IO\.IOException](https://learn.microsoft.com/en-us/dotnet/api/system.io.ioexception 'System\.IO\.IOException')<br>
+Stream access fails, stored backup data is invalid, or device verification material becomes inconsistent during export\.
+
+### Remarks
+
+Requires initialization. Contacts, group state and held secrets, and channel entries are always included;<br>
+            history is selected through [options](Meshline.MeshlineClient.md#Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,string,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken).options 'Meshline\.MeshlineClient\.ExportBackupAsync\(System\.IO\.Stream, string, Meshline\.Models\.Client\.BackupOptions, System\.Threading\.CancellationToken\)\.options'). Unprotecting group secrets requires a local device.<br>
+
+May run alongside ordinary client operations without network I/O. Each component has a consistent<br>
+            snapshot; inconsistent device verification material across snapshots fails export. Retry with a fresh stream.<br>
+
+Invalid history identifiers and an oversized manifest fail before any destination writes.<br>
+            Cancellation may wait for an active password derivation to finish.
+
 <a name='Meshline.MeshlineClient.GetConversationAsync(string,System.Threading.CancellationToken)'></a>
 
 ## MeshlineClient\.GetConversationAsync\(string, CancellationToken\) Method
@@ -484,6 +553,75 @@ The query contains unsupported conversation\-kind flags\.
 
 ### Remarks
 This query reads local storage without fetching missing relay history\. Its snapshot is fixed when opened; dispose the reader promptly and open a new reader to observe later changes\.
+
+<a name='Meshline.MeshlineClient.ImportBackupAsync(System.IO.Stream,string,System.Threading.CancellationToken)'></a>
+
+## MeshlineClient\.ImportBackupAsync\(Stream, string, CancellationToken\) Method
+
+Authenticates and incrementally merges a backup into this client and its components\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.BackupReport> ImportBackupAsync(System.IO.Stream source, string password, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.MeshlineClient.ImportBackupAsync(System.IO.Stream,string,System.Threading.CancellationToken).source'></a>
+
+`source` [System\.IO\.Stream](https://learn.microsoft.com/en-us/dotnet/api/system.io.stream 'System\.IO\.Stream')
+
+The complete backup stream positioned at its header; left open\.
+
+<a name='Meshline.MeshlineClient.ImportBackupAsync(System.IO.Stream,string,System.Threading.CancellationToken).password'></a>
+
+`password` [System\.String](https://learn.microsoft.com/en-us/dotnet/api/system.string 'System\.String')
+
+The backup password; the SDK applies Unicode NFC and UTF\-8 without trimming spaces or changing case\.
+
+<a name='Meshline.MeshlineClient.ImportBackupAsync(System.IO.Stream,string,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels import, retaining committed records\. Disposal of the client or the importing component also cancels it\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[BackupReport](Meshline.Models.Client.BackupReport.md 'Meshline\.Models\.Client\.BackupReport')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+Committed merge counts and conflicts for which local values were retained\.
+
+#### Exceptions
+
+[System\.InvalidOperationException](https://learn.microsoft.com/en-us/dotnet/api/system.invalidoperationexception 'System\.InvalidOperationException')<br>
+The client or a required component is not initialized, or group secrets require a local device that is unavailable\.
+
+[System\.ObjectDisposedException](https://learn.microsoft.com/en-us/dotnet/api/system.objectdisposedexception 'System\.ObjectDisposedException')<br>
+The client or a component is being disposed\.
+
+[System\.ArgumentException](https://learn.microsoft.com/en-us/dotnet/api/system.argumentexception 'System\.ArgumentException')<br>
+The password is null, empty, or contains invalid Unicode\.
+
+[System\.OperationCanceledException](https://learn.microsoft.com/en-us/dotnet/api/system.operationcanceledexception 'System\.OperationCanceledException')<br>
+The caller or an owned lifetime cancels import; earlier commits are retained\.
+
+[System\.Security\.Cryptography\.CryptographicException](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicexception 'System\.Security\.Cryptography\.CryptographicException')<br>
+The password is wrong, file authentication fails, or local secret protection fails\.
+
+[System\.IO\.IOException](https://learn.microsoft.com/en-us/dotnet/api/system.io.ioexception 'System\.IO\.IOException')<br>
+Stream access fails, the file is incomplete, or backup data/bindings are invalid\.
+
+### Remarks
+
+Requires initialization and a manifest account/network matching the database binding.<br>
+            Each component commits validated records alongside its ordinary writes. Later failures, including final<br>
+            authentication errors, retain earlier commits. Retry the file from the beginning to merge the remaining data.<br>
+            Successful return requires validation of the complete file.<br>
+
+Committed changes update local caches and raise existing component events. Message events include<br>
+            restored history; read status follows the target conversation's unchanged read position. Open new query<br>
+            readers to observe imported data. Active contacts enter normal background maintenance after commit.<br>
+
+Import can run while the client is running and performs no network I/O itself. Protecting or unprotecting<br>
+            group secrets requires an independently created local device. Other records do not require one.<br>
+
+The source need not support seeking. Cancellation may wait for an active password derivation to finish.
 
 <a name='Meshline.MeshlineClient.MarkReadAsync(string,long,System.Threading.CancellationToken)'></a>
 

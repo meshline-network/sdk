@@ -5,7 +5,7 @@ with their SDK; live interoperability is a separate suite requiring both runtime
 
 | Directory | Responsibility |
 | --- | --- |
-| [vectors](vectors/manifest.json) | One immutable snapshot of eight protocol vector files, with source revision and SHA-256 hashes. |
+| [vectors](vectors/) | Fixed test vectors: a pinned protocol snapshot plus SDK-owned integration and backup fixtures. |
 | [scenarios](scenarios/README.md) | Language-neutral SDK behavior cases with stable IDs, operations and independent expected results. |
 | [interop](interop/README.md) | Tests that exchange signed or encrypted data between actual SDK implementations. |
 
@@ -13,7 +13,8 @@ The protocol repository remains authoritative for wire-format vectors. Keep a
 pinned copy here so a checkout of this SDK repository is sufficient after restore;
 do not load a moving sibling protocol checkout or regenerate expected answers with
 the implementation being tested. Both language test suites verify the vector
-manifest. Platform acceptance also consumes this same snapshot.
+[manifest](vectors/manifest.json), which records the source revision and SHA-256
+hashes for eight protocol vector files. Platform acceptance also consumes this same snapshot.
 
 Both SDKs execute the certificate, certificate-tampering and gateway-URL sections
 of `push-notifications-v1.json`, and the envelope notification cases in
@@ -28,12 +29,19 @@ Push eligibility, HTTP callbacks, gateway state, actual delivery and push
 deduplication belong to Relay/gateway tests. The SDK's serialization and replay
 checks do not exercise those delivery decisions.
 
-The additional [NEP-6 wallet fixtures](vectors/nep6-wallets.json) are SDK integration
-vectors generated with the official Neo 3.10.1 wallet implementation, independent
-of either SDK adapter. They cover two accounts, standard and non-default scrypt
-costs, and Unicode password normalization. Their private scalars are public test
-values (1 and 2); never fund these accounts. They are separate from the pinned
-protocol manifest and are consumed by both SDKs' integration tests.
+SDK-owned fixtures are separate from the pinned protocol manifest. Their expected
+values come from independent implementations; each file records its source and
+parameters.
+
+| Fixture | Coverage and independent source | Consumers |
+| --- | --- | --- |
+| [nep6-wallets.json](vectors/nep6-wallets.json) | Wallet accounts, scrypt profiles and Unicode passwords; official Neo wallet implementation. | C# and TypeScript integrations |
+| [backup-v1.json](vectors/backup-v1.json) | Passwords, [container records](../docs/backup-format-v1.md), selections, group projections and epoch keys; Python, Tink and pinned protocol vectors. | C# backups |
+| [tink-streaming-aead.json](vectors/tink-streaming-aead.json) | Empty input, Unicode/binary input and segment boundaries; official Tink. | C# backups |
+
+Tests consume checked-in fixtures without regenerating expected values. All fixture
+passwords and private keys are public test values; never fund these accounts or use
+the keys to protect real data.
 
 Native adapters load the common cases and call their own SDK, without consulting
 another implementation for expected answers. They must execute every supported

@@ -94,25 +94,30 @@ sealed partial class MessageManager
     {
         var request = ProtocolModel.FromJson<MessageSendRequest>(record.RequestJson)!;
         var deviceId = Certificate.GetDeviceId(Context);
-        var box = request.SenderBoxes!.Value.Single(value => value.DeviceId == deviceId);
+        var boxes = request.Envelope.From == request.Envelope.To ? request.RecipientBoxes : request.SenderBoxes!.Value;
+        var box = boxes.Single(value => value.DeviceId == deviceId);
         var shared = await deviceManager.DeriveSharedSecretAsync(box.Enc.AsMemory(), cancellationToken).ConfigureAwait(false);
         try { return OpenPayload(request.Envelope, box, Options.AccountId, shared, Context); }
         finally { CryptographicOperations.ZeroMemory(shared); }
     }
 
-    async Task<TypedProtocolModel> DecryptAsync(MessageEnvelope envelope, MessageKeyBox keyBox, DeviceCertificate sender, CancellationToken cancellationToken)
+    void ValidateEnvelopeSignature(MessageEnvelope envelope, DeviceCertificate sender)
     {
         if (envelope.Validate(Options.Context) is { } envelopeViolation) throw new InvalidDataException(envelopeViolation.Message);
-        if (keyBox.Validate(Options.Context) is { } boxViolation) throw new InvalidDataException(boxViolation.Message);
         if (sender.Account != envelope.From || sender.GetDeviceId(Context) != envelope.FromDeviceId)
             throw new InvalidDataException("The message signing certificate belongs to another account or device.");
         if (envelope.From != Options.AccountId && envelope.To != Options.AccountId)
             throw new InvalidDataException("The message does not belong to this account.");
+        if (!Ed25519.Verify(envelope.DeviceSignature.AsSpan(), sender.SigningPublicKey.AsSpan(), envelope.GetSigningInput(Options.Context)))
+            throw new InvalidDataException("The message envelope signature is invalid.");
+    }
+
+    async Task<TypedProtocolModel> DecryptAsync(MessageEnvelope envelope, MessageKeyBox keyBox, DeviceCertificate sender, CancellationToken cancellationToken)
+    {
+        if (keyBox.Validate(Options.Context) is { } boxViolation) throw new InvalidDataException(boxViolation.Message);
         var local = deviceManager.Local ?? throw new InvalidOperationException("No local device has been loaded.");
         if (keyBox.DeviceId != local.GetDeviceId(Context))
             throw new InvalidDataException("The message key box belongs to another device.");
-        if (!Ed25519.Verify(envelope.DeviceSignature.AsSpan(), sender.SigningPublicKey.AsSpan(), envelope.GetSigningInput(Options.Context)))
-            throw new InvalidDataException("The message envelope signature is invalid.");
         byte[] shared;
         try { shared = await deviceManager.DeriveSharedSecretAsync(keyBox.Enc.AsMemory(), cancellationToken).ConfigureAwait(false); }
         catch (ArgumentException exception) when (exception.ParamName == "peerPublicKey")

@@ -11,12 +11,14 @@
 - [`CreateDeviceAsync(DeviceCreationOptions, CancellationToken)`](#Meshline.Components.DeviceManager.CreateDeviceAsync%28Meshline.Models.Client.DeviceCreationOptions%2CSystem.Threading.CancellationToken%29)
 - [`CreateDeviceAsync(TimeSpan, CancellationToken)`](#Meshline.Components.DeviceManager.CreateDeviceAsync%28System.TimeSpan%2CSystem.Threading.CancellationToken%29)
 - [`DeriveSharedSecretAsync(ReadOnlyMemory<byte>, CancellationToken)`](#Meshline.Components.DeviceManager.DeriveSharedSecretAsync%28System.ReadOnlyMemory_byte_%2CSystem.Threading.CancellationToken%29)
+- [`ExportBackupAsync(CancellationToken)`](#Meshline.Components.DeviceManager.ExportBackupAsync%28System.Threading.CancellationToken%29)
 - [`GetAuthorizationState(string)`](#Meshline.Components.DeviceManager.GetAuthorizationState%28string%29)
 - [`GetCertificate(string)`](#Meshline.Components.DeviceManager.GetCertificate%28string%29)
 - [`GetDeviceStateAsync(ContactGrant, CancellationToken)`](#Meshline.Components.DeviceManager.GetDeviceStateAsync%28Meshline.Models.Protocol.ContactGrant%2CSystem.Threading.CancellationToken%29)
 - [`GetDeviceStateAsync(ContactInvite, CancellationToken)`](#Meshline.Components.DeviceManager.GetDeviceStateAsync%28Meshline.Models.Protocol.ContactInvite%2CSystem.Threading.CancellationToken%29)
 - [`GetDeviceStateAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.GetDeviceStateAsync%28string%2CSystem.Threading.CancellationToken%29)
 - [`GetOwnDeviceStateAsync(string, CancellationToken)`](#Meshline.Components.DeviceManager.GetOwnDeviceStateAsync%28string%2CSystem.Threading.CancellationToken%29)
+- [`ImportBackupAsync(IAsyncEnumerable<JsonElement>, CancellationToken)`](#Meshline.Components.DeviceManager.ImportBackupAsync%28System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_%2CSystem.Threading.CancellationToken%29)
 - [`PublishDeviceStateAsync(string, IReadOnlyList<DeviceCertificate>, DeviceStatePublishOptions, CancellationToken)`](#Meshline.Components.DeviceManager.PublishDeviceStateAsync%28string%2CSystem.Collections.Generic.IReadOnlyList_Meshline.Models.Protocol.DeviceCertificate_%2CMeshline.Models.Client.DeviceStatePublishOptions%2CSystem.Threading.CancellationToken%29)
 - [`RefreshDeviceStateAsync(ContactGrant, CancellationToken)`](#Meshline.Components.DeviceManager.RefreshDeviceStateAsync%28Meshline.Models.Protocol.ContactGrant%2CSystem.Threading.CancellationToken%29)
 - [`RefreshDeviceStateAsync(ContactInvite, CancellationToken)`](#Meshline.Components.DeviceManager.RefreshDeviceStateAsync%28Meshline.Models.Protocol.ContactInvite%2CSystem.Threading.CancellationToken%29)
@@ -341,6 +343,30 @@ The stored local device certificate is JSON null\.
 
 ### Remarks
 The returned bytes are raw key\-agreement material\. Apply the protocol's required key derivation before using them as a cryptographic key and clear sensitive buffers after use\.
+
+<a name='Meshline.Components.DeviceManager.ExportBackupAsync(System.Threading.CancellationToken)'></a>
+
+## DeviceManager\.ExportBackupAsync\(CancellationToken\) Method
+
+Exports this component's portable logical records from a consistent local snapshot\.
+
+```csharp
+public System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> ExportBackupAsync(System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.DeviceManager.ExportBackupAsync(System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels enumeration; component disposal also cancels it\.
+
+#### Returns
+[System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')<br>
+Complete JSON records with `type` and `data` fields, independent of internal documents and valid after enumeration ends\.
+
+### Remarks
+Records are plaintext\. Use [MeshlineClient](Meshline.MeshlineClient.md 'Meshline\.MeshlineClient') for encrypted backup files\. This operation does not access the network\.
 
 <a name='Meshline.Components.DeviceManager.GetAuthorizationState(string)'></a>
 
@@ -697,6 +723,41 @@ An account identifier in the query uses an unsupported namespace\.
 
 ### Remarks
 While running, queries use device authentication only\. A stopped manager may use account authentication when its local device authorization is unavailable\. Device\-authenticated reads retry an expired session with the same identity but never escalate a rejection into account signing; use explicit account establishment for reauthorization\.
+
+<a name='Meshline.Components.DeviceManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)'></a>
+
+## DeviceManager\.ImportBackupAsync\(IAsyncEnumerable\<JsonElement\>, CancellationToken\) Method
+
+Incrementally merges this component's logical backup records\.
+
+```csharp
+public System.Threading.Tasks.Task<Meshline.Models.Client.BackupReport> ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable<System.Text.Json.JsonElement> records, System.Threading.CancellationToken cancellationToken=default(System.Threading.CancellationToken));
+```
+#### Parameters
+
+<a name='Meshline.Components.DeviceManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).records'></a>
+
+`records` [System\.Collections\.Generic\.IAsyncEnumerable&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')[System\.Text\.Json\.JsonElement](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.jsonelement 'System\.Text\.Json\.JsonElement')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.iasyncenumerable-1 'System\.Collections\.Generic\.IAsyncEnumerable\`1')
+
+Complete JSON records with `type` and `data` fields, in SDK backup order\. The caller must ensure they belong to this account and network, and keep their documents alive while records are processed or supply cloned elements\.
+
+<a name='Meshline.Components.DeviceManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken).cancellationToken'></a>
+
+`cancellationToken` [System\.Threading\.CancellationToken](https://learn.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken 'System\.Threading\.CancellationToken')
+
+Cancels import; component disposal also cancels it\.
+
+#### Returns
+[System\.Threading\.Tasks\.Task&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')[BackupReport](Meshline.Models.Client.BackupReport.md 'Meshline\.Models\.Client\.BackupReport')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.task-1 'System\.Threading\.Tasks\.Task\`1')<br>
+Counts for committed records\.
+
+### Remarks
+
+Each completed record is committed. Failure or cancellation retains earlier records;<br>
+            retrying the stream merges them without duplicates.<br>
+
+Committed changes update the normal device-state cache; the local device identity is preserved.<br>
+            Import performs no network I/O and does not replay message processing.
 
 <a name='Meshline.Components.DeviceManager.PublishDeviceStateAsync(string,System.Collections.Generic.IReadOnlyList_Meshline.Models.Protocol.DeviceCertificate_,Meshline.Models.Client.DeviceStatePublishOptions,System.Threading.CancellationToken)'></a>
 

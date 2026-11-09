@@ -13,7 +13,7 @@ Lifecycle\-managed components and events for accounts, devices, profiles, contac
 | [AccountManager](Meshline.Components.AccountManager.md 'Meshline\.Components\.AccountManager') | Resolves and publishes signed account routes and retains the current account's known route\. |
 | [AccountRouteException](Meshline.Components.AccountRouteException.md 'Meshline\.Components\.AccountRouteException') | Structured failure from AccountManager\.EnsureRouteAsync\. |
 | [BackgroundErrorEventArgs](Meshline.Components.BackgroundErrorEventArgs.md 'Meshline\.Components\.BackgroundErrorEventArgs') | Describes a background failure and the operation and resource associated with it\. |
-| [ChannelFollowChangedEventArgs](Meshline.Components.ChannelFollowChangedEventArgs.md 'Meshline\.Components\.ChannelFollowChangedEventArgs') | Describes a change to the local following state of a channel\. |
+| [ChannelFollowChangedEventArgs](Meshline.Components.ChannelFollowChangedEventArgs.md 'Meshline\.Components\.ChannelFollowChangedEventArgs') | Describes the local following state made available by a channel update\. |
 | [ChannelManager](Meshline.Components.ChannelManager.md 'Meshline\.Components\.ChannelManager') | Manages public channel metadata, posts, follows, and local timeline synchronization\. |
 | [ChannelPostChange](Meshline.Components.ChannelPostChange.md 'Meshline\.Components\.ChannelPostChange') | Describes a locally observed addition, edit, or deletion of a channel post\. |
 | [ChannelTimelineChangedEventArgs](Meshline.Components.ChannelTimelineChangedEventArgs.md 'Meshline\.Components\.ChannelTimelineChangedEventArgs') | Contains the post changes observed while updating a channel timeline\. |
@@ -30,7 +30,7 @@ Lifecycle\-managed components and events for accounts, devices, profiles, contac
 | [GroupManager](Meshline.Components.GroupManager.md 'Meshline\.Components\.GroupManager') | Manages encrypted groups, membership, invitations, messages, and group key distribution\. |
 | [GroupTimelineChangedEventArgs](Meshline.Components.GroupTimelineChangedEventArgs.md 'Meshline\.Components\.GroupTimelineChangedEventArgs') | Contains group messages newly made available in the local timeline\. |
 | [MessageManager](Meshline.Components.MessageManager.md 'Meshline\.Components\.MessageManager') | Manages contacts, encrypted direct messages, the persistent outbox, and account timeline synchronization\. |
-| [MessageReceivedEventArgs](Meshline.Components.MessageReceivedEventArgs.md 'Meshline\.Components\.MessageReceivedEventArgs') | Contains direct messages received and committed to local storage\. |
+| [MessageReceivedEventArgs](Meshline.Components.MessageReceivedEventArgs.md 'Meshline\.Components\.MessageReceivedEventArgs') | Contains direct messages made available in local storage by synchronization or backup import\. |
 | [MessageSendStatusChangedEventArgs](Meshline.Components.MessageSendStatusChangedEventArgs.md 'Meshline\.Components\.MessageSendStatusChangedEventArgs') | Contains the updated state of a direct\-message outbox operation\. |
 | [ProfileManager](Meshline.Components.ProfileManager.md 'Meshline\.Components\.ProfileManager') | Resolves, verifies, caches, and publishes account profiles\. |
 | [StateUpdateSupersededException](Meshline.Components.StateUpdateSupersededException.md 'Meshline\.Components\.StateUpdateSupersededException') | A newer state update has replaced a pending publication\. |

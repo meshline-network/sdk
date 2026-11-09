@@ -12,6 +12,7 @@ Paths in the table and code references below are relative to `tests/Meshline.Sdk
 | `Transport/` | Relay discovery, authentication, HTTP, WebSocket, dependency injection and caller-owned transport resources. Authentication vector adapters live here because they observe actual authentication at the public signer boundary. |
 | `Transport/Responses/` | Typed response deserialization and validation over **both** HTTP and WebSocket, organized by response model. Standalone model validation belongs in `Protocol/`. |
 | `Storage/` | Database setup, binding, constraints, transactions and timestamp persistence; `QueryReaderTests` owns pagination, snapshots, concurrent reads, cancellation and reader disposal. |
+| `Backups/` | Backup format, compression, encryption, passwords, record-size limits, whole-file import/export, selections and cross-component dependencies. |
 | `Components/Accounts/` | Establishment, routes, account recovery, home-relay migration and account synchronization. |
 | `Components/Devices/` | Device keys, authorization, renewal and fixed key-agreement vectors through the device API. |
 | `Components/Profiles/` | Profile edits, initialization, publication status and notifications, resolution, caching and restart recovery. |
@@ -25,12 +26,13 @@ Paths in the table and code references below are relative to `tests/Meshline.Sdk
 | `Components/Lifecycle/` | Component start/stop, cancellation, draining and background errors. |
 | `Components/StateUpdateCoordinatorTests.cs` | Shared state admission, merging, retry scheduling, cancellation and durable recovery. |
 | `Components/LatestStateUpdateTests.cs` | Route/device publication and shared-route discovery through manager APIs. |
+| `Components/ComponentBackupTests.cs` | Shared component import contracts: record validation, document ownership, cancellation and retention of committed records. |
 | `ClockScopeTests.cs` | The SDK's shared clock scope, nesting and execution-flow isolation. |
 | `Support/` | Reusable setup and scripted peers; contains no test classes. |
 | `Conformance/` | Native adapters for the shared SDK behavior scenarios. |
 | `../../../tests/` | Shared protocol vector snapshots, behavior scenarios and cross-language tests; see the [shared test guide](../tests/README.md). |
 
-Choose the layer by the behavior under test, not by whether its input happens to be a vector. Component tests may use isolated storage to seed a documented crash boundary. Keep private SDK helpers private.
+Choose the layer by the behavior under test, not by its input format or entry point. Merge rules, state maintenance and notifications belong with the owning component. Component tests may use isolated storage to seed a documented crash boundary. Keep private SDK helpers private.
 
 ## Writing and maintaining tests
 
@@ -47,7 +49,7 @@ Choose the layer by the behavior under test, not by whether its input happens to
 
 ## Support building blocks
 
-`TestNetwork` defines the network context. `ProtocolVectors` reads local snapshots and decodes their bytes. `AccountSigner`, `DeviceSigner`, `SecretProtector` and `TestDatabase` are separate resources. `ContactSetup`, `EncryptionVectorSetup` and `ProtocolResults` prepare specific test inputs; `RequestQuery` parses queries shared by scripted relays and synchronization tests.
+`TestNetwork` defines the network context. `ProtocolVectors` reads local snapshots and decodes their bytes; `BackupFormatSetup` reads backup vectors and prepares encrypted containers. `AccountSigner`, `DeviceSigner`, `SecretProtector` and `TestDatabase` are separate resources. `ContactSetup`, `EncryptionVectorSetup` and `ProtocolResults` prepare specific test inputs; `RequestQuery` parses queries shared by scripted relays and synchronization tests.
 
 `StoredMessageSetup` seeds local projections shared by history and read-position tests. Callers explicitly choose whether the account participates in the group or follows the channel. History queries use nonparticipating resources; conversation/read-position tests use participating resources. This helper does not simulate synchronization or assert outcomes. Keep the clock scope in the calling test.
 
@@ -141,6 +143,7 @@ TRX reports go to the ignored `TestResults/` directory. Add `--report-xunit-trx-
 dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-namespace Meshline.Tests.Protocol --minimum-expected-tests 1 --fail-skips on
 dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-namespace 'Meshline.Tests.Transport*' --minimum-expected-tests 1 --fail-skips on
 dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-namespace Meshline.Tests.Components.Groups --minimum-expected-tests 1 --fail-skips on
+dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-class '*Backup*' --minimum-expected-tests 1 --fail-skips on
 dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-class '*QueryReaderTests' --minimum-expected-tests 1 --fail-skips on
 dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-class '*MigrationTests' --minimum-expected-tests 1 --fail-skips on
 dotnet run --project tests/Meshline.Sdk.Tests -c Release --no-build -- --filter-method '*Socket_disconnect*' --minimum-expected-tests 1 --fail-skips on

@@ -8,8 +8,9 @@ namespace Meshline.Components;
 public sealed class GroupTimelineChangedEventArgs : EventArgs
 {
     /// <summary>
-    /// The verified messages made available by this timeline update.
+    /// The messages made available by this local timeline update.
     /// </summary>
+    /// <remarks>Includes synchronized, decrypted and restored history. Read status follows the target conversation's read position.</remarks>
     public IReadOnlyList<GroupMessageInfo> Messages { get; }
 
     internal GroupTimelineChangedEventArgs(IReadOnlyList<GroupMessageInfo> messages)

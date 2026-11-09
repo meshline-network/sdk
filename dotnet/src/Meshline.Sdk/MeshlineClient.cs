@@ -119,6 +119,7 @@ public sealed partial class MeshlineClient : ClientComponent
         ChannelManager.BackgroundError += OnComponentError;
         MessageManager.BackgroundError += OnComponentError;
         GroupManager.BackgroundError += OnComponentError;
+        MessageManager.ContactChanged += OnContactChanged;
         MessageManager.MessageReceived += OnMessageReceived;
         MessageManager.SendStatusChanged += OnMessageSendStatusChanged;
         ChannelManager.TimelineChanged += OnChannelTimelineChanged;
@@ -401,6 +402,7 @@ public sealed partial class MeshlineClient : ClientComponent
     /// <exception cref="AggregateException">A cancellation callback throws while dependent component or relay lifetimes are canceled.</exception>
     protected override async ValueTask DisposeAsyncCore()
     {
+        MessageManager.ContactChanged -= OnContactChanged;
         MessageManager.MessageReceived -= OnMessageReceived;
         MessageManager.SendStatusChanged -= OnMessageSendStatusChanged;
         ChannelManager.TimelineChanged -= OnChannelTimelineChanged;

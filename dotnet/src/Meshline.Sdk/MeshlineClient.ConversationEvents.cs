@@ -39,6 +39,8 @@ sealed partial class MeshlineClient
 
     void OnGroupChanged(object? sender, GroupChangedEventArgs args) => QueueConversationChanges([args.Group.Ref.GroupId]);
 
+    void OnContactChanged(object? sender, ContactChangedEventArgs args) => QueueConversationChanges([args.AccountId]);
+
     void QueueConversationChanges(IEnumerable<string> conversationIds)
     {
         lock (_conversationGate) _pendingConversations.UnionWith(conversationIds);

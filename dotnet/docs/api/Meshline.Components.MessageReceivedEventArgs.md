@@ -14,7 +14,7 @@
 
 ## MessageReceivedEventArgs Class
 
-Contains direct messages received and committed to local storage\.
+Contains direct messages made available in local storage by synchronization or backup import\.
 
 ```csharp
 public sealed class MessageReceivedEventArgs : System.EventArgs
@@ -27,7 +27,7 @@ Inheritance [System\.Object](https://learn.microsoft.com/en-us/dotnet/api/system
 
 ## MessageReceivedEventArgs\.Messages Property
 
-The verified messages made available by this timeline update\.
+The messages made available by this local update\.
 
 ```csharp
 public System.Collections.Generic.IReadOnlyList<Meshline.Models.Client.MessageInfo> Messages { get; }
@@ -35,3 +35,6 @@ public System.Collections.Generic.IReadOnlyList<Meshline.Models.Client.MessageIn
 
 #### Property Value
 [System\.Collections\.Generic\.IReadOnlyList&lt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')[MessageInfo](Meshline.Models.Client.MessageInfo.md 'Meshline\.Models\.Client\.MessageInfo')[&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ireadonlylist-1 'System\.Collections\.Generic\.IReadOnlyList\`1')
+
+### Remarks
+Includes synchronized and restored history\. Read status follows the target conversation's read position\.
