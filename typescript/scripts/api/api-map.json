@@ -1,5 +1,20 @@
 [
   {
+    "type": "Meshline.Models.Client.BackupSelection",
+    "path": "packages/sdk/src/models/backup.ts",
+    "notes": "Immutable none/all/only selections with copied, deduplicated identifiers; both optional history selections default to none."
+  },
+  {
+    "type": "Meshline.Models.Client.BackupOptions",
+    "path": "packages/sdk/src/models/backup.ts",
+    "notes": "Camel-case directHistory/groupHistory; mandatory base records are always included."
+  },
+  {
+    "type": "Meshline.Models.Client.BackupReport",
+    "path": "packages/sdk/src/models/backup.ts",
+    "notes": "Aggregate applied/unchanged/conflicts counts returned only on complete success; prior import commits survive failure."
+  },
+  {
     "type": "Meshline.Models.Client.OutgoingMessageInfo",
     "path": "packages/sdk/src/messages/outbox.ts",
     "notes": "Direct-message content and durable send status from one outbox snapshot; synchronized history has a separate local sequence."

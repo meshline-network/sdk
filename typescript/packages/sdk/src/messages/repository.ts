@@ -1,3 +1,6 @@
+import { mergeBackupRows } from '../backups/snapshot.js';
+import type { BackupSelection } from '../models/backup.js';
+import { record as backupRecord, fields as backupFields, text as backupText, integer as backupInteger, type Outcome } from '../backups/data.js';
 import { ProtocolError, StateConflictError } from '../errors.js';
 import { validateIdentifier } from '../identity/identifiers.js';
 import { validateAccountId, validateRelayId } from '../identity/neo.js';
@@ -7,7 +10,7 @@ import type { NetworkContext } from '../protocol/context.js';
 import { decodeBase64Url, encodeBase64Url } from '../protocol/encoding.js';
 import { canonicalBytes, canonicalJson, parseJson, requireObject, requireSafeInteger, type JsonObject } from '../protocol/json.js';
 import { throwIfAborted, type RuntimeClock } from '../runtime/clock.js';
-import { requireBatchCount, type MeshlineStore, type QueryReader, type RecordKey, type RecordQuery, type StoredRecord, type StoreMutation, type StoreSnapshot } from '../storage/store.js';
+import { requireBatchCount, type MeshlineStore, type QueryReader, type RecordKey, type RecordQuery, type StoredRecord, type StoreMutation, type StoreSnapshot, type StoreReadSnapshot } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
 import { encodeOutbox, outboxKey, updateWithOutboxRetention, type OutboxRecord } from './outbox.js';
 import { historyIndex, historyQuery, historyReader, historySelection, validateHistoryRows, type HistoryRange } from '../models/history.js';
@@ -113,6 +116,23 @@ export class MessageRepository {
             return payload;
         } finally { plaintext.fill(0); }
     }
+    async importBackup(data: JsonObject, signal?: AbortSignal): Promise<{ outcome: Outcome; message?: MessageInfo }> {
+        backupFields(data, 'sender message_id sender_device_id recipient created_at payload');
+        const payload = directMessageCodec.decode(data.payload!); validateDirectMessage(payload);
+        const message: PreparedMessage = { sender: backupText(data.sender), messageId: backupText(data.message_id), senderDeviceId: backupText(data.sender_device_id), recipient: backupText(data.recipient), createdAt: backupInteger(data.created_at), payloadType: 'meshline.message.direct', payload: directMessageCodec.encode(payload) };
+        messageKey(message); this.#belongsToAccount(message); validateIdentifier('device', message.senderDeviceId); validateAccountId(message.recipient);
+        if (message.createdAt > 253402300799) throw new ProtocolError('invalid_backup', 'Message timestamp is outside the supported range.');
+        return updateStore<{ outcome: Outcome; message?: MessageInfo }>(this.options.store, [messageKey(message), sequenceKey], snapshot => {
+            const row = snapshot.sets[0]![0];
+            if (row) {
+                const current = decodeMessage(row);
+                const same = current.recipient === message.recipient && current.senderDeviceId === message.senderDeviceId && current.createdAt === message.createdAt && canonicalJson(current.payload ?? null) === canonicalJson(message.payload!);
+                return { mutations: [], result: { outcome: same ? 'unchanged' : 'conflicts' } };
+            }
+            const insertion = insertMessage(message, snapshot.sets[1]![0]?.value, this.options.accountId);
+            return { mutations: insertion.mutations, result: { outcome: 'applied', message: this.#info({ ...message, localSequence: insertion.localSequence }) } };
+        }, signal);
+    }
     async get(key: MessageKey, signal?: AbortSignal): Promise<MessageInfo | undefined> {
         const row = (await this.options.store.read([messageKey(key)], signal)).sets[0]![0];
         if (!row) return undefined; const value = decodeMessage(row); this.#belongsToAccount(value);
@@ -144,7 +164,7 @@ export class MessageRepository {
     async history(peer?: string, signal?: AbortSignal, bounds: HistoryRange = {}): Promise<QueryReader<MessageInfo>> {
         if (peer !== undefined) validateAccountId(peer);
         const selected = historySelection(bounds);
-        await this.#ensureHistoryIndex(signal);
+        await this.ensureHistoryIndex(signal);
         const prefix = `${peer ?? '*'}|`; const query = historyQuery('message_history', prefix, selected);
         const reader = await this.options.store.openQuery(query, signal);
         return historyReader(reader, query, async (indexes, readSignal) => {
@@ -159,7 +179,28 @@ export class MessageRepository {
             });
         });
     }
-    async #ensureHistoryIndex(signal?: AbortSignal): Promise<void> {
+    async *exportBackup(snapshot: StoreReadSnapshot, history: BackupSelection, signal?: AbortSignal): AsyncGenerator<JsonObject> {
+        const queries = (history.mode === 'all' ? ['*'] : history.ids).map(peer => ({ collection: 'message_history', prefix: `${peer}|` }));
+        const indexes: StoredRecord[] = [];
+        const project = async (): Promise<JsonObject[]> => {
+            const rows = (await snapshot.read(indexes.map(row => messageKey({ sender: String(row.value.sender), messageId: String(row.value.messageId) })), signal)).sets;
+            return rows.map((records, index) => {
+                if (records.length !== 1) throw new ProtocolError('invalid_storage', 'History index references a missing message.');
+                const value = decodeMessage(records[0]!); this.#belongsToAccount(value);
+                const [peer, sequence] = indexes[index]!.key.split('|');
+                if (value.payloadType !== 'meshline.message.direct' || historyIndex(value.localSequence) !== sequence
+                    || peer !== '*' && !(value.sender === this.options.accountId && value.recipient === peer || value.sender === peer && value.recipient === this.options.accountId))
+                    throw new ProtocolError('invalid_storage', 'History index differs from its message.');
+                return backupRecord('message', { sender: value.sender, message_id: value.messageId, sender_device_id: value.senderDeviceId, recipient: value.recipient, created_at: value.createdAt, payload: value.payload! });
+            });
+        };
+        for await (const row of mergeBackupRows(snapshot, queries, row => row.key.split('|')[1]!, signal)) {
+            indexes.push(row);
+            if (indexes.length === 64) { yield* await project(); indexes.length = 0; }
+        }
+        if (indexes.length) yield* await project();
+    }
+    async ensureHistoryIndex(signal?: AbortSignal): Promise<void> {
         // Backfill older stores in bounded atomic batches. New writes maintain both indexes in their message transaction.
         for (;;) {
             throwIfAborted(signal);

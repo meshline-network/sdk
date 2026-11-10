@@ -61,3 +61,5 @@ export * from './client/account-establishment.js';
 export * from './components/account-route-error.js';
 
 export * from './integrations/cached-relay-registry.js';
+
+export * from './models/backup.js';

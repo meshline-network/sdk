@@ -20,6 +20,8 @@ import { AsyncPulse } from './runtime/async-pulse.js';
 import { EventHub, type EventListener } from './runtime/events.js';
 import type { MeshlineStore } from './storage/store.js';
 import type { RelayClientPool } from './transport/pool.js';
+import type { BackupOptions, BackupReport, BackupSink } from './models/backup.js';
+import { exportClientBackup, importClientBackup } from './client/backups.js';
 
 export type { AccountEstablishmentOptions, AccountRecoveryOptions } from './client/account-operations.js';
 export type { Conversation, ConversationChange, ConversationKind, ConversationQuery, ConversationSummary } from './client/conversations.js';
@@ -38,13 +40,13 @@ export class MeshlineClient extends ClientComponent {
     readonly #conversations: ClientConversations; readonly #events = new EventHub<MeshlineClientEvents>();
     readonly #conversationLifetime = createAbortController(); readonly #conversationPulse = new AsyncPulse(); readonly #pendingConversations = new Set<string>();
     #conversationIds: ReadonlySet<string> = new Set(); #conversationJob: Promise<void> | undefined;
-    readonly #store: MeshlineStore; readonly #pool: RelayClientPool;
+    readonly #store: MeshlineStore; readonly #pool: RelayClientPool; readonly #random: RandomSource;
     #starting: AbortController | undefined; #startJob: Promise<void> | undefined;
     #suspension: Promise<void> | undefined; #authorizationWatch: Promise<void> = Promise.resolve();
     #runtimeReserved = false;
     constructor(options: MeshlineClientOptions) {
         super(options);
-        this.#store = options.store; this.#pool = options.relayClients;
+        this.#store = options.store; this.#pool = options.relayClients; this.#random = options.random ?? systemRandom;
         this.accountManager = new AccountManager(options);
         this.deviceManager = new DeviceManager({ ...options, accountManager: this.accountManager });
         this.profileManager = new ProfileManager({ ...options, accountManager: this.accountManager, deviceSigner: this.deviceManager });
@@ -67,9 +69,24 @@ export class MeshlineClient extends ClientComponent {
                 || failure.operation === 'connect' && error.code === 'device_unknown')) this.#suspend(error);
         }));
         this.#detach.push(this.messageManager.on('messageReceived', messages => { for (const message of messages) this.#queueConversation(message.key.sender === this.accountId ? message.recipient : message.key.sender); }),
+            this.messageManager.on('contactChanged', change => this.#queueConversation(change.accountId)),
             this.messageManager.on('sendStatusChanged', status => { if (status.state === 'queued') this.#queueConversation(status.recipient); }),
             this.channelManager.on('timelineChanged', value => this.#queueConversation(value.channel.channelId)), this.channelManager.on('followChanged', value => this.#queueConversation(value.channel.channelId)),
             this.groupManager.on('timelineChanged', value => { if (value.message) this.#queueConversation(value.group.groupId); }), this.groupManager.on('groupChanged', value => this.#queueConversation(value.ref.groupId)));
+    }
+    /**
+     * Exports a password-encrypted backup; both chat history selections default to none.
+     * The destination remains open. On failure, discard partial output and retry with a fresh destination.
+     */
+    exportBackup(destination: BackupSink, password: string, options: BackupOptions = {}, signal?: AbortSignal): Promise<BackupReport> {
+        return this.runOperation(scope => exportClientBackup(this, this.#store, destination, password, options, this.#random, this.clock.nowSeconds(), scope), signal);
+    }
+    /**
+     * Merges a backup for this account/network, preserving read positions and pending work.
+     * Earlier commits survive failure; retry from the beginning. Success validates the complete file.
+     */
+    importBackup(source: AsyncIterable<Uint8Array>, password: string, signal?: AbortSignal): Promise<BackupReport> {
+        return this.runOperation(scope => importClientBackup(this, source, password, scope), signal);
     }
     get route() { return this.accountManager.route; }
     get device() { return this.deviceManager.local; }

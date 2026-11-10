@@ -6,7 +6,7 @@ import { ProtocolError, StateConflictError, certificateId, concatBytes, createId
     type MeshlineStore, type SecretProtector, type MessageTimelineEntry } from '@meshline/sdk';
 import { NodeSqliteStore } from '@meshline/storage-node';
 import { MessageRepository, messageKey, type MessageEffects } from '../../packages/sdk/dist/messages/repository.js';
-import { MessageOutbox, type OutboxRecord } from '../../packages/sdk/dist/messages/outbox.js';
+import { MessageOutbox, encodeOutbox, outboxKey, type OutboxRecord } from '../../packages/sdk/dist/messages/outbox.js';
 import { messageDevice } from '../support/message-fixture.js';
 import { context } from '../support/relay-fixture.js';
 import { AdvancingClock } from '../support/clock.js';
@@ -143,6 +143,32 @@ test('outgoing content stays in the guarded outbox until timeline acceptance ass
     expect(await repo.get({ sender: from.certificate.account, messageId: id })).toBeUndefined();
     await repo.accept(relayA, f.entry, f.prepared, false); expect((await repo.get({ sender: from.certificate.account, messageId: id }))!.localSequence).toBe(1);
     await expect(repo.enqueue(outbox, f.prepared, [])).rejects.toThrow('already exists');
+});
+
+test.each(['new', 'known'] as const)('%s own timeline confirmation atomically prunes eligible outbox records and preserves unconfirmed content', async mode => {
+    const f = await fixture(); const repo = new MessageRepository({ ...f.options, accountId: from.certificate.account, deviceId: () => from.id });
+    if (mode === 'known') await repo.importBackup({
+        sender: from.certificate.account, message_id: id, sender_device_id: from.id, recipient: to.certificate.account,
+        created_at: f.clock.wall, payload: direct,
+    });
+    const accepted: OutboxRecord = { request: f.request, state: 'targetAccepted', relayId: relayA, acceptedAt: f.clock.wall, nextAttemptAt: f.clock.wall, isDirect: true, payload: direct };
+    const unconfirmed = { ...accepted, request: { ...f.request, envelope: { ...f.request.envelope, messageId: createIdentifier('message') } } };
+    const retained = Array.from({ length: 1000 }, () => ({ relayId: relayA, nextAttemptAt: f.clock.wall, isDirect: false, state: 'canceled' as const,
+        request: { ...f.request, envelope: { ...f.request.envelope, messageId: createIdentifier('message'), createdAt: f.clock.wall + 1 } },
+    }));
+    await f.store.commit((await f.store.read([])).version, [accepted, unconfirmed, ...retained].map(value => ({ kind: 'put', ...outboxKey(value.request.envelope.messageId), value: encodeOutbox(value) })));
+    const confirm = () => mode === 'known' ? repo.acceptKnown(relayA, f.entry, false) : repo.accept(relayA, f.entry, f.prepared, false);
+    const failure = vi.spyOn(f.store, 'commit').mockRejectedValueOnce(new Error('disk full'));
+    await expect(confirm()).rejects.toThrow('disk full'); failure.mockRestore();
+    expect((await repo.getProgress(relayA)).sequence).toBe(-1);
+    expect((await f.store.read([{ collection: 'message_outbox' }])).sets[0]).toHaveLength(1002);
+    expect(Boolean(await repo.get({ sender: from.certificate.account, messageId: id }))).toBe(mode === 'known');
+    await confirm();
+    expect((await repo.getProgress(relayA)).sequence).toBe(f.entry.sequence);
+    expect(await repo.get({ sender: from.certificate.account, messageId: id })).toBeDefined();
+    const remaining = (await f.store.read([{ collection: 'message_outbox' }])).sets[0]!;
+    expect(remaining).toHaveLength(1001); expect(remaining.some(row => row.key === id)).toBe(false);
+    expect(remaining.some(row => row.key === unconfirmed.request.envelope.messageId)).toBe(true);
 });
 
 test('CAS contention rechecks state guards and cannot create duplicate local sequence numbers', async () => {

@@ -124,7 +124,10 @@ export class GroupAccountSync {
         const member = projection.members.find(value => value.account === this.options.accountId)!;
         const key = groupMemberSecretKey(group.groupId, member.memberEncryptionPublicKey); const queries = [groupKey(group), groupEpochKey(group, projection.epoch), key]; const snapshot = await store.read(queries, signal);
         if (fingerprint(snapshot.sets[0]![0]?.value) !== fingerprint(row)) throw new StateConflictError('Group authority changed before key sharing.');
-        const stored = snapshot.sets[2]![0]?.value; if (!stored || devices === undefined && stored.shared === true || snapshot.sets[1]![0]?.value.materialVerified !== true) return;
+        const stored = snapshot.sets[2]![0]?.value; const epoch = snapshot.sets[1]![0]?.value;
+        if (!stored || devices === undefined && stored.shared === true || !epoch || epoch.protectedClientSecret === undefined && epoch.materialVerified !== true) return;
+        const clientSecret = await secrets.readClientSecret(group, projection.clientSecretCommitment, signal); if (!clientSecret) return;
+        clientSecret.fill(0);
         const privateKey = await secrets.readMemberKey(group.groupId, member.memberEncryptionPublicKey, signal); if (!privateKey) return;
         try {
             await sendGroupAccountPayload(messages, accountGroupPrivateStateSyncCodec.encode({ states: [{ ...group, memberEncryptionPrivateKey: privateKey }] }), devices, signal,

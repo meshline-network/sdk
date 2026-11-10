@@ -7,7 +7,7 @@ import { groupMessageEnvelopeCodec, validateGroupRef, verifyGroupMessageEnvelope
 import { certificateId, validateCertificate, type DeviceCertificate } from '../models/identity.js';
 import type { NetworkContext } from '../protocol/context.js';
 import { equalBytes } from '../protocol/encoding.js';
-import { requireObject } from '../protocol/json.js';
+import { requireObject, requireSafeInteger } from '../protocol/json.js';
 
 export interface GroupProjectedMember extends GroupMember { readonly joinedAtSequence: number; readonly nickname?: string; readonly nicknameSequence?: number }
 export type GroupDeparture = 'left' | 'removed' | 'banned' | 'not_member';
@@ -26,16 +26,22 @@ const managementChanges: Readonly<Record<GroupManagementPayload['kind'], readonl
 export interface GroupEventResult { readonly projection: GroupProjection; readonly message?: VerifiedGroupMessage; readonly rejection?: ProtocolError; readonly changeKinds?: readonly GroupChangeKind[] }
 
 /** Applies one timeline event without mutating the preceding projection. Invalid administration stops the chain; invalid ordinary messages retain an explicit rejection. */
-export function applyGroupEvent(previous: GroupProjection | undefined, source: GroupEvent, certificate: DeviceCertificate | undefined, group: GroupRef, context: NetworkContext): GroupEventResult {
-    validateGroupRef(group); const entry = groupEventCodec.decode(groupEventCodec.encode(source)); validateGroupEvent(entry);
+export function applyGroupEvent(previous: GroupProjection | undefined, source: GroupEvent, certificate: DeviceCertificate | undefined, group: GroupRef, context: NetworkContext, retainedRejection = false): GroupEventResult {
+    validateGroupRef(group); const entry = groupEventCodec.decode(groupEventCodec.encode(source));
+    requireSafeInteger(entry.sequence, 0); requireSafeInteger(entry.epoch, 0); requireSafeInteger(entry.acceptedAt, 0);
     if (previous && (previous.groupId !== group.groupId || previous.relayId !== group.relayId)) throw new ProtocolError('invalid_binding', 'Verified group state belongs to another group or relay.');
     if (entry.sequence <= (previous?.sequence ?? -1)) throw new ProtocolError('invalid_sequence', 'A group event must advance the verified sequence.');
     if (previous?.state.status === 'closed') throw new ProtocolError('group_closed', 'A closed group cannot append events.');
-    if (entry.signerDeviceId !== undefined) {
-        if (!certificate) throw new ProtocolError('missing_certificate', 'Group event signing certificate is missing.');
-        validateCertificate(certificate, context); if (certificateId(certificate, context) !== entry.signerDeviceId) throw new ProtocolError('invalid_identity', 'Group event signing certificate belongs to another device.');
-    }
+    const verifySigner = (): void => {
+        validateGroupEvent(entry);
+        if (entry.signerDeviceId !== undefined) {
+            if (!certificate) throw new ProtocolError('missing_certificate', 'Group event signing certificate is missing.');
+            validateCertificate(certificate, context); if (certificateId(certificate, context) !== entry.signerDeviceId) throw new ProtocolError('invalid_identity', 'Group event signing certificate belongs to another device.');
+        }
+    };
+    if (!retainedRejection || entry.payload.$type !== 'meshline.group.message') verifySigner();
     if (entry.payload.$type === 'meshline.group.key.rotated') {
+        verifySigner();
         if (!previous || certificate !== undefined || entry.epoch <= previous.epoch) throw new ProtocolError('invalid_epoch', 'Relay key rotation requires an established group and a newer epoch.');
         return { projection: { ...previous, sequence: entry.sequence, epoch: entry.epoch } };
     }
@@ -43,18 +49,20 @@ export function applyGroupEvent(previous: GroupProjection | undefined, source: G
         if (!previous || entry.epoch !== previous.epoch) throw new ProtocolError('invalid_epoch', 'Group message must use the verified current epoch.');
         const projection = { ...previous, sequence: entry.sequence };
         try {
+            verifySigner();
             const member = previous.members.find(value => value.account === certificate!.account);
             if (!member || previous.bans.includes(certificate!.account)) throw new ProtocolError('unauthorized_member', 'Group message sender is not a current unbanned member.');
             const envelope = groupMessageEnvelopeCodec.decode(entry.payload);
             if (envelope.groupId !== group.groupId || envelope.epoch !== entry.epoch) throw new ProtocolError('invalid_binding', 'Group envelope and event have inconsistent group or epoch bindings.');
             verifyGroupMessageEnvelope(envelope, certificate!, entry.signerDeviceId!, context);
+            if (envelope.createdAt > 253402300799) throw new ProtocolError('invalid_timestamp', 'Group message timestamp exceeds the supported date range.');
             return { projection, message: { envelope, sender: certificate!, signerDeviceId: entry.signerDeviceId!, joinedAtSequence: member.joinedAtSequence } };
         } catch (error) {
             if (!(error instanceof ProtocolError)) throw error;
             return { projection, rejection: error };
         }
     }
-    const payload = groupManagementPayloadCodec.decode(entry.payload); verifyGroupManagementPayload(payload, certificate!, context);
+    verifySigner(); const payload = groupManagementPayloadCodec.decode(entry.payload); verifyGroupManagementPayload(payload, certificate!, context);
     const actor = certificate!.account;
     if (payload.kind === 'create') {
         const value = payload.value;

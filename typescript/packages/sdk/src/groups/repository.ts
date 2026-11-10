@@ -13,10 +13,11 @@ import { requireLength } from '../crypto/primitives.js';
 import type { MeshlineStore, RecordKey, StoreMutation, StoredRecord } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
 import { applyGroupEvent, groupChangeKinds, type GroupChangeKind, type GroupDeparture, type GroupEventResult, type GroupProjectedMember, type GroupProjection } from './state.js';
+import { confirmationMutations } from './operations.js';
 
 export interface GroupEpochRecord { readonly group: GroupRef; readonly epoch: number; readonly commitment: string; readonly memberPublicKey?: Uint8Array; readonly keyEntry?: GroupKeyEntry }
 export interface GroupPageResult { readonly projection?: GroupProjection; readonly hasMore: boolean; readonly rejected: readonly { readonly sequence: number; readonly error: ProtocolError }[]; readonly messageSequences: readonly number[];
-    readonly change?: { readonly record: JsonObject; readonly kinds: readonly GroupChangeKind[] } }
+    readonly change?: { readonly record: JsonObject; readonly kinds: readonly GroupChangeKind[] }; readonly confirmed?: readonly string[] }
 export interface GroupTimelineSource { read(query: GroupSequenceQuery, signal?: AbortSignal): Promise<GroupSyncPage> }
 const index = (value: number): string => { requireSafeInteger(value, 0); return String(value).padStart(16, '0'); };
 export const groupKey = (group: GroupRef): RecordKey => ({ collection: 'groups', key: group.groupId });
@@ -24,7 +25,10 @@ export const groupEventKey = (group: GroupRef, sequence: number): RecordKey => (
 export const groupEpochKey = (group: GroupRef, epoch: number): RecordKey => ({ collection: 'group_epochs', key: `${group.groupId}|${index(epoch)}` });
 export const groupPendingMessageKey = (group: GroupRef, sequence: number): RecordKey => ({ collection: 'group_pending_messages', key: `${group.groupId}|${index(sequence)}` });
 export const groupAcceptanceKey = (group: GroupRef, payload: JsonObject, context: NetworkContext): RecordKey => ({ collection: 'group_acceptances', key: `${group.groupId}|${groupManagementHash(payload, context)}` });
-const messageKey = (group: GroupRef, sender: string, messageId: string): RecordKey => ({ collection: 'group_message_ids', key: `${group.groupId}|${sender}|${messageId}` });
+export const groupMessageKey = (group: GroupRef, sender: string, messageId: string): RecordKey => ({ collection: 'group_message_ids', key: `${group.groupId}|${sender}|${messageId}` });
+export function groupMessageIdentity(group: GroupRef, message: JsonObject | undefined): RecordKey | undefined {
+    return typeof message?.sender === 'string' && typeof message.messageId === 'string' ? groupMessageKey(group, message.sender, message.messageId) : undefined;
+}
 const put = (key: RecordKey, value: JsonObject): StoreMutation => ({ ...key, kind: 'put', value });
 const fingerprint = (value: JsonObject | undefined): string => canonicalJson(value ?? null);
 export function encodeGroupProjection(value: GroupProjection): JsonObject {
@@ -43,7 +47,7 @@ export function decodeGroupProjection(value: JsonObject, group: GroupRef): Group
         const member = groupMemberCodec.decode(wire); validateAccountId(member.account); requireLength(member.memberEncryptionPublicKey, 32, 'Stored member public key'); requireSafeInteger(joinedAtSequence, 0);
         if (joinedAtSequence > sequence || seen.has(member.account)) throw new ProtocolError('invalid_storage', 'Stored group member has an invalid join sequence or duplicate account.'); seen.add(member.account);
         if (nickname !== undefined && typeof nickname !== 'string') throw new ProtocolError('invalid_storage', 'Stored nickname must be a string.');
-        if (nicknameSequence !== undefined) { requireSafeInteger(nicknameSequence, joinedAtSequence); if (nicknameSequence > sequence) throw new ProtocolError('invalid_storage', 'Stored nickname sequence exceeds group position.'); }
+        if (nicknameSequence !== undefined) requireSafeInteger(nicknameSequence, joinedAtSequence);
         return { ...member, joinedAtSequence, ...(nickname === undefined ? {} : { nickname }), ...(nicknameSequence === undefined ? {} : { nicknameSequence }) } as GroupProjectedMember;
     });
     const bans = value.bans.map(item => { if (typeof item !== 'string') throw new ProtocolError('invalid_storage', 'Stored ban must name an account.'); validateAccountId(item); return item; });
@@ -84,60 +88,82 @@ export class GroupRepository {
         validateGroupRef(group); const snapshot = await this.store.read([groupKey(group), groupEventKey(group, sequence)], signal); recordProjection(snapshot.sets[0]![0]?.value, group); return snapshot.sets[1]![0]?.value;
     }
     async epochs(group: GroupRef, signal?: AbortSignal): Promise<readonly GroupEpochRecord[]> {
-        validateGroupRef(group); const snapshot = await this.store.read([groupKey(group), { collection: 'group_epochs', prefix: `${group.groupId}|` }], signal); recordProjection(snapshot.sets[0]![0]?.value, group); return snapshot.sets[1]!.map(row => decodeEpoch(row, group));
+        validateGroupRef(group); const snapshot = await this.store.read([groupKey(group), { collection: 'group_epochs', prefix: `${group.groupId}|` }], signal); const projection = recordProjection(snapshot.sets[0]![0]?.value, group);
+        return snapshot.sets[1]!.filter(row => projection && typeof row.value.epoch === 'number' && row.value.epoch <= projection.epoch && row.value.commitment != null).map(row => decodeEpoch(row, group));
     }
     async keyProgress(group: GroupRef, signal?: AbortSignal): Promise<number> { const values = await this.epochs(group, signal); return values.reduce((after, entry) => entry.keyEntry ? Math.max(after, entry.epoch) : after, -1); }
     async synchronizePage(group: GroupRef, source: GroupTimelineSource, signal?: AbortSignal): Promise<GroupPageResult> {
         validateGroupRef(group); const initial = (await this.store.read([groupKey(group)], signal)).sets[0]![0]?.value; const before = recordProjection(initial, group);
         const query = { groupId: group.groupId, after: before?.sequence ?? -1 };
         const page = groupSyncPageCodec.decode(groupSyncPageCodec.encode(await source.read(query, signal))); validateGroupSyncPage(page, query, this.context);
+        return this.applyPage(group, page, initial, signal);
+    }
+    /** Verifies timeline events and commits their history, projection and pending-operation confirmations together. */
+    async applyPage(group: GroupRef, page: GroupSyncPage, initial: JsonObject | undefined, signal?: AbortSignal, imported?: JsonObject): Promise<GroupPageResult> {
+        const before = recordProjection(initial, group);
+        const retainedMessage = imported?.message == null ? undefined : requireObject(imported.message); const retainedIdentity = groupMessageIdentity(group, retainedMessage);
         const certificates = new Map(page.certificates.map(certificate => [certificateId(certificate, this.context), certificate]));
         const verified: { entry: GroupEvent; result: GroupEventResult; epochChanged: boolean }[] = []; let projection = before;
         for (const entry of page.events) {
-            const result = applyGroupEvent(projection, entry, entry.signerDeviceId === undefined ? undefined : certificates.get(entry.signerDeviceId), group, this.context);
+            const result = applyGroupEvent(projection, entry, entry.signerDeviceId === undefined ? undefined : certificates.get(entry.signerDeviceId), group, this.context, imported?.rejection !== undefined);
             verified.push({ entry, result, epochChanged: projection?.epoch !== result.projection.epoch }); projection = result.projection;
         }
         const keys = new Map<string, RecordKey>(); const addKey = (key: RecordKey): void => { keys.set(`${key.collection}|${key.key}`, key); };
         addKey(groupKey(group));
+        if (retainedIdentity) addKey(retainedIdentity);
         for (const item of verified) {
             addKey(groupEventKey(group, item.entry.sequence)); if (item.epochChanged) addKey(groupEpochKey(group, item.entry.epoch));
-            const message = item.result.message; if (message) addKey(messageKey(group, message.sender.account, message.envelope.messageId));
+            const message = item.result.message; if (message) addKey(groupMessageKey(group, message.sender.account, message.envelope.messageId));
         }
         const queries = [...keys.values()];
-        return updateStore(this.store, queries, snapshot => {
+        return updateStore(this.store, [...queries, { collection: 'group_operations', prefix: `${group.groupId}|` }, { collection: 'group_rotations', key: group.groupId }], snapshot => {
             const rows = new Map(queries.map((key, i) => [`${key.collection}|${key.key}`, snapshot.sets[i]![0]]));
             const row = (key: RecordKey) => rows.get(`${key.collection}|${key.key}`);
             if (fingerprint(row(groupKey(group))?.value) !== fingerprint(initial)) throw new StateConflictError('Group state changed while its timeline was being verified.');
             const mutations: StoreMutation[] = []; const rejected: { sequence: number; error: ProtocolError }[] = []; const messageSequences: number[] = []; const newMessages = new Set<string>();
             for (const { entry, result, epochChanged } of verified) {
                 const key = groupEventKey(group, entry.sequence); if (row(key)) throw new ProtocolError('conflicting_event', 'Group event already exists beyond the verified cursor.');
-                let rejection = result.rejection; const message = result.message; const identity = message && messageKey(group, message.sender.account, message.envelope.messageId);
-                if (identity && (row(identity) || newMessages.has(identity.key))) rejection = new ProtocolError('duplicate_message', 'Relay assigned a second sequence to an existing logical group message.');
+                let rejection = result.rejection; const message = result.message; const identity = message ? groupMessageKey(group, message.sender.account, message.envelope.messageId) : retainedIdentity;
+                const duplicate = identity && (row(identity) || newMessages.has(identity.key));
+                if (duplicate) rejection = new ProtocolError('duplicate_message', 'Relay assigned a second sequence to an existing logical group message.');
                 const certificate = entry.signerDeviceId === undefined ? undefined : certificates.get(entry.signerDeviceId)!;
-                const value: JsonObject = { event: groupEventCodec.encode(entry), ...(certificate ? { certificate: deviceCertificateCodec.encode(certificate) } : {}) };
-                if (rejection) { value.rejection = { code: rejection.code, message: rejection.message }; rejected.push({ sequence: entry.sequence, error: rejection }); }
+                const value: JsonObject = { event: groupEventCodec.encode(entry), ...(certificate ? { certificate: deviceCertificateCodec.encode(certificate) } : {}), ...(retainedMessage ? { message: retainedMessage } : {}) };
+                if (message && !duplicate) value.message = { sender: message.sender.account, messageId: message.envelope.messageId, senderDeviceId: message.signerDeviceId, createdAt: message.envelope.createdAt, joinedAtSequence: message.joinedAtSequence };
+                if (imported?.rejection && !rejection) rejection = new ProtocolError(String(requireObject(imported.rejection).code), String(requireObject(imported.rejection).message));
+                if (rejection) {
+                    value.rejection = { code: rejection.code, message: rejection.message }; rejected.push({ sequence: entry.sequence, error: rejection });
+                    const savedIdentity = groupMessageIdentity(group, value.message == null ? undefined : requireObject(value.message));
+                    if (savedIdentity && !row(savedIdentity) && !newMessages.has(savedIdentity.key)) { newMessages.add(savedIdentity.key); mutations.push(put(savedIdentity, { sequence: entry.sequence })); }
+                }
                 else if (message && identity) {
-                    value.message = { sender: message.sender.account, messageId: message.envelope.messageId, senderDeviceId: message.signerDeviceId, createdAt: message.envelope.createdAt, joinedAtSequence: message.joinedAtSequence };
-                    newMessages.add(identity.key); mutations.push(put(identity, { sequence: entry.sequence }), put(groupPendingMessageKey(group, entry.sequence), { sequence: entry.sequence })); messageSequences.push(entry.sequence);
+                    newMessages.add(identity.key); mutations.push(put(identity, { sequence: entry.sequence }));
+                    if (imported?.decryptedPayload !== undefined) { value.decryptedPayload = imported.decryptedPayload; value.isMessage = imported.isMessage!; }
+                    else mutations.push(put(groupPendingMessageKey(group, entry.sequence), { sequence: entry.sequence }));
+                    messageSequences.push(entry.sequence);
                 }
                 mutations.push(put(key, value));
-                if (!rejection && entry.signerDeviceId) mutations.push(put(groupAcceptanceKey(group, entry.payload, this.context), { sequence: entry.sequence }));
+                if (!rejection && entry.signerDeviceId) {
+                    mutations.push(put(groupAcceptanceKey(group, entry.payload, this.context), { sequence: entry.sequence }));
+                    mutations.push(...confirmationMutations(group, entry, snapshot.sets[queries.length]!, snapshot.sets[queries.length + 1]![0]?.value));
+                }
                 if (epochChanged) {
                     const epochKey = groupEpochKey(group, entry.epoch); const old = row(epochKey)?.value; const memberPublicKey = result.projection.members.find(member => member.account === this.accountId)?.memberEncryptionPublicKey;
-                    if (old?.commitment !== undefined && (old.commitment !== result.projection.clientSecretCommitment || old.memberPublicKey !== (memberPublicKey && encodeBase64Url(memberPublicKey)))) throw new ProtocolError('conflicting_epoch', 'Stored group epoch authority conflicts with verified management history.');
+                    if (old?.commitment != null && old.commitment !== result.projection.clientSecretCommitment || old?.memberPublicKey != null && old.memberPublicKey !== (memberPublicKey && encodeBase64Url(memberPublicKey))) throw new ProtocolError('conflicting_epoch', 'Stored group epoch authority conflicts with verified management history.');
                     mutations.push(put(epochKey, { ...old, epoch: entry.epoch, commitment: result.projection.clientSecretCommitment, ...(memberPublicKey ? { memberPublicKey: encodeBase64Url(memberPublicKey) } : {}) }));
                 }
             }
             let change: GroupPageResult['change'];
+            const confirmed = mutations.filter(value => value.collection === 'group_operations' && value.kind === 'delete').map(value => value.key.split('|')[1]!);
             if (verified.length) {
                 const ownerSequence = verified.filter(item => item.entry.payload.$type === 'meshline.group.owner.transfer').at(-1)?.entry.sequence ?? initial?.ownerSequence ?? 0;
                 const next: JsonObject = { ...initial, relayId: group.relayId, projection: encodeGroupProjection(projection!), ownerSequence };
+                if (confirmed.includes('group.close')) next.locallyClosed = true;
                 if (projection!.members.some(member => member.account === this.accountId)) delete next.pendingApplication;
                 mutations.push(put(groupKey(group), next));
                 const kinds = groupChangeKinds.filter(kind => verified.some(item => item.result.changeKinds?.includes(kind)));
                 if (kinds.length) change = { record: next, kinds };
             }
-            return { mutations, result: { ...(projection ? { projection } : {}), ...(change ? { change } : {}), hasMore: page.hasMore, rejected, messageSequences } };
+            return { mutations, result: { ...(projection ? { projection } : {}), ...(change ? { change } : {}), ...(confirmed.length ? { confirmed } : {}), hasMore: page.hasMore, rejected, messageSequences } };
         }, signal);
     }
     /** Reuses an omitted client box only inside this page and only while both verified commitment and account key remain unchanged. */

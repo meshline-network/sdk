@@ -23,6 +23,8 @@ protector available when reopening.
 
 The database format belongs to each adapter. The TypeScript SQLite format is
 not compatible with the .NET SDK's database; neither should be opened as the other.
+Use [portable backups](recovery-and-migration.md#restore-local-data) to transfer
+supported data between SDKs or devices with different local protection material.
 
 ## Account setup persistence
 
@@ -160,7 +162,7 @@ selection. Unscoped group/channel queries materialize their matching history;
 filtered queries may inspect several batches before returning readable messages.
 
 Private-message history uses sequence indexes. An older store's first history
-query may take longer while the SDK builds those indexes; interrupted
+query or export may take longer while the SDK builds those indexes; interrupted
 indexing resumes on the next attempt.
 
 ### Custom store contract
@@ -175,7 +177,7 @@ versions.
 | `openQuery(query, signal?)` | Fixes one selection at open time and pages it with `readNext`. An empty page marks completion. |
 | `openSnapshot(collections, signal?)` | Fixes all declared collections at one version before returning. Subsequent `read` calls share that version despite concurrent writes; queries outside those collections must fail. |
 
-Use `openSnapshot` to read related collections in bounded pages at one version.
+Backup components use `openSnapshot` to read related collections in bounded pages.
 Disposing a reader, snapshot or its store releases the associated resources;
 already returned values remain usable.
 

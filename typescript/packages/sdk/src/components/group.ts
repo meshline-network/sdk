@@ -42,6 +42,9 @@ import { StateUpdateCoordinator, type StateUpdateAttempt } from './state-update-
 import { groupUpdateCodec, validateGroupUpdate } from '../models/group-management.js';
 import { encodeBase64Url } from '../protocol/encoding.js';
 import type { RecordKey, StoredRecord } from '../storage/store.js';
+import { BackupSelection, type BackupReport } from '../models/backup.js';
+import { cancellableRecords, frame as backupFrame, report as backupReport, selection as backupSelection, text as backupText } from '../backups/data.js';
+import { exportGroups, importGroup } from '../groups/backups.js';
 
 function ordinal(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }
 
@@ -73,6 +76,33 @@ interface Subscription { client: RelayClient; subscription: RelaySubscription; s
 
 /** Verified history determines authority; local secrets and pending operations survive restart. */
 export class GroupManager extends ClientComponent {
+    /**
+     * Exports plaintext group references, management history, nicknames and held keys from one snapshot.
+     * Chat history defaults to none. Reading held secrets requires a local device.
+     */
+    async *exportBackup(history: BackupSelection = BackupSelection.none, signal?: AbortSignal): AsyncGenerator<JsonObject> {
+        backupSelection(history, true);
+        yield* this.runStream(scope => exportGroups(this.#store, this.#secrets, history, scope), signal);
+    }
+    /**
+     * Merges records incrementally and reports committed changes through existing group events.
+     * The caller must ensure account/network ownership. Failure preserves earlier commits.
+     * Restoring secrets requires a local device; read positions are preserved.
+     */
+    importBackup(records: AsyncIterable<JsonObject>, signal?: AbortSignal): Promise<BackupReport> {
+        return this.runOperation(async scope => {
+            const report = backupReport(); const blocked = new Set<string>();
+            for await (const record of cancellableRecords(records, scope)) {
+                throwIfAborted(scope); const { type, data } = backupFrame(record, ['group', 'group_event', 'group_nickname', 'group_epoch', 'group_secret']);
+                const result = await this.#writes.run(() => importGroup(this.#store, this.#repository, this.#secrets, type, data, blocked, scope), scope); report[result.outcome]++;
+                if (result.block) blocked.add(backupText(data.group_id));
+                if (result.change && result.group) { const info = this.#snapshot(result.group, result.change.record); if (info) this.#notify('groupChanged', { ...info, kinds: result.change.kinds }); }
+                if (result.message && result.group) this.#notify('timelineChanged', { group: result.group, sequence: result.message.sequence, message: result.message });
+                if (result.group) for (const method of result.confirmed ?? []) this.#confirmed(result.group, method);
+            }
+            return report;
+        }, signal);
+    }
     readonly #syncStatus = new ResourceSyncTracker(this.clock, status => this.#notify('syncStatusChanged', status));
     /** Performs a fresh timeline/key/decryption pass without requiring start(); returns caughtUp or a processing block. */
     synchronize(group: GroupRef, signal?: AbortSignal): Promise<ResourceSyncStatus> {
@@ -161,6 +191,10 @@ export class GroupManager extends ClientComponent {
         if (operation.method.startsWith('group.application.')) this.#notify('applicationsChanged', operation.group);
         if (operation.method.startsWith('group.member.recovery.')) this.#notify('keyRecoveryChanged', operation.group);
     }
+    #confirmed(group: GroupRef, method: string): void {
+        if (method === 'group.application.approve') this.#notify('applicationsChanged', group);
+        if (method === 'group.member.recovery.approve') this.#notify('keyRecoveryChanged', group);
+    }
     async #localRecovery(group: GroupRef, signal: AbortSignal): Promise<SyncBlock | undefined> {
         const recovery = await this.#secrets.derivePending(group, this.#device, signal);
         for (const failure of recovery.rejected) this.notifyBackgroundError({ operation: 'recover_group_key', resource: `${group.groupId}/${failure.epoch}`, error: failure.error });
@@ -195,6 +229,9 @@ export class GroupManager extends ClientComponent {
             }
             conflicts = 0;
             projection = page.projection; for (const failure of page.rejected) this.notifyBackgroundError({ operation: 'synchronize_group', resource: `${group.groupId}/${failure.sequence}`, error: failure.error });
+            for (const method of page.confirmed ?? []) {
+                if (attempt) attempt.deferNotification(() => this.#confirmed(group, method)); else this.#confirmed(group, method);
+            }
             if (page.change) {
                 const change = { ...this.#snapshot(group, page.change.record)!, kinds: page.change.kinds };
                 if (attempt) attempt.deferNotification(() => this.#notify('groupChanged', change)); else this.#notify('groupChanged', change);
@@ -277,7 +314,7 @@ export class GroupManager extends ClientComponent {
             if (evidence.record.rejection !== undefined) throw new ProtocolError('rejected_message', 'Accepted group message failed local content validation.');
             if (evidence.record.decryptedPayload === undefined) throw new GroupKeyAccessError('Accepted group message awaits an available epoch key.');
         }
-        await this.#operations.complete(operation, true); this.#operationChanged(operation); return evidence.record;
+        await this.#operations.complete(operation, true); return evidence.record;
     }
     createGroup(relayId: string, options: GroupCreateOptions, signal?: AbortSignal): Promise<GroupInfo> {
         validateRelayId(relayId); const copy = { ...options };

@@ -1,3 +1,7 @@
+import { backupRows, snapshotRecords } from '../backups/snapshot.js';
+import { BackupSelection, type BackupReport } from '../models/backup.js';
+import { cancellableRecords, frame as backupFrame, record as backupRecord, report as backupReport, selection as backupSelection } from '../backups/data.js';
+import { contactRecordCodec } from '../models/contacts.js';
 import { canReuseRequest } from '../storage/state-publication.js';
 import { encryptMessage, decryptMessage } from '../crypto/messages.js';
 import { systemRandom, type RandomSource } from '../crypto/primitives.js';
@@ -95,6 +99,39 @@ export class MessageManager extends ClientComponent {
             }, scope), signal);
             this.#sendPulse?.pulse();
         });
+    }
+    /** Exports all contacts and selected direct history as plaintext records from one snapshot. History defaults to none. */
+    async *exportBackup(history: BackupSelection = BackupSelection.none, signal?: AbortSignal): AsyncGenerator<JsonObject> {
+        backupSelection(history, false);
+        if (history.mode !== 'none') await this.runOperation(scope => this.#repository.ensureHistoryIndex(scope), signal);
+        const repository = this.#repository;
+        yield* this.runStream(scope => snapshotRecords(this.#store, ['contacts', ...(history.mode === 'none' ? [] : ['messages', 'message_history'])], async function* (snapshot) {
+            for await (const row of backupRows(snapshot, { collection: 'contacts' }, scope))
+                yield backupRecord('contact', contactRecordCodec.encode(readContact(row.value)!.record));
+            yield* repository.exportBackup(snapshot, history, scope);
+        }, scope), signal);
+    }
+
+    /**
+     * Merges records incrementally, emitting contactChanged and messageReceived for committed changes.
+     * The caller must ensure account/network ownership. Failure preserves earlier commits; read positions are unchanged.
+     */
+    importBackup(records: AsyncIterable<JsonObject>, signal?: AbortSignal): Promise<BackupReport> {
+        return this.runOperation(async scope => {
+            const report = backupReport();
+            for await (const record of cancellableRecords(records, scope)) {
+                throwIfAborted(scope); const { type, data } = backupFrame(record, ['contact', 'message']);
+                if (type === 'contact') {
+                    const result = await this.#writes.run(() => this.#contacts.importBackup(data, scope), scope); report[result.outcome]++;
+                    if (result.maintain) { this.#maintenanceRetry = true; this.#maintenancePulse?.pulse(); }
+                    for (const change of result.changes.contacts) this.#notify('contactChanged', change);
+                } else {
+                    const result = await this.#writes.run(() => this.#repository.importBackup(data, scope), scope); report[result.outcome]++;
+                    if (result.message) this.#notify('messageReceived', [result.message]);
+                }
+            }
+            return report;
+        }, signal);
     }
     on<K extends keyof MessageEvents>(event: K, listener: EventListener<MessageEvents[K]>): () => void { return this.#events.on(event, listener); }
     #notify<K extends keyof MessageEvents>(event: K, value: MessageEvents[K]): void {

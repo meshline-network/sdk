@@ -1,10 +1,11 @@
+import type { Outcome } from '../backups/data.js';
 import { canReuseRequest } from '../storage/state-publication.js';
 import { ProtocolError, StateConflictError } from '../errors.js';
 import { validateIdentifier } from '../identity/identifiers.js';
 import { validateAccountId } from '../identity/neo.js';
 import type { DeviceSigner } from '../interactions.js';
 import { accountContactSyncCodec, contactConsentCodec, contactGrantCodec, contactGrantInput, contactInviteCodec, contactInviteInput, contactRecordCodec,
-    filterContactGrantSignatures, selectContactGrant, validateAccountContactSync, validateContactConsent, validateContactInvite, validateContactRecord, verifyContactGrant,
+    filterContactGrantSignatures, selectContactGrant, validateContactGrant, validateAccountContactSync, validateContactConsent, validateContactInvite, validateContactRecord, verifyContactGrant,
     type AccountContactSync, type ContactAuthorization, type ContactConsent, type ContactGrant, type ContactInvite, type ContactRecord } from '../models/contacts.js';
 import { accountDeviceStateCodec, authorizedDevice, certificateId, validateDeviceState, type AccountDeviceState } from '../models/identity.js';
 import { deviceStateChangedCodec, validateDeviceStateChanged, type MessageTimelineEntry } from '../models/messages.js';
@@ -55,7 +56,7 @@ export function readContact(value: JsonObject | undefined): StoredContact | unde
     if (!value) return undefined;
     const record = contactRecordCodec.decode(value.record!);
     if (value.requiredDeviceRevision !== undefined) requireSafeInteger(value.requiredDeviceRevision, 0);
-    if (value.deviceNotificationRevision !== undefined) requireSafeInteger(value.deviceNotificationRevision, 0);
+    if (value.deviceNotificationRevision !== undefined) requireSafeInteger(value.deviceNotificationRevision, -1);
     return { record, ...(value.confirmedGrantTo === undefined ? {} : { confirmedGrantTo: contactGrantCodec.decode(value.confirmedGrantTo) }),
         ...(value.requiredDeviceRevision === undefined ? {} : { requiredDeviceRevision: value.requiredDeviceRevision }),
         ...(value.deviceNotificationRevision === undefined ? {} : { deviceNotificationRevision: value.deviceNotificationRevision }) };
@@ -88,6 +89,44 @@ function pureValidation<T>(action: () => T): T {
 /** Contact workflows prepare signatures/encrypted synchronization outside the eventual atomic transaction. */
 export class MessageContacts {
     constructor(readonly host: ContactHost) {}
+    /** Commits a contact merge and returns changes for the manager to notify outside its write gate. */
+    async importBackup(source: JsonObject, signal?: AbortSignal): Promise<{ outcome: Outcome; changes: ContactChanges; maintain: boolean }> {
+        const incoming = contactRecordCodec.decode(source); this.#checkAccount(incoming.account); validateContactRecord(incoming, this.host.clock.nowSeconds());
+        for (const [grant, grantor, grantee] of [[incoming.grantFromContact, incoming.account, this.host.accountId], [incoming.grantToContact, this.host.accountId, incoming.account]] as const) {
+            if (!grant) continue; const { expiresAt, ...withoutExpiry } = grant; validateContactGrant(withoutExpiry, this.host.clock.nowSeconds());
+            if (expiresAt !== undefined) requireSafeInteger(expiresAt, 0);
+            if (grant.grantor !== grantor || grant.grantee !== grantee) throw new ProtocolError('invalid_backup', 'Backup contact grant direction is invalid.');
+        }
+        const empty: ContactChanges = { contacts: [], requests: [] };
+        const queries = [contactKey(incoming.account), cachedDeviceStateKey(this.host.accountId), cachedDeviceStateKey(incoming.account)];
+        return updateStore(this.host.store, queries, snapshot => {
+            const previous = readContact(snapshot.sets[0]![0]?.value); const old = previous?.record;
+            const unchanged = (outcome: Outcome) => ({ mutations: [], result: { outcome, changes: empty, maintain: false } });
+            if (old && old.updatedAt > incoming.updatedAt) return unchanged('unchanged');
+            if (old && old.updatedAt === incoming.updatedAt && (old.status !== incoming.status || old.alias !== incoming.alias)) return unchanged('conflicts');
+            const remote = state(snapshot.sets[2]![0]?.value); const own = state(snapshot.sets[1]![0]?.value);
+            const from = incoming.status === 'deleted' ? undefined : this.#mergeBackupGrant(old?.grantFromContact, incoming.grantFromContact, remote);
+            const to = incoming.status === 'deleted' ? undefined : this.#mergeBackupGrant(old?.grantToContact, incoming.grantToContact, own);
+            const grantJson = (grant: ContactGrant | undefined) => grant ? contactGrantCodec.stringify(grant) : '';
+            if (old && old.updatedAt === incoming.updatedAt && grantJson(old.grantFromContact) === grantJson(from) && grantJson(old.grantToContact) === grantJson(to)) return unchanged('unchanged');
+            const kinds: ContactChangeKind[] = [];
+            if (!old || old.status !== incoming.status) kinds.push(incoming.status === 'deleted' ? 'deleted' : 'relationship');
+            if (old?.alias !== incoming.alias) kinds.push('alias');
+            if (grantJson(old?.grantFromContact) !== grantJson(from) || grantJson(old?.grantToContact) !== grantJson(to)) kinds.push('authorization');
+            const { grantFromContact: _from, grantToContact: _to, ...metadata } = incoming;
+            const next: StoredContact = { ...(incoming.status === 'active' ? previous : {}), record: { ...metadata, ...(from ? { grantFromContact: from } : {}), ...(to ? { grantToContact: to } : {}) }, deviceNotificationRevision: -1 };
+            const mutations = [put(contactKey(incoming.account), encodeContact(next))];
+            return { mutations, result: { outcome: 'applied' as const, changes: kinds.length ? this.#changes(snapshot, mutations, kinds) : empty, maintain: incoming.status === 'active' } };
+        }, signal);
+    }
+    #mergeBackupGrant(previous: ContactGrant | undefined, incoming: ContactGrant | undefined, devices: AccountDeviceState | undefined): ContactGrant | undefined {
+        if (!incoming) return previous;
+        if (!previous || contactGrantCodec.stringify(previous) === contactGrantCodec.stringify(incoming)) return incoming;
+        const same = equalBytes(contactGrantInput(previous, this.host.context), contactGrantInput(incoming, this.host.context));
+        if (!same && (incoming.expiresAt ?? Infinity) <= (previous.expiresAt ?? Infinity)) return previous;
+        if (!devices) return same ? { ...incoming, signatures: { ...incoming.signatures, ...previous.signatures } } : previous;
+        return selectContactGrant(previous, incoming, devices, this.host.context, this.host.clock.nowSeconds()).grant;
+    }
     async initializeNotificationBaselines(signal?: AbortSignal): Promise<void> {
         const own = await this.host.store.read([cachedDeviceStateKey(this.host.accountId)], signal);
         // Keep the baseline across retries so concurrent device changes remain pending.

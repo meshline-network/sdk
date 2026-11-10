@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { MeshlineClient, type ConversationChange, type QueryReader } from '@meshline/sdk';
+import { MeshlineClient, certificateId, createIdentifier, directMessageCodec, type ConversationChange, type QueryReader } from '@meshline/sdk';
 import { ClientNetwork } from '../../support/client-network.js';
 import { GroupNetwork } from '../../support/group-network.js';
 import { ChannelNetwork } from '../../support/channel-network.js';
@@ -39,15 +39,13 @@ test('query readers retain their snapshot, kind filters combine, and empty kind 
     await expect(f.client.getConversation('invalid')).rejects.toThrow(); await expect(f.client.getConversations({ kinds: ['unexpected' as 'direct'] })).rejects.toThrow();
 });
 
-async function sendSelf(f: Awaited<ReturnType<typeof fixture>>, text: string) {
-    await f.incoming(text, f.network.clock.wall, messageDevice(context, 91, 95));
-    // The fixture commits history directly; a public send queues conversation observation.
-    await f.client.messageManager.sendMessage(f.client.accountId, { body: { contentType: 'text/plain', text } });
+async function importSelf(f: Awaited<ReturnType<typeof fixture>>, text: string) {
+    await f.client.messageManager.importBackup((async function* () { yield { type: 'message', data: { sender: f.client.accountId, recipient: f.client.accountId, message_id: createIdentifier('message'), sender_device_id: certificateId(f.client.device!, context), created_at: f.network.clock.wall, payload: directMessageCodec.encode({ body: { contentType: 'text/plain', text } }) } }; })());
 }
-test('synchronized outgoing self history creates a conversation without unread counts and observers may dispose the client', async () => {
+test('restored outgoing self history creates a conversation without unread counts and observers may dispose the client', async () => {
     const f = await fixture(); const changes: ConversationChange[] = []; let disposed: Promise<void> | undefined;
     f.client.on('conversationChanged', value => { changes.push(value); disposed = f.client.dispose(); return disposed; });
-    await sendSelf(f, 'self conversation');
+    await importSelf(f, 'self conversation');
     for (let count = 0; !disposed && count < 100; count++) await new Promise(resolve => setTimeout(resolve, 5)); await disposed;
     expect(changes).toEqual([{ conversationId: f.client.accountId, kind: 'created' }]); expect(f.client.lifecycleState).toBe('disposed');
     const resumed = await f.network.open(91, f.path); expect((await resumed.client.getConversation(f.client.accountId))!.unreadCount).toBe(0);
@@ -94,9 +92,9 @@ test('conversation observation retries a local read failure and reports observer
     const f = await fixture(); const read = f.store.read.bind(f.store); let fail = true; let notifications = 0;
     vi.spyOn(f.store, 'read').mockImplementation(async (queries, signal) => { if (fail && queries.some(value => value.collection === 'conversation_reads')) { fail = false; throw new Error('Read unavailable'); } return read(queries, signal); });
     f.client.on('conversationChanged', () => { notifications++; throw new Error('Observer rejected'); });
-    await sendSelf(f, 'retry observation');
+    await importSelf(f, 'retry observation');
     for (let count = 0; notifications < 1 && count < 100; count++) { f.network.clock.tick(); await new Promise(resolve => setTimeout(resolve, 5)); }
     expect(notifications).toBe(1); expect(f.client.lastBackgroundError!.operation).toBe('observer');
-    await sendSelf(f, 'observer still alive');
+    await importSelf(f, 'observer still alive');
     for (let count = 0; notifications < 2 && count < 100; count++) await new Promise(resolve => setTimeout(resolve, 5)); expect(notifications).toBe(2);
 });

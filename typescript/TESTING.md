@@ -24,6 +24,7 @@ npx vitest run tests/components/message-outbox.test.ts tests/components/send-sta
 | `protocol/`, `conformance/` | Protocol vectors and native adapters for shared behavior cases. |
 | `transport/`, `integrations/`, `storage/` | Transport boundaries, external-format integrations and storage adapter contracts. |
 | `runtime/` | Internal cancellation, async gates and sync-status tracking without full client workflows. |
+| `backups/` | Independent container/password vectors, component merge rules, partial commits, selections and client file restoration. |
 | `components/history/` | History ordering, range bounds, snapshots, continuation and public call compatibility. |
 | `components/conversations/` | Conversation summaries, observation, unread counts and explicit/default read positions. |
 | `components/synchronization/` | Public sync status and foreground/background synchronization across message, group and channel managers. |

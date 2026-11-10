@@ -111,6 +111,13 @@ export abstract class ClientComponent {
         job.then(released, released);
         return job;
     }
+    /** Tracks active iterator pulls while retaining cancellation between pulls; disposal never waits for the consumer. */
+    protected async *runStream<T>(create: (signal: AbortSignal) => AsyncIterator<T>, signal?: AbortSignal): AsyncGenerator<T> {
+        this.ensureInitialized(); const scope = abortScope([signal, this.#lifetime.signal]); const iterator = create(scope.signal);
+        try {
+            for (;;) { const next = await this.runOperation(() => iterator.next(), scope.signal); if (next.done) return; yield next.value; }
+        } finally { try { await iterator.return?.(); } finally { scope.dispose(); } }
+    }
     protected reportBackgroundError(failure: BackgroundFailure): Promise<void> {
         this.#backgroundFailure = Object.freeze({ ...failure });
         this.#events.notify('backgroundError', failure, observerError => {

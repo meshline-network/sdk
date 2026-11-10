@@ -1,8 +1,15 @@
 import type {
     AccountRecoveryOptions, BackgroundFailure, ChannelRef, ContactInvite, DeviceSelectionInfo,
-    ConversationChange, GroupInvitation, GroupRef, MeshlineClient, QueryReader,
+    BackupSink, ConversationChange, GroupInvitation, GroupRef, MeshlineClient, QueryReader,
 } from '@meshline/sdk';
-import { AccountEstablishmentError, FieldUpdate } from '@meshline/sdk';
+import { AccountEstablishmentError, BackupSelection, FieldUpdate } from '@meshline/sdk';
+
+export async function saveLocalData(client: MeshlineClient, destination: BackupSink, password: string, peers: readonly string[]) {
+    return client.exportBackup(destination, password, {
+        directHistory: BackupSelection.only(peers),
+        groupHistory: BackupSelection.none,
+    });
+}
 
 /** Configure the application's callback only when creating a new device. */
 export async function establishPushEnabledAccount(client: MeshlineClient, pushGateway: string, signal?: AbortSignal) {

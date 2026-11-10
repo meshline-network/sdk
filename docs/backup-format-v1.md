@@ -2,7 +2,8 @@
 
 This v1 draft defines the Meshline SDK's portable backup format. It requires no
 network protocol changes or relay, contract, or cloud-backup services. Use the
-[C# recovery guide](../dotnet/docs/guides/recovery-and-migration.md) for application
+[C# recovery guide](../dotnet/docs/guides/recovery-and-migration.md) or
+[TypeScript recovery guide](../typescript/docs/guides/recovery-and-migration.md) for application
 workflows, component stream ownership and notifications.
 
 ## Ownership and scope

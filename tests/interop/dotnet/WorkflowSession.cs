@@ -85,6 +85,28 @@ static class WorkflowSession
         string[] Accounts() => request.GetProperty("accounts").EnumerateArray().Select(value => value.GetString()!).ToArray();
         switch (operation)
         {
+            case "backup-export":
+                using (var output = new MemoryStream())
+                {
+                    var options = new BackupOptions
+                    {
+                        DirectHistory = request.TryGetProperty("directHistory", out var directHistory) && directHistory.GetBoolean() ? BackupSelection.All : BackupSelection.None,
+                        GroupHistory = request.TryGetProperty("groupHistory", out var groupHistory) && groupHistory.GetBoolean() ? BackupSelection.All : BackupSelection.None
+                    };
+                    var report = await sdk.ExportBackupAsync(output, Text("password"), options);
+                    return new { data = Convert.ToBase64String(output.ToArray()), applied = report.Applied };
+                }
+            case "backup-import":
+                using (var input = new MemoryStream(Convert.FromBase64String(Text("data"))))
+                {
+                    var report = await sdk.ImportBackupAsync(input, Text("password"));
+                    return new { applied = report.Applied, unchanged = report.Unchanged, conflicts = report.Conflicts };
+                }
+            case "backup-records":
+                var records = new List<JsonElement>();
+                IAsyncEnumerable<JsonElement>[] sources = [sdk.DeviceManager.ExportBackupAsync(), sdk.MessageManager.ExportBackupAsync(BackupSelection.All), sdk.GroupManager.ExportBackupAsync(BackupSelection.All), sdk.ChannelManager.ExportBackupAsync()];
+                foreach (var source in sources) await foreach (var record in source) records.Add(record.Clone());
+                return new { records };
             case "close": Clients.Remove(id); await current.DisposeAsync(); return new { closed = true };
             case "establish": await sdk.EstablishAccountAsync(new() { RelayId = Text("relayId") }); break;
             case "recover": await sdk.RecoverAccountAsync(new() { RelayId = Text("relayId") }); break;

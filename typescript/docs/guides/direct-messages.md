@@ -112,7 +112,7 @@ permanent delivery ledger.
 
 ## Receive and query
 
-`messageReceived` carries received messages;
+`messageReceived` carries newly stored messages, including imported history;
 `timelineChanged` indicates local timeline changes. Use `getMessage({ sender, messageId })` for one message and
 `getMessageHistory(peerAccountId?)` for a disposable local snapshot reader.
 History is ordered by ascending `MessageInfo.localSequence`, including when

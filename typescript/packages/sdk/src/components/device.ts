@@ -1,3 +1,6 @@
+import { cancellableRecords, frame as backupFrame, record as backupRecord, report as backupReport, type Outcome } from '../backups/data.js';
+import type { BackupReport } from '../models/backup.js';
+import { readContact } from '../messages/contacts.js';
 import { agreeKey, devicePublicKey, encryptionPublicKey, requireLength, signDevice, verifyDevice, systemRandom, type RandomSource } from '../crypto/primitives.js';
 import { ProtocolError, SecretAccessError, StateConflictError } from '../errors.js';
 import type { ContactAuthorizationIssue, DeviceSelectionInfo } from '../client/account-establishment.js';
@@ -100,6 +103,37 @@ export class DeviceManager extends ClientComponent implements DeviceSigner {
                 if ('certificates' in patch) for (const key of Object.keys(previous)) if (key.startsWith('remove:')) delete previous[key];
             }
         }(this.#store, this.clock);
+    }
+    /** Exports the owner's and active contacts' signed device states as plaintext records from one snapshot. */
+    async *exportBackup(signal?: AbortSignal): AsyncGenerator<JsonObject> {
+        const snapshot = await this.runOperation(scope => this.#store.read([{ collection: 'device_states' }, { collection: 'contacts' }], scope), signal);
+        const accounts = new Set([this.accountId, ...snapshot.sets[1]!.filter(row => readContact(row.value)?.record.status === 'active').map(row => row.key)]);
+        for (const row of snapshot.sets[0]!) { this.ensureInitialized(); throwIfAborted(signal); if (accounts.has(row.key)) yield backupRecord('device_state', row.value); }
+    }
+    /**
+     * Merges peer device states into storage and cache, preserving this device's identity and state.
+     * The caller must ensure account/network ownership. Failure preserves earlier commits.
+     */
+    importBackup(records: AsyncIterable<JsonObject>, signal?: AbortSignal): Promise<BackupReport> {
+        return this.runOperation(async scope => {
+            const report = backupReport();
+            for await (const record of cancellableRecords(records, scope)) {
+                throwIfAborted(scope); const { data } = backupFrame(record, ['device_state']);
+                const incoming = accountDeviceStateCodec.decode(data); validateDeviceState(incoming, this.context);
+                const outcome = await this.#stateGate.run(async () => {
+                    if (incoming.account === this.accountId) return 'unchanged' as const;
+                    const outcome = await updateStore<Outcome>(this.#store, [stateKey(incoming.account)], snapshot => {
+                        const current = snapshot.sets[0]![0]?.value; const previous = current && accountDeviceStateCodec.decode(current);
+                        if (previous && previous.revision >= incoming.revision) return { mutations: [], result: previous.revision === incoming.revision && accountDeviceStateCodec.stringify(previous) !== accountDeviceStateCodec.stringify(incoming) ? 'conflicts' : 'unchanged' };
+                        return { mutations: [{ kind: 'put', ...stateKey(incoming.account), value: accountDeviceStateCodec.encode(incoming) }], result: 'applied' };
+                    }, scope);
+                    if (outcome === 'applied') this.#cacheState(incoming);
+                    return outcome;
+                }, scope);
+                report[outcome]++;
+            }
+            return report;
+        }, signal);
     }
     get local(): DeviceCertificate | undefined { return this.#local && clone(this.#local); }
     get deviceState(): AccountDeviceState | undefined { return this.#state && copyState(this.#state); }

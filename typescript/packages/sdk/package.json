@@ -27,6 +27,7 @@
     "@noble/ciphers": "2.4.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
+    "fflate": "0.8.3",
     "multiformats": "14.0.5",
     "tr46": "6.0.0"
   },

@@ -1,3 +1,6 @@
+import { cancellableRecords, boolean as backupBoolean, fields as backupFields, frame as backupFrame, record as backupRecord, report as backupReport, text as backupText, type Outcome } from '../backups/data.js';
+import type { BackupReport } from '../models/backup.js';
+import { updateStore } from '../storage/transaction.js';
 import { StateUpdateCoordinator, type StateUpdateAttempt } from './state-update-coordinator.js';
 import type { RecordKey, StoredRecord } from '../storage/store.js';
 import { relayLimits } from '../transport/discovery.js';
@@ -81,6 +84,32 @@ export class ChannelManager extends ClientComponent {
             protected publish(attempt: StateUpdateAttempt<ChannelInfo>, signal: AbortSignal): Promise<ChannelInfo> { return owner.#publishLatest(attempt, signal); }
             protected report(resource: string, error: unknown): void { owner.notifyBackgroundError({ operation: 'synchronize_channel', resource, error }); }
         }(this.#store, this.clock);
+    }
+    /** Exports plaintext channel references and follow choices from one snapshot; posts and descriptors are excluded. */
+    async *exportBackup(signal?: AbortSignal): AsyncGenerator<JsonObject> {
+        const snapshot = await this.runOperation(scope => this.#store.read([{ collection: 'channels' }], scope), signal);
+        for (const row of snapshot.sets[0]!) { this.ensureInitialized(); throwIfAborted(signal); yield backupRecord('channel', { channel_id: row.key, relay_id: row.value.relayId!, is_followed: row.value.isFollowed! }); }
+    }
+    /**
+     * Merges records incrementally and emits followChanged after committed additions.
+     * The caller must ensure account/network ownership. Failure preserves earlier commits.
+     */
+    importBackup(records: AsyncIterable<JsonObject>, signal?: AbortSignal): Promise<BackupReport> {
+        return this.runOperation(async scope => {
+            const report = backupReport();
+            for await (const record of cancellableRecords(records, scope)) {
+                throwIfAborted(scope); const { data } = backupFrame(record, ['channel']); backupFields(data, 'channel_id relay_id is_followed');
+                const channel = { channelId: backupText(data.channel_id), relayId: backupText(data.relay_id) }; validateChannelRef(channel);
+                const isFollowed = backupBoolean(data.is_followed);
+                const outcome = await this.#writes.run(() => updateStore<Outcome>(this.#store, [{ collection: 'channels', key: channel.channelId }], snapshot => {
+                    const current = snapshot.sets[0]![0]?.value;
+                    if (current) return { mutations: [], result: current.relayId === channel.relayId ? 'unchanged' : 'conflicts' };
+                    return { mutations: [{ kind: 'put', collection: 'channels', key: channel.channelId, value: { relayId: channel.relayId, syncSequence: -1, isFollowed } }], result: 'applied' };
+                }, scope), scope);
+                report[outcome]++; if (outcome === 'applied') this.#notify('followChanged', { channel, isFollowed });
+            }
+            return report;
+        }, signal);
     }
     on<K extends keyof ChannelEvents>(event: K, listener: EventListener<ChannelEvents[K]>): () => void { return this.#events.on(event, listener); }
     #notify<K extends keyof ChannelEvents>(event: K, value: ChannelEvents[K]): void { this.#events.notify(event, value, error => this.notifyBackgroundError({ operation: 'observer', resource: event, error })); }

@@ -44,6 +44,24 @@ test('a member-key broadcast is queued atomically with its shared flag and does 
     expect((await client.store.read([{ collection: 'message_outbox' }])).sets[0]!.length).toBe(queued); expect(await all(client.messages.getMessageHistory())).toEqual([]);
 });
 
+test.each([true, false])('restored member keys are shared without relay derivation only when the epoch client secret is held: %s', async held => {
+    const { network, client: source } = await setup(); const group = (await source.groups.createGroup(network.network.descriptor.relayId, { name: 'Restored sharing', memberCapacity: 5 })).ref;
+    const records: JsonObject[] = []; for await (const record of source.groups.exportBackup()) records.push(record);
+    const target = await network.client(80);
+    await target.groups.importBackup((async function* () {
+        for (const record of records) yield !held && record.type === 'group_epoch' ? { ...record, data: { ...record.data as JsonObject, client_secret: null } } : record;
+    })());
+    const secrets = new GroupSecrets({ store: target.store, context, accountId: target.accountId, deviceId: () => certificateId(target.device.certificate, context), protector: target.protector });
+    const sync = new GroupAccountSync({ store: target.store, context, accountId: target.accountId, clock: network.network.clock, device: target.device, messages: target.messages, secrets, rejected() {} });
+    const requests = network.requests.length; const before = (await target.store.read([{ collection: 'message_outbox' }])).sets[0]!.length;
+    await sync.shareCurrent(group, new AbortController().signal);
+    const snapshot = await target.store.read([{ collection: 'message_outbox' }, { collection: 'group_member_keys' }, { collection: 'group_epochs' }]);
+    expect(snapshot.sets[0]).toHaveLength(before + (held ? 1 : 0)); expect(snapshot.sets[1]![0]!.value.shared).toBe(held);
+    expect(snapshot.sets[2]![0]!.value.materialVerified).toBeUndefined(); expect(network.requests).toHaveLength(requests);
+    await sync.shareCurrent(group, new AbortController().signal);
+    expect((await target.store.read([{ collection: 'message_outbox' }])).sets[0]).toHaveLength(snapshot.sets[0]!.length);
+});
+
 test('local protection failure leaves an entire multi-key message and its consumer cursor uncommitted for restart', async () => {
     const { network, client } = await setup(); const states = [state(network), state(network, new Uint8Array(32).fill(132))]; let locked = true; let calls = 0; const inputs: Uint8Array[] = [];
     const protector: SecretProtector = { ...client.protector, async protect(bytes, purpose, signal) { inputs.push(bytes); if (locked && ++calls === 2) throw new Error('keychain unavailable'); return client.protector.protect(bytes, purpose, signal); } };

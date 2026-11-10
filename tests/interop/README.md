@@ -3,7 +3,9 @@
 Shared vectors and scenarios verify each implementation against independent
 expected results. This suite additionally exchanges messages between the actual
 .NET and TypeScript SDKs, including signatures, encryption, client workflows,
-persistent-state recovery and process termination.
+persistent-state recovery, process termination, and password-encrypted backups in
+both directions. Backup workflows verify selection, merge/retry and restored group
+keys by sending messages from the new device.
 
 - [dotnet](dotnet/Meshline.Interop.csproj) is the JSON-lines host for the actual
   .NET SDK. Its project references the .NET SDK and reuses its manual test clock.

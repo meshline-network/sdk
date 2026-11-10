@@ -2415,7 +2415,9 @@
     {
       "symbol": "M:Meshline.Models.Client.BackupSelection.Only(System.String[])",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.Only(string[])",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Immutable none/all/only selections with copied, deduplicated identifiers; both optional history selections default to none."
     },
     {
       "symbol": "M:Meshline.Models.Client.ClientOptions.Validate",
@@ -4518,37 +4520,51 @@
     {
       "symbol": "P:Meshline.Models.Client.BackupOptions.DirectHistory",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupOptions.md#Meshline.Models.Client.BackupOptions.DirectHistory",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Camel-case directHistory/groupHistory; mandatory base records are always included."
     },
     {
       "symbol": "P:Meshline.Models.Client.BackupOptions.GroupHistory",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupOptions.md#Meshline.Models.Client.BackupOptions.GroupHistory",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Camel-case directHistory/groupHistory; mandatory base records are always included."
     },
     {
       "symbol": "P:Meshline.Models.Client.BackupReport.Applied",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md#Meshline.Models.Client.BackupReport.Applied",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Aggregate applied/unchanged/conflicts counts returned only on complete success; prior import commits survive failure."
     },
     {
       "symbol": "P:Meshline.Models.Client.BackupReport.Conflicts",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md#Meshline.Models.Client.BackupReport.Conflicts",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Aggregate applied/unchanged/conflicts counts returned only on complete success; prior import commits survive failure."
     },
     {
       "symbol": "P:Meshline.Models.Client.BackupReport.Unchanged",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md#Meshline.Models.Client.BackupReport.Unchanged",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Aggregate applied/unchanged/conflicts counts returned only on complete success; prior import commits survive failure."
     },
     {
       "symbol": "P:Meshline.Models.Client.BackupSelection.All",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.All",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Immutable none/all/only selections with copied, deduplicated identifiers; both optional history selections default to none."
     },
     {
       "symbol": "P:Meshline.Models.Client.BackupSelection.None",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.None",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Immutable none/all/only selections with copied, deduplicated identifiers; both optional history selections default to none."
     },
     {
       "symbol": "P:Meshline.Models.Client.ChannelInfo.Descriptor",
@@ -8662,17 +8678,23 @@
     {
       "symbol": "T:Meshline.Models.Client.BackupOptions",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupOptions.md",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Camel-case directHistory/groupHistory; mandatory base records are always included."
     },
     {
       "symbol": "T:Meshline.Models.Client.BackupReport",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Aggregate applied/unchanged/conflicts counts returned only on complete success; prior import commits survive failure."
     },
     {
       "symbol": "T:Meshline.Models.Client.BackupSelection",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md",
-      "status": "unmapped"
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/models/backup.ts",
+      "notes": "Immutable none/all/only selections with copied, deduplicated identifiers; both optional history selections default to none."
     },
     {
       "symbol": "T:Meshline.Models.Client.ChannelInfo",

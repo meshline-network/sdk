@@ -1,3 +1,4 @@
+import { backupRows, mergeBackupRows } from '../backups/snapshot.js';
 import { deriveGroupApplicationSecret, groupClientSecretBoxAad, groupClientSecretCommitment, groupRelaySecretBoxAad, GroupKeyAccessError, openGroupSecret } from '../crypto/groups.js';
 import { agreeKey, encryptionPublicKey, requireLength } from '../crypto/primitives.js';
 import type { MessageDecryptor } from '../crypto/messages.js';
@@ -13,10 +14,11 @@ import type { NetworkContext } from '../protocol/context.js';
 import { decodeBase64Url, encodeBase64Url, equalBytes } from '../protocol/encoding.js';
 import { canonicalJson, requireObject, requireSafeInteger, type JsonObject } from '../protocol/json.js';
 import { throwIfAborted } from '../runtime/clock.js';
-import type { MeshlineStore, RecordKey, RecordQuery, StoreMutation, StoreSnapshot } from '../storage/store.js';
+import type { MeshlineStore, RecordKey, RecordQuery, StoreMutation, StoreSnapshot, StoreReadSnapshot } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
 import { decodeGroupProjection, groupEpochKey, groupKey, GroupRepository } from './repository.js';
 import type { GroupApplicationSecrets } from './messages.js';
+import { base64, bytes, failure, fields, integer, record, text, type Outcome } from '../backups/data.js';
 
 const fingerprint = (value: JsonObject | undefined): string => canonicalJson(value ?? null);
 const put = (key: RecordKey, value: JsonObject): StoreMutation => ({ ...key, kind: 'put', value });
@@ -28,6 +30,7 @@ export interface PreparedGroupMemberKey { readonly group: GroupRef; readonly pub
 export interface GroupSecretEffect { readonly queries: readonly RecordQuery[]; plan(snapshot: StoreSnapshot): readonly StoreMutation[] }
 export interface GroupSecretsOptions { readonly store: MeshlineStore; readonly context: NetworkContext; readonly accountId: string; readonly deviceId: () => string; readonly protector: SecretProtector }
 export interface GroupKeyRecoveryResult { readonly derived: readonly number[]; readonly missing: readonly number[]; readonly rejected: readonly { readonly epoch: number; readonly error: ProtocolError }[] }
+export const groupSecretBackupCollections = ['group_epochs', 'group_application_secrets', 'group_client_secrets', 'group_member_keys'];
 export interface GroupRotation { readonly group: GroupRef; readonly baseCommitment: string; readonly commitment: string; readonly ownerSequence: number; readonly deviceId: string; readonly ownerPublicKey?: Uint8Array; readonly expiresAt?: number }
 function rotationRecord(value: JsonObject, group: GroupRef): GroupRotation {
     validateGroupRef(group);
@@ -42,6 +45,71 @@ function rotationRecord(value: JsonObject, group: GroupRef): GroupRotation {
 /** Account-message authentication is the caller's responsibility; arriving keys never select current membership or advance verified history. */
 export class GroupSecrets implements GroupApplicationSecrets {
     constructor(readonly options: GroupSecretsOptions) { validateAccountId(options.accountId); }
+    async *exportBackup(snapshot: StoreReadSnapshot, signal?: AbortSignal): AsyncGenerator<JsonObject> {
+        for await (const row of mergeBackupRows(snapshot, [{ collection: 'group_epochs' }, { collection: 'group_application_secrets' }], undefined, signal)) {
+            throwIfAborted(signal); const key = row.key; const groupId = key.split('|')[0]!;
+            const [epochs, applications] = (await snapshot.read([{ collection: 'group_epochs', key }, { collection: 'group_application_secrets', key }], signal)).sets;
+            const application = applications![0]?.value; const value = epochs![0]?.value ?? { epoch: application!.epoch! };
+            const epoch = integer(value.epoch); const commitment = value.commitment == null ? undefined : text(value.commitment);
+            const client = value.protectedClientSecret ? { protectedSecret: value.protectedClientSecret } : commitment && value.materialVerified === true
+                ? (await snapshot.read([clientSecretKey(groupId, commitment)], signal)).sets[0]![0]?.value : undefined;
+            let clientBytes: Uint8Array | undefined; let applicationBytes: Uint8Array | undefined;
+            try {
+                if (client) clientBytes = await this.#unprotect(client, 'protectedSecret', this.#purpose(groupId, 'client', commitment!), signal);
+                if (application) applicationBytes = await this.#unprotect(application, 'protectedSecret', this.#purpose(groupId, 'epoch', String(epoch)), signal);
+                yield record('group_epoch', { group_id: groupId, epoch, commitment: commitment ?? null, member_public_key: value.memberPublicKey == null ? null : base64(decodeBase64Url(text(value.memberPublicKey), 32)), client_secret: clientBytes ? base64(clientBytes) : null, application_secret: applicationBytes ? base64(applicationBytes) : null });
+            } finally { clientBytes?.fill(0); applicationBytes?.fill(0); }
+        }
+        for await (const row of backupRows(snapshot, { collection: 'group_member_keys' }, signal)) {
+            throwIfAborted(signal); const [groupId, id] = row.key.split('|'); const secret = await this.#unprotect(row.value, 'protectedKey', this.#purpose(groupId!, 'member', id!), signal);
+            try { yield record('group_secret', { group_id: groupId!, kind: 'member', id: id!, secret: base64(secret) }); } finally { secret.fill(0); }
+        }
+    }
+    async importBackup(type: string, data: JsonObject, signal?: AbortSignal): Promise<Outcome> {
+        const groupId = text(data.group_id); validateIdentifier('group', groupId);
+        fields(data, type === 'group_secret' ? 'group_id kind id secret' : 'group_id epoch commitment member_public_key client_secret application_secret');
+        const deviceId = [data.secret, data.client_secret, data.application_secret].some(value => value != null) ? this.options.deviceId() : undefined; const secrets: Uint8Array[] = [];
+        const read = (value: JsonObject[string] | undefined): Uint8Array | undefined => { if (value == null) return undefined; const result = bytes(value, 32); secrets.push(result); return result; };
+        try {
+            let queries: RecordQuery[]; const mutations: StoreMutation[] = []; let conflict = false;
+            if (type === 'group_secret') {
+                if (data.kind !== 'member') failure('Unsupported group secret kind.'); const id = text(data.id); const secret = read(data.secret) ?? failure('Missing member secret.');
+                const publicKey = encryptionPublicKey(secret); if (encodeBase64Url(publicKey) !== id) failure('Member secret differs from its public identifier.');
+                queries = [groupMemberSecretKey(groupId, publicKey)]; const snapshot = await this.options.store.read(queries, signal); const current = snapshot.sets[0]![0]?.value; const purpose = this.#purpose(groupId, 'member', id);
+                if (current) conflict = !await this.#backupSecretMatches(current, 'protectedKey', secret, purpose, signal);
+                else mutations.push(put(queries[0] as RecordKey, { publicKey: id, protectedKey: await this.#protect(secret, purpose, signal), shared: false }));
+                return await commit.call(this, snapshot);
+            }
+            const epoch = integer(data.epoch); const commitment = data.commitment == null ? undefined : text(data.commitment); if (commitment !== undefined) contentHashBytes(commitment);
+            const member = read(data.member_public_key); const client = read(data.client_secret); const application = read(data.application_secret);
+            if (client && groupClientSecretCommitment(groupId, client, this.options.context) !== commitment) failure('Client secret differs from its commitment.');
+            const key = { collection: 'group_epochs', key: `${groupId}|${String(epoch).padStart(16, '0')}` };
+            queries = [key, groupApplicationSecretKey(groupId, epoch), ...(commitment ? [clientSecretKey(groupId, commitment)] : [])];
+            const snapshot = await this.options.store.read(queries, signal); const current = snapshot.sets[0]![0]?.value; const heldApplication = snapshot.sets[1]![0]?.value;
+            const memberKey = member && encodeBase64Url(member);
+            if (current?.commitment != null && commitment != null && current.commitment !== commitment || current?.memberPublicKey != null && memberKey != null && current.memberPublicKey !== memberKey) return 'conflicts';
+            const mergedCommitment = current?.commitment ?? commitment; const mergedMember = current?.memberPublicKey ?? memberKey;
+            const heldClient = current?.protectedClientSecret ? { protectedSecret: current.protectedClientSecret } : current?.materialVerified === true ? snapshot.sets[2]?.[0]?.value : undefined;
+            if (client && !await this.#backupSecretMatches(heldClient, 'protectedSecret', client, this.#purpose(groupId, 'client', String(mergedCommitment)), signal)
+                || application && !await this.#backupSecretMatches(heldApplication, 'protectedSecret', application, this.#purpose(groupId, 'epoch', String(epoch)), signal)) return 'conflicts';
+            const next: JsonObject = { ...current, epoch, ...(mergedCommitment == null ? {} : { commitment: mergedCommitment }), ...(mergedMember == null ? {} : { memberPublicKey: mergedMember }) };
+            if (client && !heldClient) next.protectedClientSecret = await this.#protect(client, this.#purpose(groupId, 'client', String(mergedCommitment)), signal);
+            if (fingerprint(next) !== fingerprint(current)) mutations.push(put(key, next));
+            if (application && !heldApplication) mutations.push(put(queries[1] as RecordKey, { epoch, protectedSecret: await this.#protect(application, this.#purpose(groupId, 'epoch', String(epoch)), signal), source: 'account', shared: false }));
+            return await commit.call(this, snapshot);
+            async function commit(this: GroupSecrets, initial: StoreSnapshot): Promise<Outcome> {
+                return updateStore(this.options.store, queries, current => {
+                    if (deviceId !== undefined && deviceId !== this.options.deviceId()) throw new GroupKeyAccessError('Local device changed during secret import.');
+                    if (current.sets.some((rows, i) => fingerprint(rows[0]?.value) !== fingerprint(initial.sets[i]![0]?.value))) throw new StateConflictError('Group secrets changed during import.');
+                    return { mutations: conflict ? [] : mutations, result: conflict ? 'conflicts' : mutations.length ? 'applied' : 'unchanged' };
+                }, signal);
+            }
+        } finally { for (const secret of secrets) secret.fill(0); }
+    }
+    async #backupSecretMatches(current: JsonObject | undefined, field: string, incoming: Uint8Array | undefined, purpose: string, signal?: AbortSignal): Promise<boolean> {
+        if (!current || !incoming) return true; const secret = await this.#unprotect(current, field, purpose, signal);
+        try { return equalBytes(secret, incoming); } finally { secret.fill(0); }
+    }
     #purpose(groupId: string, kind: string, key: string): string {
         validateIdentifier('group', groupId); const deviceId = this.options.deviceId(); validateIdentifier('device', deviceId);
         return `Meshline/${this.options.context}/${this.options.accountId}/${deviceId}/group/${groupId}/${kind}/${key}`;
@@ -144,7 +212,9 @@ export class GroupSecrets implements GroupApplicationSecrets {
     async readClientSecret(group: GroupRef, commitment: string, signal?: AbortSignal): Promise<Uint8Array | undefined> {
         validateGroupRef(group); contentHashBytes(commitment); const epochs = await new GroupRepository(this.options.store, this.options.context, this.options.accountId).epochs(group, signal);
         if (!epochs.some(epoch => epoch.commitment === commitment)) return undefined;
-        const row = (await this.options.store.read([clientSecretKey(group.groupId, commitment)], signal)).sets[0]![0]?.value; if (!row) return undefined;
+        const snapshot = await this.options.store.read([clientSecretKey(group.groupId, commitment), { collection: 'group_epochs', prefix: `${group.groupId}|` }], signal);
+        const held = snapshot.sets[1]!.find(row => row.value.commitment === commitment && row.value.protectedClientSecret)?.value.protectedClientSecret;
+        const row = snapshot.sets[0]![0]?.value ?? (held ? { protectedSecret: held } : undefined); if (!row) return undefined;
         const purpose = this.#purpose(group.groupId, 'client', commitment); const secret = await this.#unprotect(row, 'protectedSecret', purpose, signal);
         if (groupClientSecretCommitment(group.groupId, secret, this.options.context) !== commitment || purpose !== this.#purpose(group.groupId, 'client', commitment)) { secret.fill(0); throw new GroupKeyAccessError('Stored client secret does not match its verified commitment or local device.'); } return secret;
     }

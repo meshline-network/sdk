@@ -11,6 +11,23 @@ import { updateStore } from '../storage/transaction.js';
 import type { HttpMethod } from '../transport/http.js';
 import { decodeGroupProjection, groupAcceptanceKey, groupEventKey, groupKey } from './repository.js';
 import { groupMemberSecretKey, groupRotationKey, type PreparedGroupMemberKey } from './secrets.js';
+import type { GroupEvent } from '../models/group-management.js';
+import type { StoredRecord } from '../storage/store.js';
+
+/** Retires only requests identified by this verified event, in its storage transaction. */
+export function confirmationMutations(group: GroupRef, event: GroupEvent, rows: readonly StoredRecord[], rotation: JsonObject | undefined): StoreMutation[] {
+    const mutations: StoreMutation[] = [];
+    for (const row of rows) {
+        if (!row.value.request || row.value.method === 'group.update') continue;
+        const operation = decode(row.value); if (operation.group.relayId !== group.relayId) continue;
+        const payload = groupOperationPayload(operation); const matches = payload !== undefined && canonicalJson(payload) === canonicalJson(event.payload);
+        if (!matches) continue;
+        if (operation.acceptedSequence !== undefined && operation.acceptedSequence !== event.sequence) throw new ProtocolError('conflicting_acknowledgement', 'Accepted sequence differs from verified history.');
+        mutations.push({ kind: 'delete', collection: row.collection, key: row.key });
+        if (operation.method === 'group.secret.rotation.commit' && rotation?.commitment === operation.request.client_secret_commitment) mutations.push({ kind: 'delete', ...groupRotationKey(group) });
+    }
+    return mutations;
+}
 
 export const groupOperationMethods = {
     'group.create': 'POST', 'group.update': 'PATCH', 'group.close': 'DELETE', 'group.message.send': 'POST',
