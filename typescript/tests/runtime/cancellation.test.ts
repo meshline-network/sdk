@@ -7,6 +7,21 @@ const NativeAbortController = globalThis.AbortController;
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const legacy = () => vi.stubGlobal('AbortController', LegacyAbortController);
 
+test.each(['before waiting', 'while waiting'] as const)('cancellation %s observes later operation failures and preserves the cancellation reason', async when => {
+    const controller = new AbortController(); const reason = new Error('caller canceled');
+    let reject!: (error: Error) => void; const operation = new Promise<void>((_resolve, fail) => { reject = fail; });
+    const unhandled: unknown[] = []; const observe = (error: unknown) => { unhandled.push(error); }; process.on('unhandledRejection', observe);
+    try {
+        if (when === 'before waiting') {
+            controller.abort(reason); expect(() => awaitWithSignal(operation, controller.signal)).toThrow(reason);
+        } else {
+            const waiting = expect(awaitWithSignal(operation, controller.signal)).rejects.toBe(reason); controller.abort(reason); await waiting;
+        }
+        reject(new Error('operation failed after cancellation'));
+        await new Promise(resolve => setImmediate(resolve)); expect(unhandled).toEqual([]);
+    } finally { process.off('unhandledRejection', observe); }
+});
+
 test('a deadline keeps its TimeoutError through nested scopes on the actual React Native abort-controller polyfill', async () => {
     legacy(); vi.useFakeTimers(); const parent = abortScope([], 25); const child = abortScope([parent.signal]);
     const settled = Promise.allSettled([awaitWithSignal(new Promise<void>(() => {}), child.signal)]);

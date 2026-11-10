@@ -32,7 +32,11 @@ export const systemClock: RuntimeClock = {
 
 /** A caller can abandon a shared operation without canceling other callers' work. */
 export function awaitWithSignal<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-    throwIfAborted(signal);
+    if (signal?.aborted) {
+        // The supplied operation has already started; observe its failure even if nobody waits for it.
+        void promise.catch(() => {});
+        throw abortReason(signal);
+    }
     if (!signal) return promise;
     return new Promise<T>((resolve, reject) => {
         const onAbort = (): void => { signal.removeEventListener('abort', onAbort); reject(abortReason(signal)); };
