@@ -45,15 +45,13 @@ device manager determines whether a saved publication matches the intended
 replacement and whether authorization is effective. Internal operation IDs are
 stored by the SDK; applications do not supply them.
 
-These records use the adapter's existing compare-and-commit contract. Wallet
-signing and network I/O stay outside transactions, and setup requires no separate
-schema migration. A settled signed request may have been rejected: successful
-setup additionally requires verified, effective authorization.
+Setup uses atomic compare-and-commit storage; wallet signing and network I/O
+happen outside write transactions. A settled signed request may have been rejected:
+successful setup also requires verified, effective authorization.
 
-Background contact maintenance reconstructs work from grants and outgoing
-messages. Each pass shares one lazy outbox scan and rechecks matching delivery
-records before reuse. Notification progress is stored per contact, committed
-atomically with its outbox request, and retained across stops and restarts.
+Contact maintenance resumes from persisted grants, outgoing messages and
+per-contact notification progress. Progress and its outbox request commit together
+and survive stops and restarts.
 
 Reauthorizing a device does not restore messages or decryption keys from a lost
 installation.
@@ -89,9 +87,10 @@ queries; an empty relay ID is not a request for all relays.
 
 Use the exported `HistoryRange` type to read newer messages with `after` or older
 messages with `before`. Resource filters, the range, and the signal are optional.
-Omitted, null, and empty ranges are unbounded. Managers copy and validate bounds
-when opening the query. `readNext(count, signal?)` chooses the batch size. Every
-batch is ascending; the boundary selects the adjacent batch.
+Omitted, null, and empty ranges are unbounded. Without a range, pass the signal
+directly after the resource filter, as in `getMessageHistory(peer, signal)`.
+Managers copy and validate bounds when opening the query. `readNext(count, signal?)`
+chooses the batch size. Every batch is ascending; the boundary selects the adjacent batch.
 
 | Range overload | Resource filters | Sequence |
 | --- | --- | --- |
@@ -144,15 +143,6 @@ to discover messages that become readable there. These positions are not exact
 processing ACKs or proof of complete history. Local queries do not synchronize,
 mark read, or follow. A canceled read does not advance the reader.
 
-### Calling forms and compatibility
-
-Existing calls such as `getMessageHistory(peer, signal)` and
-`getMessages({ groupId }, signal)` continue to use the original overload.
-Use `getMessageHistory()` for unbounded history,
-`getMessageHistory(undefined, { after: 80 })` for all peers after a position,
-or `getMessageHistory(peer, { before: 80 })` for earlier messages with one peer.
-`getMessageHistory(peer, null, signal)` explicitly requests an unbounded query.
-
 ## Distinguish relay pages
 
 Local readers do not fetch missing remote history.
@@ -163,37 +153,40 @@ These page objects are not disposable readers.
 
 ## Storage adapter behavior
 
-The supplied adapters apply key bounds and ordering in storage. Direct history
-and queries scoped to one group/channel use storage readers: SQLite materializes
-bounded batches, while IndexedDB copies the selected range to snapshot storage
-when opening a reader. Unscoped group/channel queries still materialize their
-matching local history when opened. Group/channel filtering may inspect multiple
-batches to skip non-message, deleted, or nonmatching rows.
+SQLite readers hold read transactions and materialize bounded batches. IndexedDB
+copies the selected range, or all declared collections for `openSnapshot`, into
+owned snapshot storage. Opening time and temporary database space scale with that
+selection. Unscoped group/channel queries materialize their matching history;
+filtered queries may inspect several batches before returning readable messages.
 
-Private-message history uses account-wide and per-peer sequence indexes containing
-message references. New messages maintain these indexes in their transaction.
-The first history query of an older store backfills them in atomic batches of at
-most 256 source rows, retaining a restartable checkpoint on failure or cancellation.
-That initial query can take longer than later indexed queries.
-
-## Preserve durable state
-
-The store commits state and cursors atomically. A failed local write or secret
-protection operation must not be treated as successfully consumed history.
-Allow the SDK to retry from retained state, and report persistent failures.
+Private-message history uses sequence indexes. An older store's first history
+query may take longer while the SDK builds those indexes; interrupted
+indexing resumes on the next attempt.
 
 ### Custom store contract
 
-If implementing your own `MeshlineStore`, preserve atomic compare-and-commit,
-binding validation, fixed snapshots, cancellation, and disposal semantics.
-Support `RecordQuery.after` and `before` as exclusive ASCII key bounds intersected
-with `key`/`prefix`, `reverse` as key ordering, and `limit` as a positive maximum
-row count. The limit applies to the whole `openQuery` snapshot, not separately to
-each `readNext` call. Empty intersections return no rows. Ignoring these fields
-can invalidate history pagination; use updated SDK and storage adapter packages
-together. Adapters supplied here require no schema change for these key queries.
-Do computation, signing, and network I/O outside database transactions.
-A stale revision requires recomputing from a new read, not replaying an external
-business request blindly.
+Implement `MeshlineStore` with binding validation, atomic compare-and-commit,
+fixed snapshots, cancellation and resource disposal. Use matching SDK and adapter
+versions.
+
+| Read method | Snapshot and paging contract |
+| --- | --- |
+| `read(queries, signal?)` | Returns the requested records from one current version. |
+| `openQuery(query, signal?)` | Fixes one selection at open time and pages it with `readNext`. An empty page marks completion. |
+| `openSnapshot(collections, signal?)` | Fixes all declared collections at one version before returning. Subsequent `read` calls share that version despite concurrent writes; queries outside those collections must fail. |
+
+Use `openSnapshot` to read related collections in bounded pages at one version.
+Disposing a reader, snapshot or its store releases the associated resources;
+already returned values remain usable.
+
+`RecordQuery.after` and `before` are exclusive ASCII key bounds intersected with
+`key`/`prefix`; `reverse` selects descending key order. `limit` is a positive maximum
+row count, applied to the whole `openQuery` selection rather than each `readNext`
+call. Empty intersections return no rows. Canceling `readNext` must not advance it.
+
+Commit state and synchronization cursors atomically. A stale revision requires
+recomputing from a new read; never replay an external business request blindly.
+Keep computation, signing and network I/O outside write transactions. Failed writes
+or secret-protection operations must leave work available for retry.
 
 [All guides](../README.md)

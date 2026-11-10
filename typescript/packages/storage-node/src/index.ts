@@ -5,7 +5,7 @@ import {
     StateConflictError, bindingJson, canonicalJson, parseJson, prepareCommit,
     requireBatchCount, requireObject, throwIfAborted, validateRecordQuery,
     type MeshlineStore, type QueryReader, type RecordQuery, type StorageBinding,
-    type StoredRecord, type StoreMutation, type StoreSnapshot,
+    type StoredRecord, type StoreMutation, type StoreSnapshot, type StoreReadSnapshot,
 } from '@meshline/sdk';
 
 interface Row { collection: string; key: string; revision: number; value: string }
@@ -32,7 +32,7 @@ export class NodeSqliteStore implements MeshlineStore {
     private initialized = false;
     private disposed = false;
     private disposal: Promise<void> | undefined;
-    private readonly readers = new Set<SqliteReader>();
+    private readonly readers = new Set<SqliteReader | SqliteSnapshot>();
 
     constructor(path: string) {
         if (!path.trim() || path === ':memory:') throw new TypeError('A persistent SQLite file path is required.');
@@ -141,6 +141,18 @@ export class NodeSqliteStore implements MeshlineStore {
         } catch (error) { database.close(); throw error; }
     }
 
+    async openSnapshot(collections: readonly string[], signal?: AbortSignal): Promise<StoreReadSnapshot> {
+        this.connection(); const allowed = new Set(collections);
+        for (const collection of allowed) validateRecordQuery({ collection });
+        throwIfAborted(signal); const database = new DatabaseSync(this.path, { readOnly: true });
+        try {
+            database.exec('PRAGMA busy_timeout = 5000; BEGIN DEFERRED;');
+            const version = (database.prepare('SELECT version FROM meshline_meta WHERE id = 1').get() as { version: number }).version;
+            const snapshot = new SqliteSnapshot(database, version, allowed, () => this.readers.delete(snapshot));
+            this.readers.add(snapshot); return snapshot;
+        } catch (error) { database.close(); throw error; }
+    }
+
     dispose(): Promise<void> {
         if (this.disposal) return this.disposal;
         this.disposed = true;
@@ -188,6 +200,27 @@ class SqliteReader implements QueryReader<StoredRecord> {
     async dispose(): Promise<void> {
         if (this.disposed) return;
         this.disposed = true;
+        try { this.database.exec('ROLLBACK'); }
+        finally { try { this.database.close(); } finally { this.released(); } }
+    }
+}
+
+class SqliteSnapshot implements StoreReadSnapshot {
+    private disposed = false;
+    constructor(private readonly database: DatabaseSync, private readonly version: number, private readonly collections: ReadonlySet<string>, private readonly released: () => void) {}
+    async read(queries: readonly RecordQuery[], signal?: AbortSignal): Promise<StoreSnapshot> {
+        if (this.disposed) throw new Error('Snapshot is disposed.');
+        const selected = queries.map(query => {
+            if (!this.collections.has(query.collection)) throw new TypeError('Collection is outside the snapshot.');
+            return selection(query);
+        });
+        throwIfAborted(signal);
+        const sets = selected.map(query => (this.database.prepare(`SELECT * FROM meshline_records WHERE ${query.where} ORDER BY key ${query.order} LIMIT ?`)
+            .all(...query.parameters, query.limit ?? -1) as unknown as Row[]).map(decodeRow));
+        throwIfAborted(signal); return { version: this.version, sets };
+    }
+    async dispose(): Promise<void> {
+        if (this.disposed) return; this.disposed = true;
         try { this.database.exec('ROLLBACK'); }
         finally { try { this.database.close(); } finally { this.released(); } }
     }

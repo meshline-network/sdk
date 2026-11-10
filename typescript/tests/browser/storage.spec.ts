@@ -92,10 +92,11 @@ test('closing a tab releases ownership so abandoned snapshots can be recovered',
         await h.open('crash');
         await h.stores.main!.commit(0, [{ kind: 'put', collection: 'messages', key: '001', value: { text: 'keep' } }]);
         h.readers.main = await h.stores.main!.openQuery({ collection: 'messages' });
+        await h.stores.main!.openSnapshot(['messages']);
     });
     const other = await context.newPage();
     await ready(other);
-    expect(await other.evaluate(() => window.meshlineHarness.count('crash', 'snapshots'))).toBe(1);
+    expect(await other.evaluate(() => window.meshlineHarness.count('crash', 'snapshots'))).toBe(2);
     await page.close();
     // Page closure and the browser process releasing Web Locks are separate events.
     await expect.poll(() => other.evaluate(async () => (await navigator.locks.query()).held?.filter(lock => lock.name?.startsWith('meshline:crash:')).length ?? 0)).toBe(0);
@@ -159,4 +160,34 @@ test('browser crypto validates the same independent certificate and rejects anot
     }, JSON.parse(readFileSync(new URL('../../../tests/vectors/identity-auth-v1.json', import.meta.url), 'utf8')));
     expect(result.id).toBe(result.expected);
     expect(result.rejected).toBe(true);
+});
+
+test('multi-collection snapshots retain one version across pages and release all owned rows', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+        const h = window.meshlineHarness; await h.open('multi-snapshot'); const store = h.stores.main!;
+        const put = (key: string, value: number, collection = 'messages') => ({ kind: 'put' as const, collection, key, value: { value } });
+        await store.commit(0, [put('a1', 1), put('a2', 2), put('a3', 3), put('b1', 4), put('relay', 1, 'cursors')]);
+        const collections = ['messages', 'cursors']; const snapshot = await store.openSnapshot(collections); collections.push('outside');
+        const reader = await store.openQuery({ collection: 'messages', key: 'a1' });
+        await store.commit(1, [put('a1', 9), { kind: 'delete', collection: 'messages', key: 'a2' }, put('a4', 4), put('relay', 2, 'cursors')]);
+        const first = await snapshot.read([{ collection: 'messages', prefix: 'a', limit: 1 }, { collection: 'cursors', key: 'relay' }]);
+        const rest = await snapshot.read([{ collection: 'messages', prefix: 'a', after: 'a1', before: 'b', reverse: true, limit: 2 }]);
+        const empty = await snapshot.read([{ collection: 'messages', key: 'a1', after: 'a1' }, { collection: 'messages', prefix: 'a', after: 'z' }]);
+        const error = async (action: () => Promise<unknown>) => { try { await action(); return ''; } catch (value) { return (value as Error).message; } };
+        const outside = await error(() => snapshot.read([{ collection: 'outside' }]));
+        const abort = new AbortController(); abort.abort(new Error('stop snapshot read'));
+        const canceledRead = await error(() => snapshot.read([{ collection: 'messages' }], abort.signal));
+        const canceledOpen = await error(() => store.openSnapshot(['messages'], abort.signal));
+        await snapshot.dispose(); await snapshot.dispose();
+        const disposedRead = await error(() => snapshot.read([])); const remaining = await h.count('multi-snapshot', 'snapshots');
+        const otherReader = await reader.readNext(1); await reader.dispose();
+        const second = await store.openSnapshot(['messages']); await store.dispose();
+        const closedRead = await error(() => second.read([]));
+        return { first, rest, empty, outside, canceledRead, canceledOpen, disposedRead, remaining, otherReader, closedRead, final: await h.count('multi-snapshot', 'snapshots') };
+    });
+    expect(result.first.version).toBe(1); expect(result.first.sets.map(rows => rows.map(row => row.value.value))).toEqual([[1], [1]]);
+    expect(result.rest.version).toBe(1); expect(result.rest.sets[0]!.map(row => row.key)).toEqual(['a3', 'a2']); expect(result.empty.sets).toEqual([[], []]);
+    expect(result.outside).toContain('outside'); expect(result.canceledRead).toBe('stop snapshot read'); expect(result.canceledOpen).toBe('stop snapshot read');
+    expect(result.disposedRead).toContain('disposed'); expect(result.closedRead).toContain('disposed');
+    expect(result.remaining).toBe(1); expect(result.otherReader[0]!.value.value).toBe(1); expect(result.final).toBe(0);
 });

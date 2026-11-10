@@ -27,6 +27,14 @@ export type StoreMutation = (RecordKey & { readonly kind: 'put'; readonly value:
 
 export interface StoreSnapshot { readonly version: number; readonly sets: readonly (readonly StoredRecord[])[] }
 
+/** Read-only view of declared collections, fixed before openSnapshot returns and unaffected by later writes. */
+export interface StoreReadSnapshot {
+    /** Uses the store's query bounds and limits. Queries outside the declared collections fail. */
+    read(queries: readonly RecordQuery[], signal?: AbortSignal): Promise<StoreSnapshot>;
+    /** Releases the snapshot; already returned values remain usable. Disposing its store also releases it. */
+    dispose(): Promise<void>;
+}
+
 /** Fixed at open time. An empty batch marks completion; dispose releases the snapshot. */
 export interface QueryReader<T> {
     readNext(count: number, signal?: AbortSignal): Promise<readonly T[]>;
@@ -35,7 +43,7 @@ export interface QueryReader<T> {
 
 /**
  * Atomic compare-and-commit storage. Computation, signing, and network I/O happen
- * outside database transactions. A conflicting commit must be recomputed from a
+ * outside write transactions. A conflicting commit must be recomputed from a
  * new read; it must never blindly replay an external business request.
  */
 export interface MeshlineStore {
@@ -44,6 +52,7 @@ export interface MeshlineStore {
     read(queries: readonly RecordQuery[], signal?: AbortSignal): Promise<StoreSnapshot>;
     commit(expectedVersion: number, mutations: readonly StoreMutation[], signal?: AbortSignal): Promise<number>;
     openQuery(query: RecordQuery, signal?: AbortSignal): Promise<QueryReader<StoredRecord>>;
+    openSnapshot(collections: readonly string[], signal?: AbortSignal): Promise<StoreReadSnapshot>;
     dispose(): Promise<void>;
 }
 

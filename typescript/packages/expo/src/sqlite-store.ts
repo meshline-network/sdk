@@ -1,7 +1,7 @@
 import {
     AsyncGate, StateConflictError, bindingJson, canonicalJson, parseJson, prepareCommit, requireBatchCount,
     requireObject, throwIfAborted, validateRecordQuery, type MeshlineStore, type QueryReader, type RecordQuery,
-    type StorageBinding, type StoredRecord, type StoreMutation, type StoreSnapshot,
+    type StorageBinding, type StoredRecord, type StoreMutation, type StoreSnapshot, type StoreReadSnapshot,
 } from '@meshline/sdk';
 
 /** Private adapter boundary, also exercised against a real SQLite driver in contract tests. */
@@ -29,10 +29,10 @@ function selection(query: RecordQuery) {
     return { where, parameters, order: query.reverse ? 'DESC' : 'ASC', limit: query.limit };
 }
 
-/** Serialized private writer and independent WAL snapshots, with no transaction spanning application callbacks. */
+/** Serialized private writer and independent WAL read snapshots. */
 export class NativeSqliteStore implements MeshlineStore {
     readonly #gate = new AsyncGate();
-    readonly #readers = new Set<NativeReader>();
+    readonly #readers = new Set<NativeReader | NativeSnapshot>();
     #database: SqliteDatabase | undefined;
     #disposed = false;
     #disposal: Promise<void> | undefined;
@@ -135,6 +135,21 @@ export class NativeSqliteStore implements MeshlineStore {
         }, signal);
     }
 
+    openSnapshot(collections: readonly string[], signal?: AbortSignal): Promise<StoreReadSnapshot> {
+        this.#check(); const allowed = new Set(collections);
+        for (const collection of allowed) validateRecordQuery({ collection });
+        return this.#gate.run(async () => {
+            this.#connection(); throwIfAborted(signal); const database = await this.runtime.open();
+            try {
+                await database.execAsync('PRAGMA busy_timeout = 5000; PRAGMA query_only = ON; BEGIN DEFERRED;');
+                const version = (await database.getFirstAsync<{ version: number }>('SELECT version FROM meshline_meta WHERE id = 1'))!.version;
+                throwIfAborted(signal);
+                const snapshot = new NativeSnapshot(database, version, allowed, () => this.#readers.delete(snapshot));
+                this.#readers.add(snapshot); return snapshot;
+            } catch (error) { await database.closeAsync(); throw error; }
+        }, signal);
+    }
+
     #check(): void { if (this.#disposed) throw new Error('Store is disposed.'); }
     #connection(): SqliteDatabase { this.#check(); if (!this.#database) throw new Error('Store is not initialized.'); return this.#database; }
     dispose(): Promise<void> {
@@ -179,6 +194,35 @@ class NativeReader implements QueryReader<StoredRecord> {
             const records = rows.map(decodeRow); throwIfAborted(signal);
             this.#offset += records.length; this.#completed = records.length < count;
             return records;
+        }, signal);
+    }
+    dispose(): Promise<void> {
+        this.#disposed = true;
+        return this.#disposal ??= this.#gate.run(async () => {
+            try { await this.database.execAsync('ROLLBACK'); }
+            finally { try { await this.database.closeAsync(); } finally { this.released(); } }
+        });
+    }
+}
+
+class NativeSnapshot implements StoreReadSnapshot {
+    readonly #gate = new AsyncGate();
+    #disposed = false;
+    #disposal: Promise<void> | undefined;
+    constructor(readonly database: SqliteDatabase, readonly version: number, readonly collections: ReadonlySet<string>, readonly released: () => void) {}
+    read(queries: readonly RecordQuery[], signal?: AbortSignal): Promise<StoreSnapshot> {
+        const selected = queries.map(query => {
+            if (!this.collections.has(query.collection)) throw new TypeError('Collection is outside the snapshot.');
+            return selection(query);
+        });
+        return this.#gate.run(async () => {
+            if (this.#disposed) throw new Error('Snapshot is disposed.');
+            throwIfAborted(signal); const sets: StoredRecord[][] = [];
+            for (const query of selected) {
+                throwIfAborted(signal);
+                sets.push((await this.database.getAllAsync<Row>(`SELECT * FROM meshline_records WHERE ${query.where} ORDER BY key ${query.order} LIMIT ?`, ...query.parameters, query.limit ?? -1)).map(decodeRow));
+            }
+            throwIfAborted(signal); return { version: this.version, sets };
         }, signal);
     }
     dispose(): Promise<void> {

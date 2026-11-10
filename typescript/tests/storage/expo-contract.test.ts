@@ -115,3 +115,25 @@ test('prefix selection treats SQL wildcard characters literally and reverse orde
     const pending = store.dispose(); expect(store.dispose()).toBe(pending); await pending;
     expect(() => store.read([])).toThrow('disposed');
 });
+
+test('multi-collection snapshots are pinned at open and support bounded reads until disposal', async () => {
+    const { store: instance } = await create();
+    await instance.commit(0, [put('a1', 1), put('a2', 2), put('a3', 3), put('b1', 4), put('relay', 1, 'cursors')]);
+    const collections = ['messages', 'cursors']; const snapshot = await instance.openSnapshot(collections); collections.push('outside');
+    await instance.commit(1, [put('a1', 9), { kind: 'delete', collection: 'messages', key: 'a2' }, put('a4', 4), put('relay', 2, 'cursors')]);
+    const first = await snapshot.read([{ collection: 'messages', prefix: 'a', limit: 1 }, { collection: 'cursors', key: 'relay' }]);
+    expect(first.version).toBe(1); expect(first.sets.map(rows => rows.map(row => row.value.value))).toEqual([[1], [1]]);
+    const rest = await snapshot.read([{ collection: 'messages', prefix: 'a', after: 'a1', before: 'b', reverse: true, limit: 2 }]);
+    expect(rest.version).toBe(1); expect(rest.sets[0]!.map(row => row.key)).toEqual(['a3', 'a2']);
+    expect((await snapshot.read([{ collection: 'messages', key: 'a1', after: 'a1' }, { collection: 'messages', prefix: 'a', after: 'z' }])).sets).toEqual([[], []]);
+    await expect(Promise.resolve().then(() => snapshot.read([{ collection: 'outside' }]))).rejects.toThrow('outside');
+    const abort = new AbortController(); abort.abort(new Error('stop snapshot read'));
+    await expect(Promise.resolve().then(() => snapshot.read([{ collection: 'messages' }], abort.signal))).rejects.toThrow('stop snapshot read');
+    expect((await snapshot.read([{ collection: 'messages', key: 'a1' }])).sets[0]![0]!.value.value).toBe(1);
+    await expect(Promise.resolve().then(() => instance.openSnapshot(['messages'], abort.signal))).rejects.toThrow('stop snapshot read');
+    await snapshot.dispose(); await snapshot.dispose();
+    await expect(Promise.resolve().then(() => snapshot.read([]))).rejects.toThrow('disposed');
+    expect(first.sets[0]![0]!.value.value).toBe(1);
+    const second = await instance.openSnapshot(['messages']); await instance.dispose();
+    await expect(Promise.resolve().then(() => second.read([]))).rejects.toThrow('disposed');
+});

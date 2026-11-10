@@ -57,6 +57,7 @@ export async function recoverGroup(environment: Environment, staged: Awaited<Ret
     const faultStore: sdk.MeshlineStore = {
         migrate: signal => realStore.migrate(signal), initialize: (binding, signal) => realStore.initialize(binding, signal),
         read: (queries, signal) => realStore.read(queries, signal), openQuery: (query, signal) => realStore.openQuery(query, signal),
+        openSnapshot: (collections, signal) => realStore.openSnapshot(collections, signal),
         dispose: () => realStore.dispose(),
         async commit(version, mutations, signal) {
             const keyBatch = mutations.some(value => value.collection === 'group_member_keys');

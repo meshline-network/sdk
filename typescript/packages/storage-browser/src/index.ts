@@ -2,11 +2,11 @@ import {
     AsyncGate, StateConflictError, bindingJson, canonicalJson, encodeBase64Url, parseJson,
     prepareCommit, requireBatchCount, requireObject, throwIfAborted, systemRandom, validateRecordQuery,
     type MeshlineStore, type QueryReader, type RandomSource, type RecordQuery, type StorageBinding,
-    type StoredRecord, type StoreMutation, type StoreSnapshot,
+    type StoredRecord, type StoreMutation, type StoreSnapshot, type StoreReadSnapshot,
 } from '@meshline/sdk';
 
 interface DiskRecord { collection: string; key: string; revision: number; value: string }
-interface SnapshotRow { owner: string; reader: string; index: number; record: DiskRecord }
+interface SnapshotRow { owner: string; reader: string; index: number | [string, string]; record: DiskRecord }
 interface Owner { id: string }
 
 /** Explicit platform dependencies permit worker use without importing DOM application code. */
@@ -96,7 +96,7 @@ export class IndexedDbStore implements MeshlineStore {
     private ownerLock: Promise<void> | undefined;
     private disposed = false;
     private invalidated = false;
-    private readonly readers = new Set<IndexedDbReader>();
+    private readonly readers = new Set<IndexedDbReader | IndexedDbSnapshot>();
 
     constructor(readonly name: string, private readonly options: IndexedDbOptions = {}) {
         if (!name.trim()) throw new TypeError('An IndexedDB database name is required.');
@@ -214,6 +214,25 @@ export class IndexedDbStore implements MeshlineStore {
         }, signal);
     }
 
+    openSnapshot(collections: readonly string[], signal?: AbortSignal): Promise<StoreReadSnapshot> {
+        const allowed = new Set(collections);
+        const ranges = [...allowed].map(collection => keyRange({ collection }));
+        return this.gate.run(async () => {
+            const database = this.connection(); const owner = this.owner!;
+            const id = encodeBase64Url((this.options.random ?? systemRandom).bytes(16));
+            const version = await transaction(database, ['meta', 'records', 'snapshots'], 'readwrite', async tx => {
+                const version = (await request(tx.objectStore('meta').get('version')) as { value: number }).value;
+                for (const range of ranges) await scan(tx.objectStore('records'), range, false, cursor => {
+                    const record = cursor.value as DiskRecord;
+                    tx.objectStore('snapshots').add({ owner, reader: id, index: [record.collection, record.key], record });
+                });
+                return version;
+            }, signal);
+            const snapshot = new IndexedDbSnapshot(database, owner, id, version, allowed, () => this.readers.delete(snapshot));
+            this.readers.add(snapshot); return snapshot;
+        }, signal);
+    }
+
     dispose(): Promise<void> {
         return this.gate.run(async () => {
             if (this.disposed) return;
@@ -306,6 +325,44 @@ class IndexedDbReader implements QueryReader<StoredRecord> {
             try {
                 await transaction(this.database, ['snapshots'], 'readwrite', async tx => {
                     await request(tx.objectStore('snapshots').delete(IDBKeyRange.bound([this.owner, this.reader, 0], [this.owner, this.reader, Number.MAX_SAFE_INTEGER])));
+                });
+            } finally { this.released(); }
+        });
+    }
+}
+
+class IndexedDbSnapshot implements StoreReadSnapshot {
+    private readonly gate = new AsyncGate();
+    private disposed = false;
+    constructor(private readonly database: IDBDatabase, private readonly owner: string, private readonly id: string,
+        private readonly version: number, private readonly collections: ReadonlySet<string>, private readonly released: () => void) {}
+    read(queries: readonly RecordQuery[], signal?: AbortSignal): Promise<StoreSnapshot> {
+        const selected = queries.map(query => {
+            if (!this.collections.has(query.collection)) throw new TypeError('Collection is outside the snapshot.');
+            const range = keyRange(query);
+            return { range: range && IDBKeyRange.bound([this.owner, this.id, range.lower], [this.owner, this.id, range.upper], range.lowerOpen, range.upperOpen), reverse: query.reverse ?? false, limit: query.limit };
+        });
+        return this.gate.run(() => {
+            if (this.disposed) throw new Error('Snapshot is disposed.');
+            return transaction(this.database, ['snapshots'], 'readonly', async tx => {
+                const sets: StoredRecord[][] = [];
+                for (const query of selected) {
+                    const values: StoredRecord[] = [];
+                    await scan(tx.objectStore('snapshots'), query.range, query.reverse, cursor => {
+                        values.push(decode((cursor.value as SnapshotRow).record)); return query.limit === undefined || values.length < query.limit;
+                    });
+                    sets.push(values);
+                }
+                return { version: this.version, sets };
+            }, signal);
+        }, signal);
+    }
+    dispose(): Promise<void> {
+        return this.gate.run(async () => {
+            if (this.disposed) return; this.disposed = true;
+            try {
+                await transaction(this.database, ['snapshots'], 'readwrite', async tx => {
+                    await request(tx.objectStore('snapshots').delete(IDBKeyRange.bound([this.owner, this.id], [this.owner, this.id + '\0'], false, true)));
                 });
             } finally { this.released(); }
         });
