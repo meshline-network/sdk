@@ -70,7 +70,7 @@ describe('Message delivery and history', () => {
         });
     });
 
-    test('ungranted direct sends are rejected; self messages persist locally and queued cancellation prevents transmission', async () => {
+    test('ungranted direct sends are rejected; canceled self messages remain in the outbox without entering history', async () => {
         const { a, b, network } = await fixture();
         await expect(a.messages.sendMessage(b.accountId, { body: { contentType: 'text/plain', text: 'not authorized' } })).rejects.toThrow('grant');
         const states = vi.spyOn(a.device, 'getDeviceState');
@@ -79,7 +79,8 @@ describe('Message delivery and history', () => {
         expect(await a.messages.cancelMessage(sent.messageId)).toBe(true); expect(await a.messages.cancelMessage(sent.messageId)).toBe(false);
         await a.messages.start(); await network.until(async () => network.submissions.length > 0);
         expect(network.submissions.some(request => request.envelope.messageId === sent.messageId)).toBe(false);
-        expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(1); expect((await a.messages.getSendStatus(sent.messageId))!.state).toBe('canceled');
+        expect(await all(a.messages.getMessageHistory(a.accountId))).toHaveLength(0); expect((await a.messages.getOutgoingMessage(sent.messageId))!.message.body!.text).toBe('self message');
+        expect((await a.messages.getSendStatus(sent.messageId))!.state).toBe('canceled');
     });
 
     test('send preparation reuses both states during a blocked refresh and still rejects revoked authorization', async () => {

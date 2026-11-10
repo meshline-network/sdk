@@ -25,8 +25,10 @@ retrieval belong to your application. Omitted attachments mean no attachments.
 
 `sendMessage()` returns a durable outbox status, not remote delivery confirmation.
 Direct messages automatically request offline push notifications.
-Persisting the encrypted request precedes submission. Observe `sendStatusChanged`
-or call `getSendStatus(messageId)` as processing continues.
+The outbox holds content and the encrypted request before submission; the message
+enters history and receives a `localSequence` only after synchronization from the
+account's own timeline. Observe `sendStatusChanged` or call
+`getSendStatus(messageId)` as processing continues.
 
 ## Interpret send state
 
@@ -41,8 +43,10 @@ or call `getSendStatus(messageId)` as processing continues.
 | `canceled` | A queued request was canceled. |
 
 Status includes message and recipient IDs, creation time, and acceptance/error
-details when available. `getOutbox({ recipient, states })` opens a local snapshot:
-omitting `states` includes all states; `states: []` includes none.
+details when available. `getOutbox({ recipient, states })` opens a local snapshot of
+`OutgoingMessageInfo` values containing `message` and `status`;
+`getOutgoingMessage(messageId)` returns one such value. Both exclude internal
+protocol sends. Omitting `states` includes all states; `states: []` includes none.
 
 ## Wait for an acceptance milestone
 
@@ -90,14 +94,15 @@ as a generic retry can duplicate the user's message.
 
 ## Retained send history
 
-The SDK retains the newest 1000 terminal outbox records (`targetAccepted`, `failed`,
-and `canceled`) across this account, including internal protocol messages. Retention
-uses `createdAt` descending, then ordinal message ID descending to break ties; it
-follows creation order, not completion order. Pending records are never evicted by
-this limit. Initialization and send-state transactions prune excess terminal records
-without removing message history. Retained records
-include the original encrypted request and remain queryable after restart;
-`getOutbox` includes retained direct-message terminal records unless filtered out.
+The SDK retains the newest 1000 eligible terminal outbox records (`targetAccepted`,
+`failed`, and `canceled`) account-wide, including internal protocol sends. Pending
+records are protected. Direct sends accepted by their submitting relay are also
+protected until their own history is synchronized, even if later delivery fails;
+unaccepted failed/canceled sends and terminal internal sends are eligible immediately.
+
+Retention orders records by `createdAt` descending, then ordinal message ID descending,
+and never removes message history. Retained requests and statuses survive restart.
+`getOutbox` includes retained terminal direct messages unless filtered out.
 
 `getSendStatus` returns `undefined` for unknown or evicted records. Absence does not
 prove success, failure, or that a message was never recorded locally. Previously
@@ -107,8 +112,8 @@ permanent delivery ledger.
 
 ## Receive and query
 
-`messageReceived` carries received messages; `timelineChanged` indicates local
-timeline changes. Use `getMessage({ sender, messageId })` for one message and
+`messageReceived` carries received messages;
+`timelineChanged` indicates local timeline changes. Use `getMessage({ sender, messageId })` for one message and
 `getMessageHistory(peerAccountId?)` for a disposable local snapshot reader.
 History is ordered by ascending `MessageInfo.localSequence`, including when
 messages arrive with older creation times. `getMessage` and `messageReceived`

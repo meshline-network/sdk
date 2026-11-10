@@ -291,7 +291,12 @@ export class MessageContacts {
         }
         const contacts = ['meshline.contact.grant', 'meshline.device.state.changed', 'meshline.account.contacts.sync'];
         if (contacts.includes(type as string) && self !== (type === 'meshline.account.contacts.sync')) reject('invalid_binding', 'Contact payload has invalid sender/recipient account binding.');
-        if (type === 'meshline.account.contacts.sync') return this.#receiveSync(entry, pureValidation(() => { const value = accountContactSyncCodec.decode(payload); validateAccountContactSync(value, this.host.clock.nowSeconds(), this.host.accountId); return value; }), signal);
+        if (type === 'meshline.account.contacts.sync') {
+            const sync = pureValidation(() => { const value = accountContactSyncCodec.decode(payload); validateAccountContactSync(value, this.host.clock.nowSeconds(), this.host.accountId); return value; });
+            if (envelope.from === this.host.accountId && envelope.fromDeviceId === certificateId(this.host.device.certificate, this.host.context)
+                && (await this.host.store.read([outboxKey(envelope.messageId)], signal)).sets[0]!.length) return undefined;
+            return this.#receiveSync(entry, sync, signal);
+        }
         if (type !== 'meshline.message.direct' && type !== 'meshline.contact.grant' && type !== 'meshline.device.state.changed') return undefined;
         await this.#ownReceptionState(entry, signal);
         if (type === 'meshline.contact.grant') {

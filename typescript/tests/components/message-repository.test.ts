@@ -131,7 +131,7 @@ test('history readers hold a stable snapshot while the local timeline uses monot
     expect((await f.repo.readTimeline(1, 10)).map(value => [value.localSequence, value.messageId])).toEqual([[2, nextId]]);
 });
 
-test('outgoing history and outbox insertion are atomic and guarded against changes made during signing', async () => {
+test('outgoing content stays in the guarded outbox until timeline acceptance assigns its local sequence', async () => {
     const f = await fixture(); const repo = new MessageRepository({ ...f.options, accountId: from.certificate.account, deviceId: () => from.id });
     const outbox: OutboxRecord = { request: f.request, state: 'queued', relayId: relayA, nextAttemptAt: f.clock.wall, isDirect: true };
     const guard = { collection: 'test_authorization', key: 'peer' }; const snapshot = await f.store.read([]); await f.store.commit(snapshot.version, [{ kind: 'put', ...guard, value: { revision: 2 } }]);
@@ -139,8 +139,9 @@ test('outgoing history and outbox insertion are atomic and guarded against chang
     expect((await f.store.read([{ collection: 'message_outbox' }, messageKey(f.prepared)])).sets).toEqual([[], []]);
     await repo.enqueue(outbox, f.prepared, [{ query: guard, value: { revision: 2 } }]);
     const queue = new MessageOutbox(f.store, f.clock, { getHome: async () => relayA, currentHome: () => relayA, prepare: async () => { throw new Error('unused'); } });
-    expect((await queue.get(id))!.state).toBe('queued'); expect((await repo.readTimeline(0, 10))[0]!.localSequence).toBe(1);
-    expect((await repo.get({ sender: from.certificate.account, messageId: id }))!.localSequence).toBe(1);
+    expect((await queue.get(id))!.state).toBe('queued'); expect((await queue.get(id))!.payload).toEqual(direct); expect(await repo.readTimeline(0, 10)).toEqual([]);
+    expect(await repo.get({ sender: from.certificate.account, messageId: id })).toBeUndefined();
+    await repo.accept(relayA, f.entry, f.prepared, false); expect((await repo.get({ sender: from.certificate.account, messageId: id }))!.localSequence).toBe(1);
     await expect(repo.enqueue(outbox, f.prepared, [])).rejects.toThrow('already exists');
 });
 

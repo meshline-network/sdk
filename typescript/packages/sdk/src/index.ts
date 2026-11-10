@@ -52,7 +52,7 @@ export * from './components/message.js';
 export * from './components/channel.js';
 export type { ChannelInfo, ChannelPostInfo, ChannelPostChange } from './channels/repository.js';
 export type { MessageKey, MessageInfo, AccountMessage } from './messages/repository.js';
-export type { MessageSendState, MessageSendStatus } from './messages/outbox.js';
+export type { MessageSendState, MessageSendStatus, OutgoingMessageInfo } from './messages/outbox.js';
 export type { ContactInfo, ContactGrantState, ContactRequestInfo, ContactRequestDirection, ContactChange, ContactChangeKind, ContactRequestChange, ContactRequestChangeKind } from './messages/contacts.js';
 export * from './components/group.js';
 export type { GroupMessageInfo } from './groups/messages.js';

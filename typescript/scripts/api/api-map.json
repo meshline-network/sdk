@@ -1,5 +1,10 @@
 [
   {
+    "type": "Meshline.Models.Client.OutgoingMessageInfo",
+    "path": "packages/sdk/src/messages/outbox.ts",
+    "notes": "Direct-message content and durable send status from one outbox snapshot; synchronized history has a separate local sequence."
+  },
+  {
     "type": "Meshline.Interactions.CachedRelayRegistry",
     "path": "packages/sdk/src/integrations/cached-relay-registry.ts",
     "notes": "Optional caller-owned registry wrapper; demand refresh, one-hour success interval and one-minute failure cooldown."

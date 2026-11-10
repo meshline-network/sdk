@@ -1,7 +1,7 @@
 import { decryptMessage, type MessageDecryptor } from '../crypto/messages.js';
 import { ProtocolError } from '../errors.js';
 import { certificateId, type DeviceCertificate } from '../models/identity.js';
-import { directMessageCodec, messageTimelinePageCodec, validateDirectMessage, validateMessageTimelinePage, type MessageTimelineEntry } from '../models/messages.js';
+import { directMessageCodec, messageTimelinePageCodec, validateDirectMessage, validateMessageTimelinePage, verifyMessageEnvelope, type MessageTimelineEntry } from '../models/messages.js';
 import type { NetworkContext } from '../protocol/context.js';
 import type { JsonObject, JsonValue } from '../protocol/json.js';
 import { AsyncGate } from '../runtime/async-gate.js';
@@ -53,6 +53,11 @@ export class MessageReceiver {
         }, signal);
     }
     async #receive(relayId: string, entry: MessageTimelineEntry, sender: DeviceCertificate, hasRetentionGap: boolean, signal?: AbortSignal): Promise<{ inserted: boolean; error?: ProtocolError; message?: MessageInfo }> {
+        try { verifyMessageEnvelope(entry.envelope, sender, this.context); }
+        catch (error) {
+            if (!(error instanceof ProtocolError) || !permanentCryptographyCodes.has(error.code)) throw error;
+            await this.repository.reject(relayId, entry.sequence, error, hasRetentionGap, signal); return { inserted: false, error };
+        }
         if (await this.repository.acceptKnown(relayId, entry, hasRetentionGap, signal)) return { inserted: false };
         let payload: JsonObject;
         try { payload = await decryptMessage({ context: this.context, receiver: this.device, envelope: entry.envelope, keyBox: entry.keyBox, sender, ...(signal ? { signal } : {}) }); }

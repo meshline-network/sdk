@@ -11,7 +11,7 @@ import { accountContactSyncCodec, contactAuthorizationCodec, contactConsentCodec
 import { directMessageCodec, messageDeliveryStatusCodec, messageSendRequestCodec, messageTimelineChangedCodec, validateDirectMessage, validateMessageTimelineChanged, type DirectMessage } from '../models/messages.js';
 import { MessageContacts, ContactMessageRejection, cachedDeviceStateKey, contactKey, contactRequestKey, readContact, readContactRequest,
     type ContactChange, type ContactRequestChange, type ContactChanges, type ContactInfo, type ContactRequestDirection, type ContactRequestInfo, type PreparedContactSend } from '../messages/contacts.js';
-import { MessageOutbox, decodeOutbox, outboxStatus, type MessageSendState, type MessageSendStatus, type OutboxChange } from '../messages/outbox.js';
+import { MessageOutbox, decodeOutbox, outboxStatus, outgoingMessage, type OutgoingMessageInfo, type MessageSendState, type MessageSendStatus, type OutboxChange } from '../messages/outbox.js';
 import { MessageRepository, snapshotReader, type AccountMessage, type MessageInfo, type MessageKey } from '../messages/repository.js';
 import { MessageReceiver, type ReceptionResult } from '../messages/receiver.js';
 import { registerAccountSender } from '../messages/account-sender.js';
@@ -176,7 +176,7 @@ export class MessageManager extends ClientComponent {
         const payload = directMessageCodec.encode(draft); validateDirectMessage(directMessageCodec.decode(payload));
         const status = await this.runOperation(scope => this.#writes.run(async () => { const prepared = await this.#prepareSend(recipient, payload, undefined, undefined, scope);
             const message = await this.#repository.prepare(prepared.outbox.request.envelope, payload, scope); await this.#repository.enqueue(prepared.outbox, message, prepared.guards, undefined, scope); return outboxStatus(prepared.outbox); }, scope), signal);
-        this.#sendPulse?.pulse(); this.#notify('timelineChanged', undefined); this.#notify('sendStatusChanged', status); return status;
+        this.#sendPulse?.pulse(); this.#notify('sendStatusChanged', status); return status;
     }
     getMessage(key: MessageKey, signal?: AbortSignal): Promise<MessageInfo | undefined> { const copy = { ...key }; return this.runOperation(scope => this.#repository.get(copy, scope), signal); }
     /** Opens a fixed local snapshot in ascending localSequence order. Does not synchronize or mark read. */
@@ -188,15 +188,23 @@ export class MessageManager extends ClientComponent {
         return this.runOperation(scope => this.#repository.history(peer, scope, args.range), args.signal);
     }
     readTimeline(after: number, count: number, signal?: AbortSignal): Promise<readonly AccountMessage[]> { return this.runOperation(scope => this.#repository.readTimeline(after, count, scope), signal); }
-    /** Includes retained direct-message terminal records; the account-wide terminal history is limited to the newest 1000 records. */
-    getOutbox(query: OutboxQuery = {}, signal?: AbortSignal): Promise<QueryReader<MessageSendStatus>> {
+    /**
+     * Opens a fixed snapshot of pending and retained terminal direct sends, with content and status together.
+     * Orders by createdAt, then ordinal message ID, ascending. Internal protocol sends are excluded.
+     * Missing or invalid content fails the query. Reopen to observe later changes.
+     */
+    getOutbox(query: OutboxQuery = {}, signal?: AbortSignal): Promise<QueryReader<OutgoingMessageInfo>> {
         const recipient = query.recipient; const states = query.states && [...query.states]; if (recipient !== undefined) validateAccountId(recipient);
         if (states?.some(value => !sendStates.has(value))) throw new TypeError('Unknown message send state.');
         return this.runOperation(async scope => { const rows = await this.#store.read([{ collection: 'message_outbox' }], scope);
             return snapshotReader(rows.sets[0]!.map(decodeOutbox).filter(value => value.isDirect && (recipient === undefined || value.request.envelope.to === recipient) && (states === undefined || states.includes(value.state)))
-                .sort((a, b) => a.request.envelope.createdAt - b.request.envelope.createdAt || ordinal(a.request.envelope.messageId, b.request.envelope.messageId)).map(outboxStatus)); }, signal);
+                .sort((a, b) => a.request.envelope.createdAt - b.request.envelope.createdAt || ordinal(a.request.envelope.messageId, b.request.envelope.messageId)).map(outgoingMessage)); }, signal);
     }
-    /** Reads pending or retained terminal status. Undefined means no local record remains, including after history eviction. */
+    /** Reads one retained direct message's content and status together. Undefined means absent, internal or evicted. */
+    getOutgoingMessage(messageId: string, signal?: AbortSignal): Promise<OutgoingMessageInfo | undefined> {
+        return this.runOperation(async scope => { const record = await this.#outbox.get(messageId, scope); return record?.isDirect ? outgoingMessage(record) : undefined; }, signal);
+    }
+    /** Reads pending or retained terminal status. Undefined means no outbox record remains; it does not establish the send outcome. */
     getSendStatus(messageId: string, signal?: AbortSignal): Promise<MessageSendStatus | undefined> { return this.runOperation(async scope => { const record = await this.#outbox.get(messageId, scope); return record && outboxStatus(record); }, signal); }
     /**
      * Wait for queued, relayAccepted, or targetAccepted (the default), returning the actual status.

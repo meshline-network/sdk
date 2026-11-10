@@ -9,7 +9,7 @@ import { canonicalBytes, canonicalJson, parseJson, requireObject, requireSafeInt
 import { throwIfAborted, type RuntimeClock } from '../runtime/clock.js';
 import { requireBatchCount, type MeshlineStore, type QueryReader, type RecordKey, type RecordQuery, type StoredRecord, type StoreMutation, type StoreSnapshot } from '../storage/store.js';
 import { updateStore } from '../storage/transaction.js';
-import { encodeOutbox, outboxKey, type OutboxRecord } from './outbox.js';
+import { encodeOutbox, outboxKey, updateWithOutboxRetention, type OutboxRecord } from './outbox.js';
 import { historyIndex, historyQuery, historyReader, historySelection, validateHistoryRows, type HistoryRange } from '../models/history.js';
 
 export interface MessageKey { readonly sender: string; readonly messageId: string }
@@ -127,10 +127,14 @@ export class MessageRepository {
     async acceptKnown(relayId: string, entry: MessageTimelineEntry, hasRetentionGap: boolean, signal?: AbortSignal): Promise<boolean> {
         const key = timelineKey(relayId); requireSafeInteger(entry.sequence, 0); requireSafeInteger(entry.acceptedAt, 0);
         const now = this.options.clock.nowSeconds(); requireSafeInteger(now, 0);
-        return updateStore(this.options.store, [key, messageKey({ sender: entry.envelope.from, messageId: entry.envelope.messageId })], snapshot => {
-            const known = snapshot.sets[1]![0]; if (!known) return { mutations: [], result: false };
-            this.#belongsToAccount(decodeMessage(known)); const current = progress(snapshot.sets[0]![0]?.value);
-            return { mutations: current.sequence >= entry.sequence ? [] : [{ kind: 'put', ...key, value: { sequence: entry.sequence, hasRetentionGap: current.hasRetentionGap || hasRetentionGap, lastSynchronizedAt: now } }], result: true };
+        const own = entry.envelope.from === this.options.accountId;
+        return (own ? updateWithOutboxRetention : updateStore)(this.options.store, [key, messageKey({ sender: entry.envelope.from, messageId: entry.envelope.messageId })], snapshot => {
+            const known = snapshot.sets[1]![0]; if (!known) return { mutations: [], result: false, prune: false };
+            const message = decodeMessage(known); this.#belongsToAccount(message);
+            if (!matchesEnvelope(message, entry.envelope)) throw new ProtocolError('invalid_identity', 'Timeline envelope differs from retained message metadata.');
+            const current = progress(snapshot.sets[0]![0]?.value);
+            const mutations: StoreMutation[] = current.sequence >= entry.sequence ? [] : [{ kind: 'put', ...key, value: { sequence: entry.sequence, hasRetentionGap: current.hasRetentionGap || hasRetentionGap, lastSynchronizedAt: now } }];
+            return { mutations, result: true };
         }, signal);
     }
     #info(value: StoredMessage): MessageInfo {
@@ -192,16 +196,15 @@ export class MessageRepository {
     async enqueue(outbox: OutboxRecord, message: PreparedMessage | undefined, guards: readonly RecordGuard[], effects?: MessageEffects, signal?: AbortSignal): Promise<void> {
         const envelope = outbox.request.envelope; const key = outboxKey(envelope.messageId);
         if (envelope.from !== this.options.accountId || outbox.state !== 'queued' || outbox.acceptedAt !== undefined) throw new ProtocolError('invalid_outbox', 'Only new local queued messages may be enqueued.');
-        if (outbox.isDirect !== Boolean(message) || message && message.payloadType !== 'meshline.message.direct') throw new ProtocolError('invalid_outbox', 'Only direct outgoing messages are inserted into local history at enqueue time.');
+        if (outbox.isDirect !== Boolean(message) || message && message.payloadType !== 'meshline.message.direct') throw new ProtocolError('invalid_outbox', 'Direct outgoing messages require plaintext content in their outbox entry.');
         if (message && !matchesEnvelope(message, envelope)) throw new ProtocolError('invalid_outbox', 'Local message identity differs from the outgoing envelope.');
-        const queries: RecordQuery[] = [key, messageKey({ sender: envelope.from, messageId: envelope.messageId }), sequenceKey, ...guards.map(value => value.query), ...effects?.queries ?? []];
-        const document = encodeOutbox(outbox);
+        const queries: RecordQuery[] = [key, messageKey({ sender: envelope.from, messageId: envelope.messageId }), ...guards.map(value => value.query), ...effects?.queries ?? []];
+        const document = encodeOutbox({ ...outbox, ...(message?.payload ? { payload: message.payload } : {}) });
         const committed = await updateStore(this.options.store, queries, snapshot => {
             if (snapshot.sets[0]!.length || snapshot.sets[1]!.length) throw new StateConflictError('Outgoing message ID already exists.');
-            guards.forEach((guard, index) => { if (fingerprint(snapshot.sets[index + 3]![0]?.value) !== fingerprint(guard.value)) throw new StateConflictError('Message authorization changed while preparing the encrypted request.'); });
+            guards.forEach((guard, index) => { if (fingerprint(snapshot.sets[index + 2]![0]?.value) !== fingerprint(guard.value)) throw new StateConflictError('Message authorization changed while preparing the encrypted request.'); });
             const mutations: StoreMutation[] = [{ kind: 'put', ...key, value: document }];
-            if (message) mutations.push(...insertMessage(message, snapshot.sets[2]![0]?.value, this.options.accountId).mutations);
-            const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(3 + guards.length) }; const effectMutations = effects?.plan(effectSnapshot) ?? [];
+            const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(2 + guards.length) }; const effectMutations = effects?.plan(effectSnapshot) ?? [];
             mutations.push(...effectMutations);
             return { mutations, result: { snapshot: effectSnapshot, mutations: effectMutations } };
         }, signal);
@@ -211,13 +214,14 @@ export class MessageRepository {
         if (!matchesEnvelope(message, entry.envelope)) throw new ProtocolError('invalid_message', 'Prepared message identity differs from the timeline envelope.');
         this.#belongsToAccount(message); requireSafeInteger(entry.sequence, 0); requireSafeInteger(entry.acceptedAt, 0);
         const key = timelineKey(relayId); const now = this.options.clock.nowSeconds(); requireSafeInteger(now, 0);
-        const result = await updateStore<MessageAcceptance & { snapshot?: StoreSnapshot; mutations?: readonly StoreMutation[] }>(this.options.store, [key, messageKey(message), sequenceKey, ...effects?.queries ?? []], snapshot => {
+        const own = message.sender === this.options.accountId; const effectQueries = effects?.queries ?? [];
+        const result = await (own ? updateWithOutboxRetention : updateStore)<MessageAcceptance & { snapshot?: StoreSnapshot; mutations?: readonly StoreMutation[] }>(this.options.store, [key, messageKey(message), sequenceKey, ...effectQueries], snapshot => {
             const current = progress(snapshot.sets[0]![0]?.value);
-            if (current.sequence >= entry.sequence) return { mutations: [], result: { advanced: false, inserted: false } };
+            if (current.sequence >= entry.sequence) return { mutations: [], result: { advanced: false, inserted: false }, prune: false };
             const inserted = !snapshot.sets[1]!.length;
             const mutations: StoreMutation[] = [{ kind: 'put', ...key, value: { sequence: entry.sequence, hasRetentionGap: hasRetentionGap || current.hasRetentionGap, lastSynchronizedAt: now } }];
             if (!inserted) return { mutations, result: { advanced: true, inserted: false } };
-            const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(3) }; const effectMutations = effects?.plan(effectSnapshot) ?? [];
+            const effectSnapshot = { ...snapshot, sets: snapshot.sets.slice(3, 3 + effectQueries.length) }; const effectMutations = effects?.plan(effectSnapshot) ?? [];
             const insertion = insertMessage(message, snapshot.sets[2]![0]?.value, this.options.accountId);
             mutations.push(...effectMutations, ...insertion.mutations);
             return { mutations, result: { advanced: true, inserted: true, localSequence: insertion.localSequence, snapshot: effectSnapshot, mutations: effectMutations } };

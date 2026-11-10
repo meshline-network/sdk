@@ -1,6 +1,6 @@
 {
   "source": "../../../dotnet/docs/api/coverage.json",
-  "sourceSha256": "3de3c1b4621fdfbda3cdee744ec5f5f422a285e9348410d4831825cc50be6cff",
+  "sourceSha256": "567ebc41d48faa671c777f45872ca8b86f46ac607f290e06620c672b4280b9d1",
   "sdkBaseline": "f024be46d6ff288739d1555ef9e6607b914d571d",
   "note": "Symbol mappings are a worklist, not a feature-coverage or acceptance claim. Review overloads and behavioral requirements separately.",
   "symbols": [
@@ -1314,6 +1314,13 @@
       "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
     },
     {
+      "symbol": "M:Meshline.Components.ChannelManager.ExportBackupAsync(System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.ExportBackupAsync(System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/channel.ts",
+      "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+    },
+    {
       "symbol": "M:Meshline.Components.ChannelManager.FollowAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.FollowAsync(Meshline.Models.Client.ChannelRef,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1351,6 +1358,13 @@
     {
       "symbol": "M:Meshline.Components.ChannelManager.GetSyncStatusAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/channel.ts",
+      "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
+    },
+    {
+      "symbol": "M:Meshline.Components.ChannelManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable{System.Text.Json.JsonElement},System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.ChannelManager.md#Meshline.Components.ChannelManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/channel.ts",
       "notes": "Descriptor/post lifecycle, follows, historical permission verification, edit catch-up, deletion tombstones, subscriptions and durable recovery implemented; full runtime acceptance remains pending."
@@ -1510,6 +1524,13 @@
       "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
     },
     {
+      "symbol": "M:Meshline.Components.DeviceManager.ExportBackupAsync(System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.ExportBackupAsync(System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/device.ts",
+      "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+    },
+    {
       "symbol": "M:Meshline.Components.DeviceManager.GetAuthorizationState(System.String)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.GetAuthorizationState(string)",
       "status": "mapped-requires-behavior-review",
@@ -1547,6 +1568,13 @@
     {
       "symbol": "M:Meshline.Components.DeviceManager.GetOwnDeviceStateAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.GetOwnDeviceStateAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/device.ts",
+      "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
+    },
+    {
+      "symbol": "M:Meshline.Components.DeviceManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable{System.Text.Json.JsonElement},System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.DeviceManager.md#Meshline.Components.DeviceManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/device.ts",
       "notes": "Protected local keys, renewal, publication, own/public/contact-authorized resolution, home synchronization and contact-safe removeDevice. Removal requires accepted replacement signatures and treats staging as incomplete."
@@ -1671,6 +1699,13 @@
       "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
     },
     {
+      "symbol": "M:Meshline.Components.GroupManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/group.ts",
+      "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
+    },
+    {
       "symbol": "M:Meshline.Components.GroupManager.GetApplicationsAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetApplicationsAsync(Meshline.Models.Client.GroupRef,Meshline.Models.Client.PageRequest,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1750,6 +1785,13 @@
     {
       "symbol": "M:Meshline.Components.GroupManager.GetSyncStatusAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/group.ts",
+      "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
+    },
+    {
+      "symbol": "M:Meshline.Components.GroupManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable{System.Text.Json.JsonElement},System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.GroupManager.md#Meshline.Components.GroupManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/group.ts",
       "notes": "Lifecycle, messages/nicknames, member administration, invitations/admission, member-key recovery, protected secret rotation, account-device synchronization and durable runtime recovery are implemented. Full .NET workflow comparison remains required; this mapping is not a parity claim."
@@ -1909,6 +1951,13 @@
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
     },
     {
+      "symbol": "M:Meshline.Components.MessageManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.ExportBackupAsync(Meshline.Models.Client.BackupSelection,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
       "symbol": "M:Meshline.Components.MessageManager.GetContactAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetContactAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1958,6 +2007,13 @@
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
     },
     {
+      "symbol": "M:Meshline.Components.MessageManager.GetOutgoingMessageAsync(System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetOutgoingMessageAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
       "symbol": "M:Meshline.Components.MessageManager.GetSendStatusAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetSendStatusAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -1967,6 +2023,13 @@
     {
       "symbol": "M:Meshline.Components.MessageManager.GetSyncStatusAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.GetSyncStatusAsync(string,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/components/message.ts",
+      "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
+    },
+    {
+      "symbol": "M:Meshline.Components.MessageManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable{System.Text.Json.JsonElement},System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Components.MessageManager.md#Meshline.Components.MessageManager.ImportBackupAsync(System.Collections.Generic.IAsyncEnumerable_System.Text.Json.JsonElement_,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/components/message.ts",
       "notes": "Public encrypted message/contact workflows, snapshot readers, events, cancellation, outbox recovery and multi-device grant maintenance. MeshlineClient and group account-device synchronization use these engines."
@@ -2294,6 +2357,13 @@
       "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
     },
     {
+      "symbol": "M:Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,System.String,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.ExportBackupAsync(System.IO.Stream,string,Meshline.Models.Client.BackupOptions,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client.ts",
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
+    },
+    {
       "symbol": "M:Meshline.MeshlineClient.GetConversationAsync(System.String,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.GetConversationAsync(string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
@@ -2303,6 +2373,13 @@
     {
       "symbol": "M:Meshline.MeshlineClient.GetConversationsAsync(Meshline.Models.Client.ConversationQuery,System.Threading.CancellationToken)",
       "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.GetConversationsAsync(Meshline.Models.Client.ConversationQuery,System.Threading.CancellationToken)",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/client.ts",
+      "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
+    },
+    {
+      "symbol": "M:Meshline.MeshlineClient.ImportBackupAsync(System.IO.Stream,System.String,System.Threading.CancellationToken)",
+      "documentation": "../../../dotnet/docs/api/Meshline.MeshlineClient.md#Meshline.MeshlineClient.ImportBackupAsync(System.IO.Stream,string,System.Threading.CancellationToken)",
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client.ts",
       "notes": "Unified idempotent establishment, separate cached startup, durable device/route/profile replay, explicit recovery/migration and conversations. Mappings are not platform acceptance evidence."
@@ -2334,6 +2411,11 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client/account-establishment.ts",
       "notes": "Unified setup uses Promise<void> and AccountEstablishmentError with camel-case reasons, complete device selection and continuity/key details. Operation IDs remain internal."
+    },
+    {
+      "symbol": "M:Meshline.Models.Client.BackupSelection.Only(System.String[])",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.Only(string[])",
+      "status": "unmapped"
     },
     {
       "symbol": "M:Meshline.Models.Client.ClientOptions.Validate",
@@ -3634,6 +3716,21 @@
       "status": "unmapped"
     },
     {
+      "symbol": "M:Meshline.Storage.Migrations.PortableBackup.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.PortableBackup.md#Meshline.Storage.Migrations.PortableBackup.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.PortableBackup.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.PortableBackup.md#Meshline.Storage.Migrations.PortableBackup.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "M:Meshline.Storage.Migrations.PortableBackup.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.PortableBackup.md#Meshline.Storage.Migrations.PortableBackup.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)",
+      "status": "unmapped"
+    },
+    {
       "symbol": "M:Meshline.Storage.Migrations.ProfileUpdateDiagnostics.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.ProfileUpdateDiagnostics.md#Meshline.Storage.Migrations.ProfileUpdateDiagnostics.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)",
       "status": "unmapped"
@@ -4417,6 +4514,41 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/client/account-operations.ts",
       "notes": "Explicit recovery accepts previous device state and revision overrides; does not run as a startup fallback."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.BackupOptions.DirectHistory",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupOptions.md#Meshline.Models.Client.BackupOptions.DirectHistory",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.BackupOptions.GroupHistory",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupOptions.md#Meshline.Models.Client.BackupOptions.GroupHistory",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.BackupReport.Applied",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md#Meshline.Models.Client.BackupReport.Applied",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.BackupReport.Conflicts",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md#Meshline.Models.Client.BackupReport.Conflicts",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.BackupReport.Unchanged",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md#Meshline.Models.Client.BackupReport.Unchanged",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.BackupSelection.All",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.All",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.BackupSelection.None",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md#Meshline.Models.Client.BackupSelection.None",
+      "status": "unmapped"
     },
     {
       "symbol": "P:Meshline.Models.Client.ChannelInfo.Descriptor",
@@ -5327,6 +5459,20 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/messages/outbox.ts",
       "notes": "Durable delivery-state projection, uncertainty and accepted-relay binding."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.OutgoingMessageInfo.Message",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.OutgoingMessageInfo.md#Meshline.Models.Client.OutgoingMessageInfo.Message",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/messages/outbox.ts",
+      "notes": "Direct-message content and durable send status from one outbox snapshot; synchronized history has a separate local sequence."
+    },
+    {
+      "symbol": "P:Meshline.Models.Client.OutgoingMessageInfo.Status",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.OutgoingMessageInfo.md#Meshline.Models.Client.OutgoingMessageInfo.Status",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/messages/outbox.ts",
+      "notes": "Direct-message content and durable send status from one outbox snapshot; synchronized history has a separate local sequence."
     },
     {
       "symbol": "P:Meshline.Models.Client.PageRequest.Cursor",
@@ -8514,6 +8660,21 @@
       "notes": "Explicit recovery accepts previous device state and revision overrides; does not run as a startup fallback."
     },
     {
+      "symbol": "T:Meshline.Models.Client.BackupOptions",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupOptions.md",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.BackupReport",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupReport.md",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.BackupSelection",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.BackupSelection.md",
+      "status": "unmapped"
+    },
+    {
       "symbol": "T:Meshline.Models.Client.ChannelInfo",
       "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.ChannelInfo.md",
       "status": "mapped-requires-behavior-review",
@@ -8799,6 +8960,13 @@
       "status": "mapped-requires-behavior-review",
       "typescript": "../../packages/sdk/src/messages/outbox.ts",
       "notes": "Durable delivery-state projection, uncertainty and accepted-relay binding."
+    },
+    {
+      "symbol": "T:Meshline.Models.Client.OutgoingMessageInfo",
+      "documentation": "../../../dotnet/docs/api/Meshline.Models.Client.OutgoingMessageInfo.md",
+      "status": "mapped-requires-behavior-review",
+      "typescript": "../../packages/sdk/src/messages/outbox.ts",
+      "notes": "Direct-message content and durable send status from one outbox snapshot; synchronized history has a separate local sequence."
     },
     {
       "symbol": "T:Meshline.Models.Client.PageRequest",
@@ -9793,6 +9961,11 @@
     {
       "symbol": "T:Meshline.Storage.Migrations.LatestStatePublications",
       "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.LatestStatePublications.md",
+      "status": "unmapped"
+    },
+    {
+      "symbol": "T:Meshline.Storage.Migrations.PortableBackup",
+      "documentation": "../../../dotnet/docs/api/Meshline.Storage.Migrations.PortableBackup.md",
       "status": "unmapped"
     },
     {

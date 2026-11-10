@@ -213,12 +213,13 @@ export async function verifyProcessRecovery(options: InteropOptions, state: Proc
         const proof = sdk.encodeUtf8('process recovered signing identity');
         check(sdk.certificateId(client.device!, local.context) === state.deviceId && sdk.verifyDevice(proof, await client.deviceManager.sign(proof), client.device!.signingPublicKey)
             && (await messages.getSendStatus(state.messageId))?.state === 'submissionUnknown', 'Initialization lost identity or did not recover submitting state'); pass('initialization restores the signing identity and marks the interrupted submission unknown');
-        check(await messages.getContact(state.remoteAccount) && (await all(messages.getMessageHistory(state.remoteAccount))).some(value => value.key.messageId === state.messageId && value.body?.text === 'direct accepted before process termination 😀'), 'Contact grant or local direct history was lost'); pass('contact authorization and locally queued plaintext history survive process termination');
+        check(await messages.getContact(state.remoteAccount) && (await messages.getOutgoingMessage(state.messageId))?.message.body?.text === 'direct accepted before process termination 😀', 'Contact grant or outgoing content was lost'); pass('contact authorization and queued outgoing content survive process termination');
         check((await all(channels.getFollowed())).some(value => value.ref.channelId === state.channel.channelId) && (await all(channels.getPosts({ channelId: state.channel.channelId }))).some(value => value.body?.text === 'channel history before termination'), 'Followed channel or previously accepted history was lost');
         pass('followed channel and previously accepted local posts survive process termination');
         await messages.start(); await groups.start(); await channels.start();
         for (const member of members) await member.local.client.groupManager.start();
         await until('outbox, rotation, publication and member request reconciliation', async () => (await messages.getSendStatus(state.messageId))?.state === 'targetAccepted'
+            && (await all(messages.getMessageHistory(state.remoteAccount))).some(value => value.key.messageId === state.messageId && value.body?.text === 'direct accepted before process termination 😀')
             && (await store.read([{ collection: 'group_operations' }, { collection: 'group_rotations' }, { collection: 'channel_operations' }])).sets.every(rows => rows.length === 0)
             && (await Promise.all(members.map(async member => (await member.local.store.read([{ collection: 'group_operations' }])).sets[0]!.length))).every(count => count === 0));
         pass('runtime recovery retains confirmed send status and clears rotation, publication and both member submissions without application resubmission');

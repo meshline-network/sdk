@@ -261,7 +261,7 @@ test('due work has stable chronological ordering, skips terminal entries and res
 
 test('recovery keeps 1000 terminal records with stable tie ordering and preserves all pending states', async () => {
     const f = await fixture(); const failedId = 'msg_EBESExQVFhcYGRobHB0eHw'; const canceledId = 'msg_ICEiIyQlJicoKSorLC0uLw';
-    const record = (messageId: string, state: OutboxRecord['state'], offset: number): OutboxRecord => ({ ...f.record, state,
+    const record = (messageId: string, state: OutboxRecord['state'], offset: number): OutboxRecord => ({ ...f.record, state, isDirect: state !== 'targetAccepted',
         request: { ...f.request, envelope: { ...f.request.envelope, messageId, createdAt: f.clock.wall + offset } },
         ...(['relayAccepted', 'targetAccepted'].includes(state) ? { acceptedAt: f.clock.wall } : {}) });
     const pending = (['queued', 'submitting', 'submissionUnknown', 'relayAccepted'] as const).map(state => record(createIdentifier('message'), state, -100));
@@ -277,7 +277,7 @@ test('recovery keeps 1000 terminal records with stable tie ordering and preserve
 
 test('late completion and concurrent terminal writes enforce the shared bound without replaying a send', async () => {
     const f = await fixture(); const oldest = createIdentifier('message'); const recent = createIdentifier('message'); const concurrent = createIdentifier('message');
-    const record = (messageId: string, state: OutboxRecord['state'], offset: number): OutboxRecord => ({ ...f.record, state,
+    const record = (messageId: string, state: OutboxRecord['state'], offset: number): OutboxRecord => ({ ...f.record, state, isDirect: false,
         request: { ...f.request, envelope: { ...f.request.envelope, messageId, createdAt: f.clock.wall + offset } },
         ...(state === 'targetAccepted' ? { acceptedAt: f.clock.wall } : {}) });
     const snapshot = await f.store.read([]); await f.store.commit(snapshot.version, [record(id, 'queued', -100), record(oldest, 'targetAccepted', -10), record(recent, 'queued', 200),
@@ -295,4 +295,40 @@ test('late completion and concurrent terminal writes enforce the shared bound wi
     expect(inject).toBe(false); expect(f.calls).toHaveLength(1); expect(await f.queue.get(oldest)).toBeUndefined();
     expect((await f.queue.get(recent))!.state).toBe('targetAccepted'); expect((await f.queue.get(concurrent))!.state).toBe('targetAccepted');
     expect((await f.store.read([{ collection: 'message_outbox' }])).sets[0]).toHaveLength(1000);
+});
+
+test('accepted direct sends remain protected until history exists, including later delivery failure', async () => {
+    const f = await fixture(); const failed = createIdentifier('message');
+    const entry = (messageId: string, state: OutboxRecord['state'], accepted: boolean): OutboxRecord => ({ ...f.record, state, request: { ...f.request, envelope: { ...f.request.envelope, messageId } }, ...(accepted ? { acceptedAt: f.clock.wall } : {}) });
+    const snapshot = await f.store.read([]); await f.store.commit(snapshot.version, [entry(id, 'targetAccepted', true), entry(failed, 'failed', true), ...Array.from({ length: 1001 }, () => entry(createIdentifier('message'), 'canceled', false))].map(value => ({ kind: 'put', ...outboxKey(value.request.envelope.messageId), value: encodeOutbox(value) })));
+    await f.queue.recover(); expect((await f.queue.get(id))!.state).toBe('targetAccepted'); expect((await f.queue.get(failed))!.state).toBe('failed'); expect((await f.store.read([{ collection: 'message_outbox' }])).sets[0]).toHaveLength(1002);
+});
+
+test('small outboxes never query history during state changes or recovery', async () => {
+    const f = await fixture(); const read = vi.spyOn(f.store, 'read');
+    expect((await f.queue.cancel(id))!.current.state).toBe('canceled'); await f.queue.recover();
+    expect(read.mock.calls.flatMap(([queries]) => queries).filter(query => query.collection === 'messages')).toEqual([]);
+});
+
+test('retention checks only accepted candidate identities and retries if their snapshot changes', async () => {
+    const f = await fixture(); const messageKey = `${f.request.envelope.from}|${id}`;
+    const accepted = { ...f.record, state: 'targetAccepted' as const, acceptedAt: f.clock.wall,
+        request: { ...f.request, envelope: { ...f.request.envelope, createdAt: f.clock.wall - 1 } } };
+    const snapshot = await f.store.read([]);
+    await f.store.commit(snapshot.version, [accepted, ...Array.from({ length: 1000 }, () => ({ ...f.record, state: 'canceled' as const,
+        request: { ...f.request, envelope: { ...f.request.envelope, messageId: createIdentifier('message') } } }))]
+        .map(value => ({ kind: 'put', ...outboxKey(value.request.envelope.messageId), value: encodeOutbox(value) })));
+    const read = f.store.read.bind(f.store); let concurrent = false;
+    const observed = vi.spyOn(f.store, 'read').mockImplementation(async (queries, signal) => {
+        if (!concurrent && queries.some(query => query.collection === 'messages')) {
+            concurrent = true; const current = await read([]);
+            await f.store.commit(current.version, [{ kind: 'put', collection: 'messages', key: messageKey, value: { synchronized: true } }]);
+        }
+        return read(queries, signal);
+    });
+    await f.queue.recover(); expect(concurrent).toBe(true); expect(await f.queue.get(id)).toBeUndefined();
+    expect(observed.mock.calls.flatMap(([queries]) => queries).filter(query => query.collection === 'messages')).toEqual([
+        { collection: 'messages', key: messageKey }, { collection: 'messages', key: messageKey },
+    ]);
+    expect((await read([{ collection: 'message_outbox' }])).sets[0]).toHaveLength(1000); expect(f.calls).toHaveLength(0);
 });

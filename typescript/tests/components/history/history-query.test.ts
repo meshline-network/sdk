@@ -16,7 +16,11 @@ async function fixture(kind: typeof kinds[number]) {
     let reopen: () => Promise<void>; let append: () => Promise<unknown>;
     if (kind === 'direct') {
         const network = new MessagingNetwork(); resources.push(network); let owner = await network.client(71);
-        append = () => owner.messages.sendMessage(owner.accountId, { body: { contentType: 'text/plain', text: 'item' } });
+        append = async () => {
+            const sent = await owner.messages.sendMessage(owner.accountId, { body: { contentType: 'text/plain', text: 'item' } }); await owner.messages.start();
+            await network.until(async () => (await owner.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted');
+            await owner.messages.synchronize(network.descriptor.relayId); await owner.messages.stop(); return sent;
+        };
         for (let i = 0; i < 5; i++) await append();
         open = (bounds, signal) => owner.messages.getMessageHistory(owner.accountId, bounds, signal);
         unfiltered = () => owner.messages.getMessageHistory();
@@ -140,10 +144,14 @@ test.each(['group', 'channel'] as const)('%s sequence bounds require a resource 
 test('indexed direct readers bound payload reads and retry canceled projection without skipping', async () => {
     const network = new MessagingNetwork(); resources.push(network); const owner = await network.client(72);
     for (let i = 0; i < 6; i++) await owner.messages.sendMessage(owner.accountId, { body: { contentType: 'text/plain', text: `item-${i}` } });
+    await owner.messages.start(); await network.until(async () => {
+        const query = await owner.messages.getMessageHistory(); try { return (await query.readNext(10)).length === 6; } finally { await query.dispose(); }
+    }); await owner.messages.stop();
     await (await owner.messages.getMessageHistory()).dispose(); // Existing stores are indexed once.
     const underlying = owner.store.read.bind(owner.store);
+    const known = await owner.messages.getMessageHistory(owner.accountId); const positions = (await known.readNext(10)).map(value => value.localSequence); await known.dispose();
     const reads = vi.spyOn(owner.store, 'read'); const queries = vi.spyOn(owner.store, 'openQuery');
-    const reader = await owner.messages.getMessageHistory(owner.accountId, { before: 6 });
+    const reader = await owner.messages.getMessageHistory(owner.accountId, { before: positions[5]! });
     try {
         const controller = new AbortController();
         reads.mockImplementationOnce(async (query, signal) => {
@@ -152,12 +160,13 @@ test('indexed direct readers bound payload reads and retry canceled projection w
         await expect(reader.readNext(2, controller.signal)).rejects.toThrow('projection canceled');
         reads.mockRestore(); const subsequent = vi.spyOn(owner.store, 'read');
         const concurrent = await Promise.all([reader.readNext(2), reader.readNext(2)]);
-        expect(concurrent.map(batch => batch.map(value => value.localSequence))).toEqual([[4, 5], [2, 3]]);
+        expect(concurrent.map(batch => batch.map(value => value.localSequence))).toEqual([positions.slice(3, 5), positions.slice(1, 3)]);
         expect(subsequent.mock.calls.flatMap(([query]) => query).filter(query => query.collection === 'messages')).toHaveLength(2);
         expect(subsequent.mock.calls.flatMap(([query]) => query).filter(query => query.collection === 'messages').every(query => query.key !== undefined)).toBe(true);
-        expect(queries.mock.calls[0]![0]).toMatchObject({ collection: 'message_history', reverse: true, before: `${owner.accountId}|0000000000000006` });
+        expect(queries.mock.calls[0]![0]).toMatchObject({ collection: 'message_history', reverse: true, before: `${owner.accountId}|${String(positions[5]).padStart(16, '0')}` });
     } finally { await reader.dispose(); }
-    await owner.messages.sendMessage(owner.accountId, { body: { contentType: 'text/plain', text: 'new' } });
-    const newest = await owner.messages.getMessageHistory(undefined, { after: 6 });
-    try { expect((await newest.readNext(1))[0]!.localSequence).toBe(7); } finally { await newest.dispose(); }
+    const sent = await owner.messages.sendMessage(owner.accountId, { body: { contentType: 'text/plain', text: 'new' } }); await owner.messages.start();
+    await network.until(async () => (await owner.messages.getSendStatus(sent.messageId))?.state === 'targetAccepted'); await owner.messages.synchronize(network.descriptor.relayId); await owner.messages.stop();
+    const newest = await owner.messages.getMessageHistory(undefined, { after: positions[5]! });
+    try { expect((await newest.readNext(1))[0]!.localSequence).toBeGreaterThan(positions[5]!); } finally { await newest.dispose(); }
 });
